@@ -1,0 +1,8 @@
+{
+  "name": "Broken Agent",
+  "version": "1.0.0",
+  "scopes": [],
+  "network": { "allowlist": [] },
+  "approvalGates": [],
+  "dataClasses": []
+}

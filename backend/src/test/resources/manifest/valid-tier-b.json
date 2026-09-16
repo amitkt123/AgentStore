@@ -1,0 +1,15 @@
+{
+  "name": "WhatsApp Collections Agent",
+  "version": "1.0.0",
+  "scopes": [
+    { "type": "READ", "resource": "invoice", "description": "Read overdue invoices" },
+    { "type": "WRITE", "resource": "whatsapp_message", "description": "Send payment reminders" }
+  ],
+  "network": { "allowlist": ["graph.facebook.com"] },
+  "costEnvelope": { "currency": "INR", "maxPerRun": 200.00, "pricingUnit": "OUTCOME", "unitPrice": 5.00, "unitLabel": "invoice_cycle" },
+  "modelRequirements": { "provider": "anthropic", "model": "claude-sonnet-5" },
+  "approvalGates": [
+    { "trigger": "MESSAGE_CUSTOMER", "description": "Confirm before sending reminders to a customer" }
+  ],
+  "dataClasses": ["INVOICE", "CONTACT"]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Bank Reconciliation Agent",
+  "version": "1.0.0",
+  "scopes": [
+    { "type": "READ", "resource": "bank_statement", "description": "Read uploaded bank statement rows" }
+  ],
+  "network": { "allowlist": [] },
+  "costEnvelope": { "currency": "INR", "maxPerRun": 500.00, "pricingUnit": "METERED", "unitPrice": 2.00, "unitLabel": "reconciled_transaction" },
+  "modelRequirements": { "provider": "anthropic", "model": "claude-sonnet-5" },
+  "approvalGates": [],
+  "dataClasses": ["BANK_STATEMENT"]
+}
