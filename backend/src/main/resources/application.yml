@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: agent-store-platform
+  datasource:
+    url: jdbc:postgresql://localhost:5432/agentstore
+    username: agentstore
+    password: agentstore
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+agentstore:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef-0123456789}
+    expiration-minutes: 60
+  secrets:
+    encryption-key-base64: ${SECRET_ENCRYPTION_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+  e2b:
+    api-key: ${E2B_API_KEY:}
+    base-url: https://api.e2b.app
+  callback:
+    base-url: ${CALLBACK_BASE_URL:http://localhost:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

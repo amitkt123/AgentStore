@@ -1,0 +1,1 @@
+-- Baseline migration; module-owned tables are added by later tasks' migrations.
