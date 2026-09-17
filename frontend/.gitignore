@@ -10,3 +10,8 @@
 # misc
 .DS_Store
 *.tsbuildinfo
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
