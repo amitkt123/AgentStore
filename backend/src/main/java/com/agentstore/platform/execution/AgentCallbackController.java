@@ -41,20 +41,33 @@ public class AgentCallbackController {
 
         runStepRepository.save(new RunStep(null, run, request.kind(), toJson(request.detail())));
 
-        if (request.kind() == RunStepKind.COST) {
-            var manifest = manifestParser.parse(run.getAgentVersion().getManifestJson());
-            BigDecimal quantity = new BigDecimal(String.valueOf(request.detail().getOrDefault("quantity", "0")));
-            BigDecimal amount = quantity.multiply(manifest.costEnvelope().unitPrice());
-            run.setTotalCharged(run.getTotalCharged().add(amount));
-            if (run.getTotalCharged().compareTo(run.getCostCap()) > 0) {
-                sandboxProvider.kill(run.getSandboxId());
-                run.setStatus(RunStatus.FAILED);
-                run.setCompletedAt(Instant.now());
+        switch (request.kind()) {
+            case GATE -> {
+                run.setStatus(RunStatus.AWAITING_APPROVAL);
+                runRepository.save(run);
             }
-            runRepository.save(run);
+            case COST -> {
+                var manifest = manifestParser.parse(run.getAgentVersion().getManifestJson());
+                BigDecimal quantity = new BigDecimal(String.valueOf(request.detail().getOrDefault("quantity", "0")));
+                BigDecimal amount = quantity.multiply(manifest.costEnvelope().unitPrice());
+                run.setTotalCharged(run.getTotalCharged().add(amount));
+                if (run.getTotalCharged().compareTo(run.getCostCap()) > 0) {
+                    sandboxProvider.kill(run.getSandboxId());
+                    run.setStatus(RunStatus.FAILED);
+                    run.setCompletedAt(Instant.now());
+                }
+                runRepository.save(run);
+            }
+            default -> { /* READ/WRITE/COMPLETE/FAILED handled in Task 20 */ }
         }
 
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/gate-status")
+    public GateStatusResponse gateStatus(@PathVariable UUID runId, @RequestHeader("Authorization") String authorization) {
+        Run run = authorize(runId, authorization);
+        return GateStatusResponse.from(run.getStatus());
     }
 
     private Run authorize(UUID runId, String authorizationHeader) {

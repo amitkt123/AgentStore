@@ -85,4 +85,36 @@ public class RunController {
 
         return RunResponse.from(run);
     }
+
+    @PostMapping("/{runId}/approve")
+    @PreAuthorize("hasRole('BUYER_APPROVER')")
+    public RunResponse approve(@PathVariable java.util.UUID runId, @RequestBody ApproveRunRequest request) {
+        Run run = ownedAwaitingApprovalRun(runId);
+        run.setStatus(RunStatus.RUNNING);
+        return RunResponse.from(runRepository.save(run));
+    }
+
+    @PostMapping("/{runId}/reject")
+    @PreAuthorize("hasRole('BUYER_APPROVER')")
+    public RunResponse reject(@PathVariable java.util.UUID runId, @RequestBody ApproveRunRequest request) {
+        Run run = ownedAwaitingApprovalRun(runId);
+        run.setStatus(RunStatus.CANCELLED);
+        run.setCompletedAt(Instant.now());
+        sandboxProvider.kill(run.getSandboxId());
+        return RunResponse.from(runRepository.save(run));
+    }
+
+    private Run ownedAwaitingApprovalRun(java.util.UUID runId) {
+        Run run = runRepository.findById(runId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found"));
+        var claims = (com.agentstore.platform.identity.JwtService.Claims)
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!run.getConnection().getBuyerOrg().getId().equals(claims.orgId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Run not owned by caller's org");
+        }
+        if (run.getStatus() != RunStatus.AWAITING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Run is not awaiting approval: " + run.getStatus());
+        }
+        return run;
+    }
 }
