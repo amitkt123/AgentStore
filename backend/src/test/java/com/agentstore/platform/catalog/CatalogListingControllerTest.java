@@ -55,7 +55,11 @@ class CatalogListingControllerTest extends AbstractIntegrationTest {
                 new ParameterizedTypeReference<List<CatalogListingResponse>>() {});
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(1);
-        assertThat(response.getBody().get(0).agentName()).isEqualTo("Bank Reconciliation");
+        assertThat(response.getBody())
+                .filteredOn(entry -> entry.agentId().equals(liveAgent.getId()))
+                .singleElement()
+                .satisfies(entry -> assertThat(entry.agentName()).isEqualTo("Bank Reconciliation"));
+        assertThat(response.getBody())
+                .noneMatch(entry -> entry.agentId().equals(draftAgent.getId()));
     }
 }
