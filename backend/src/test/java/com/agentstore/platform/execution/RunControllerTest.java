@@ -1,0 +1,79 @@
+package com.agentstore.platform.execution;
+
+import com.agentstore.platform.AbstractIntegrationTest;
+import com.agentstore.platform.catalog.*;
+import com.agentstore.platform.identity.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.*;
+
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class RunControllerTest extends AbstractIntegrationTest {
+
+    @LocalServerPort
+    int port;
+    @Autowired
+    TestRestTemplate rest;
+    @Autowired
+    JwtService jwtService;
+    @Autowired
+    OrgRepository orgRepository;
+    @Autowired
+    AgentRepository agentRepository;
+    @Autowired
+    AgentVersionRepository agentVersionRepository;
+    @Autowired
+    ConnectionRepository connectionRepository;
+    @Autowired
+    RunRepository runRepository;
+    @Autowired
+    FakeSandboxProvider fakeSandboxProvider;
+
+    String url(String path) {
+        return "http://localhost:" + port + path;
+    }
+
+    @Test
+    void triggeringARunCreatesASandboxWithManifestAllowlist() throws Exception {
+        Org developer = orgRepository.save(new Org(null, "DevCo", OrgType.DEVELOPER));
+        Org buyer = orgRepository.save(new Org(null, "Acme", OrgType.BUYER));
+        Agent agent = agentRepository.save(new Agent(null, developer, "Collections", "collections", "d"));
+        String manifest = Files.readString(Path.of("src/test/resources/manifest/valid-tier-b.json"));
+        AgentVersion version = new AgentVersion(null, agent, "1.0.0", manifest, "collections-template-v1",
+                VersionStatus.LIVE, Tier.TIER_B, "cl");
+        version.setApprovedAt(Instant.now());
+        agentVersionRepository.save(version);
+        Connection connection = connectionRepository.save(new Connection(null, buyer, agent,
+                List.of("invoice", "whatsapp_message"), new BigDecimal("200.00"), ConnectionStatus.ACTIVE));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), buyer.getId(), UserRole.BUYER_ADMIN));
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        var request = new HttpEntity<>(new TriggerRunRequest(connection.getId()), headers);
+
+        var response = rest.postForEntity(url("/api/v1/runs"), request, RunResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().status()).isEqualTo(RunStatus.RUNNING);
+
+        Run saved = runRepository.findById(response.getBody().id()).orElseThrow();
+        assertThat(saved.getSandboxId()).isNotBlank();
+        assertThat(saved.getCallbackToken()).isNotBlank();
+
+        var lastSpec = fakeSandboxProvider.createdSpecs().get(fakeSandboxProvider.createdSpecs().size() - 1);
+        assertThat(lastSpec.templateId()).isEqualTo("collections-template-v1");
+        assertThat(lastSpec.allowOut()).contains("graph.facebook.com");
+        assertThat(lastSpec.envVars()).containsEntry("AGENT_RUN_ID", saved.getId().toString());
+        assertThat(lastSpec.envVars()).containsEntry("AGENT_CALLBACK_TOKEN", saved.getCallbackToken());
+    }
+}
