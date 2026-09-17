@@ -1,0 +1,52 @@
+package com.agentstore.platform.execution;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+
+import java.util.Map;
+
+@Component
+@Profile("e2b")
+public class E2bSandboxProvider implements SandboxProvider {
+
+    private final RestClient restClient;
+    private final String apiKey;
+
+    public E2bSandboxProvider(RestClient.Builder builder,
+                               @Value("${agentstore.e2b.base-url}") String baseUrl,
+                               @Value("${agentstore.e2b.api-key}") String apiKey) {
+        this.restClient = builder.baseUrl(baseUrl).build();
+        this.apiKey = apiKey;
+    }
+
+    @Override
+    public SandboxHandle create(SandboxSpec spec) {
+        Map<String, Object> body = Map.of(
+                "templateID", spec.templateId(),
+                "timeout", spec.timeoutSeconds(),
+                "envVars", spec.envVars(),
+                "network", Map.of("allowOut", spec.allowOut()));
+
+        Map<?, ?> response = restClient.post()
+                .uri("/sandboxes")
+                .header("X-API-Key", apiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(Map.class);
+
+        return new SandboxHandle((String) response.get("sandboxID"));
+    }
+
+    @Override
+    public void kill(String sandboxId) {
+        restClient.delete()
+                .uri("/sandboxes/{id}", sandboxId)
+                .header("X-API-Key", apiKey)
+                .retrieve()
+                .toBodilessEntity();
+    }
+}
