@@ -14,7 +14,7 @@ export function PermissionStatementDoc({ manifest, mode, onGrantChange }: Props)
 
   return (
     <aside className="bg-doc border border-line rounded p-6" aria-label="Permission statement">
-      <h3 className="font-serif text-lg">{manifest.name}</h3>
+      {mode !== "listing" && <h3 className="font-serif text-lg">{manifest.name}</h3>}
       <p className="font-serif italic text-ink2 text-sm mb-4">What this agent may do</p>
 
       {mode === "grant" ? (
