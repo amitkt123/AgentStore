@@ -3,7 +3,6 @@ package com.agentstore.platform.ledger;
 import com.agentstore.platform.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -21,7 +20,6 @@ class LedgerServiceWalletTest extends AbstractIntegrationTest {
     WalletRepository walletRepository;
 
     @Test
-    @Transactional
     void chargingDebitsTheWalletExactlyOnce() {
         UUID orgId = UUID.randomUUID();
         Wallet wallet = new Wallet(null, orgId, new BigDecimal("1000.00"), null);

@@ -9,7 +9,6 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -53,7 +52,6 @@ public class RunController {
     }
 
     @PostMapping
-    @Transactional
     @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
     public RunResponse trigger(@Valid @RequestBody TriggerRunRequest request) {
         Connection connection = connectionRepository.findById(request.connectionId())
