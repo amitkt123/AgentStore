@@ -16,12 +16,14 @@ import java.util.UUID;
 public class PublishingService {
 
     private final AgentVersionRepository agentVersionRepository;
+    private final ReviewItemRepository reviewItemRepository;
     private final ManifestValidator manifestValidator;
     private final ManifestParser manifestParser;
 
-    public PublishingService(AgentVersionRepository agentVersionRepository, ManifestValidator manifestValidator,
-                              ManifestParser manifestParser) {
+    public PublishingService(AgentVersionRepository agentVersionRepository, ReviewItemRepository reviewItemRepository,
+                              ManifestValidator manifestValidator, ManifestParser manifestParser) {
         this.agentVersionRepository = agentVersionRepository;
+        this.reviewItemRepository = reviewItemRepository;
         this.manifestValidator = manifestValidator;
         this.manifestParser = manifestParser;
     }
@@ -46,10 +48,50 @@ public class PublishingService {
 
         if (isTierB) {
             version.setStatus(VersionStatus.IN_REVIEW);
-        } else {
-            version.setStatus(VersionStatus.LIVE);
-            version.setApprovedAt(Instant.now());
+            version = agentVersionRepository.save(version);
+            reviewItemRepository.save(new ReviewItem(null, version, ReviewStatus.PENDING));
+            return version;
         }
+        version.setStatus(VersionStatus.LIVE);
+        version.setApprovedAt(Instant.now());
         return agentVersionRepository.save(version);
+    }
+
+    public ReviewItem approve(UUID reviewItemId, UUID reviewerUserId, String notes) {
+        ReviewItem item = pendingItem(reviewItemId);
+        item.setStatus(ReviewStatus.APPROVED);
+        item.setReviewerUserId(reviewerUserId);
+        item.setNotes(notes);
+        item.setDecidedAt(Instant.now());
+
+        AgentVersion version = item.getAgentVersion();
+        version.setStatus(VersionStatus.LIVE);
+        version.setApprovedAt(Instant.now());
+        agentVersionRepository.save(version);
+
+        return reviewItemRepository.save(item);
+    }
+
+    public ReviewItem reject(UUID reviewItemId, UUID reviewerUserId, String notes) {
+        ReviewItem item = pendingItem(reviewItemId);
+        item.setStatus(ReviewStatus.REJECTED);
+        item.setReviewerUserId(reviewerUserId);
+        item.setNotes(notes);
+        item.setDecidedAt(Instant.now());
+
+        AgentVersion version = item.getAgentVersion();
+        version.setStatus(VersionStatus.REJECTED);
+        agentVersionRepository.save(version);
+
+        return reviewItemRepository.save(item);
+    }
+
+    private ReviewItem pendingItem(UUID reviewItemId) {
+        ReviewItem item = reviewItemRepository.findById(reviewItemId)
+                .orElseThrow(() -> new IllegalArgumentException("ReviewItem not found: " + reviewItemId));
+        if (item.getStatus() != ReviewStatus.PENDING) {
+            throw new IllegalStateException("ReviewItem already decided: " + item.getStatus());
+        }
+        return item;
     }
 }
