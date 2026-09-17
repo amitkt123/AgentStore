@@ -38,4 +38,15 @@ public class RunDetailController {
                 .map(RunStepResponse::from).toList();
         return new RunDetailResponse(run.getId(), run.getStatus(), run.getCostCap(), run.getTotalCharged(), steps);
     }
+
+    @GetMapping("/mine")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    public java.util.List<RunSummaryResponse> mine(@RequestParam(required = false) RunStatus status) {
+        var claims = (JwtService.Claims)
+                SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        var runs = status == null
+                ? runRepository.findByConnectionBuyerOrgIdOrderByStartedAtDesc(claims.orgId())
+                : runRepository.findByConnectionBuyerOrgIdAndStatusOrderByStartedAtDesc(claims.orgId(), status);
+        return runs.stream().map(RunSummaryResponse::from).toList();
+    }
 }
