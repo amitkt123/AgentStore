@@ -1,5 +1,7 @@
 package com.agentstore.platform.execution;
 
+import com.agentstore.platform.ledger.UsageEvent;
+import com.agentstore.platform.ledger.UsageEventRepository;
 import com.agentstore.platform.manifest.ManifestParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
@@ -18,14 +20,17 @@ public class AgentCallbackController {
 
     private final RunRepository runRepository;
     private final RunStepRepository runStepRepository;
+    private final UsageEventRepository usageEventRepository;
     private final ManifestParser manifestParser;
     private final SandboxProvider sandboxProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AgentCallbackController(RunRepository runRepository, RunStepRepository runStepRepository,
-                                    ManifestParser manifestParser, SandboxProvider sandboxProvider) {
+                                    UsageEventRepository usageEventRepository, ManifestParser manifestParser,
+                                    SandboxProvider sandboxProvider) {
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
+        this.usageEventRepository = usageEventRepository;
         this.manifestParser = manifestParser;
         this.sandboxProvider = sandboxProvider;
     }
@@ -49,7 +54,12 @@ public class AgentCallbackController {
             case COST -> {
                 var manifest = manifestParser.parse(run.getAgentVersion().getManifestJson());
                 BigDecimal quantity = new BigDecimal(String.valueOf(request.detail().getOrDefault("quantity", "0")));
-                BigDecimal amount = quantity.multiply(manifest.costEnvelope().unitPrice());
+                BigDecimal unitCost = manifest.costEnvelope().unitPrice();
+                BigDecimal amount = quantity.multiply(unitCost);
+
+                usageEventRepository.save(new UsageEvent(null, run.getId(), run.getConnection().getBuyerOrg().getId(),
+                        quantity, unitCost, amount));
+
                 run.setTotalCharged(run.getTotalCharged().add(amount));
                 if (run.getTotalCharged().compareTo(run.getCostCap()) > 0) {
                     sandboxProvider.kill(run.getSandboxId());
@@ -58,7 +68,19 @@ public class AgentCallbackController {
                 }
                 runRepository.save(run);
             }
-            default -> { /* READ/WRITE/COMPLETE/FAILED handled in Task 20 */ }
+            case COMPLETE -> {
+                sandboxProvider.kill(run.getSandboxId());
+                run.setStatus(RunStatus.COMPLETED);
+                run.setCompletedAt(Instant.now());
+                runRepository.save(run);
+            }
+            case FAILED -> {
+                sandboxProvider.kill(run.getSandboxId());
+                run.setStatus(RunStatus.FAILED);
+                run.setCompletedAt(Instant.now());
+                runRepository.save(run);
+            }
+            default -> { /* READ/WRITE are trace-only */ }
         }
 
         return ResponseEntity.ok().build();
