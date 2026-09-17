@@ -3,6 +3,7 @@ package com.agentstore.platform.execution;
 import com.agentstore.platform.catalog.AgentVersion;
 import com.agentstore.platform.catalog.AgentVersionRepository;
 import com.agentstore.platform.catalog.VersionStatus;
+import com.agentstore.platform.ledger.WalletRepository;
 import com.agentstore.platform.manifest.ManifestParser;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,11 +33,12 @@ public class RunController {
     private final SandboxProvider sandboxProvider;
     private final RunTokenService runTokenService;
     private final String callbackBaseUrl;
+    private final WalletRepository walletRepository;
 
     public RunController(ConnectionRepository connectionRepository, AgentVersionRepository agentVersionRepository,
                           RunRepository runRepository, SecretRepository secretRepository, SecretService secretService,
                           ManifestParser manifestParser, SandboxProvider sandboxProvider, RunTokenService runTokenService,
-                          @Value("${agentstore.callback.base-url}") String callbackBaseUrl) {
+                          @Value("${agentstore.callback.base-url}") String callbackBaseUrl, WalletRepository walletRepository) {
         this.connectionRepository = connectionRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.runRepository = runRepository;
@@ -46,6 +48,7 @@ public class RunController {
         this.sandboxProvider = sandboxProvider;
         this.runTokenService = runTokenService;
         this.callbackBaseUrl = callbackBaseUrl;
+        this.walletRepository = walletRepository;
     }
 
     @PostMapping
@@ -55,6 +58,11 @@ public class RunController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Connection not found"));
         if (connection.getStatus() != ConnectionStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Connection not active");
+        }
+        var wallet = walletRepository.findByOrgId(connection.getBuyerOrg().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "No wallet for org"));
+        if (wallet.getBalance().compareTo(connection.getSpendCap()) < 0) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient wallet balance for spend cap");
         }
         AgentVersion version = agentVersionRepository
                 .findFirstByAgentIdAndStatusOrderByApprovedAtDesc(connection.getAgent().getId(), VersionStatus.LIVE)

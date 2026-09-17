@@ -3,6 +3,8 @@ package com.agentstore.platform.execution;
 import com.agentstore.platform.AbstractIntegrationTest;
 import com.agentstore.platform.catalog.*;
 import com.agentstore.platform.identity.*;
+import com.agentstore.platform.ledger.Wallet;
+import com.agentstore.platform.ledger.WalletRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -38,6 +40,8 @@ class RunControllerTest extends AbstractIntegrationTest {
     RunRepository runRepository;
     @Autowired
     FakeSandboxProvider fakeSandboxProvider;
+    @Autowired
+    WalletRepository walletRepository;
 
     String url(String path) {
         return "http://localhost:" + port + path;
@@ -55,6 +59,9 @@ class RunControllerTest extends AbstractIntegrationTest {
         agentVersionRepository.save(version);
         Connection connection = connectionRepository.save(new Connection(null, buyer, agent,
                 List.of("invoice", "whatsapp_message"), new BigDecimal("200.00"), ConnectionStatus.ACTIVE));
+        Wallet wallet = new Wallet(null, buyer.getId(), new BigDecimal("1000.00"), null);
+        wallet.setUpdatedAt(Instant.now());
+        walletRepository.save(wallet);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), buyer.getId(), UserRole.BUYER_ADMIN));
