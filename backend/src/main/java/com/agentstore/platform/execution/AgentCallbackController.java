@@ -1,5 +1,6 @@
 package com.agentstore.platform.execution;
 
+import com.agentstore.platform.ledger.LedgerService;
 import com.agentstore.platform.ledger.UsageEvent;
 import com.agentstore.platform.ledger.UsageEventRepository;
 import com.agentstore.platform.manifest.ManifestParser;
@@ -23,16 +24,18 @@ public class AgentCallbackController {
     private final UsageEventRepository usageEventRepository;
     private final ManifestParser manifestParser;
     private final SandboxProvider sandboxProvider;
+    private final LedgerService ledgerService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AgentCallbackController(RunRepository runRepository, RunStepRepository runStepRepository,
                                     UsageEventRepository usageEventRepository, ManifestParser manifestParser,
-                                    SandboxProvider sandboxProvider) {
+                                    SandboxProvider sandboxProvider, LedgerService ledgerService) {
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.usageEventRepository = usageEventRepository;
         this.manifestParser = manifestParser;
         this.sandboxProvider = sandboxProvider;
+        this.ledgerService = ledgerService;
     }
 
     @PostMapping("/events")
@@ -57,8 +60,9 @@ public class AgentCallbackController {
                 BigDecimal unitCost = manifest.costEnvelope().unitPrice();
                 BigDecimal amount = quantity.multiply(unitCost);
 
-                usageEventRepository.save(new UsageEvent(null, run.getId(), run.getConnection().getBuyerOrg().getId(),
-                        quantity, unitCost, amount));
+                UsageEvent usageEvent = usageEventRepository.save(new UsageEvent(null, run.getId(),
+                        run.getConnection().getBuyerOrg().getId(), quantity, unitCost, amount));
+                ledgerService.chargeUsageEvent(usageEvent.getId());
 
                 run.setTotalCharged(run.getTotalCharged().add(amount));
                 if (run.getTotalCharged().compareTo(run.getCostCap()) > 0) {
