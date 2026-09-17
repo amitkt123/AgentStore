@@ -1,0 +1,147 @@
+export type UserRole = "BUYER_ADMIN" | "BUYER_APPROVER" | "DEVELOPER" | "ADMIN";
+export type OrgType = "BUYER" | "DEVELOPER";
+export type VersionStatus = "DRAFT" | "IN_REVIEW" | "LIVE" | "REJECTED";
+export type ScopeType = "READ" | "WRITE";
+export type PricingUnit = "METERED" | "OUTCOME" | "SUBSCRIPTION";
+export type ConnectionStatus = "ACTIVE" | "REVOKED";
+export type RunStatus = "PENDING" | "RUNNING" | "AWAITING_APPROVAL" | "COMPLETED" | "FAILED" | "CANCELLED";
+export type RunStepKind = "READ" | "WRITE" | "GATE" | "COST" | "COMPLETE" | "FAILED";
+export type LedgerEntryType = "CHARGE" | "REVERSAL" | "FEE";
+export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface AuthResponse {
+  token: string;
+}
+
+// Parsed manifest shape (GET responses) — mirrors the backend's Manifest Java record exactly.
+export interface Scope {
+  type: ScopeType;
+  resource: string;
+  description: string;
+}
+export interface CostEnvelope {
+  currency: string;
+  maxPerRun: number;
+  pricingUnit: PricingUnit;
+  unitPrice: number;
+  unitLabel: string;
+}
+export interface ApprovalGateDecl {
+  trigger: string;
+  description: string;
+}
+export interface Manifest {
+  name: string;
+  version: string;
+  scopes: Scope[];
+  networkAllowlist: string[];
+  costEnvelope: CostEnvelope;
+  approvalGates: ApprovalGateDecl[];
+  dataClasses: string[];
+}
+
+// Raw manifest wire format — what POST .../versions expects as manifestJson, built by Task 21's wizard.
+export interface ManifestDraft {
+  name: string;
+  version: string;
+  scopes: Scope[];
+  network: { allowlist: string[] };
+  costEnvelope: CostEnvelope;
+  modelRequirements: { provider: string; model: string };
+  approvalGates: ApprovalGateDecl[];
+  dataClasses: string[];
+}
+
+export interface AgentResponse {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+}
+export interface AgentVersionResponse {
+  id: string;
+  versionNumber: string;
+  status: VersionStatus;
+}
+export interface CatalogListingResponse {
+  agentId: string;
+  agentName: string;
+  category: string;
+  versionId: string;
+  versionNumber: string;
+}
+export interface AgentVersionDetailResponse {
+  id: string;
+  agentId: string;
+  agentName: string;
+  versionNumber: string;
+  status: VersionStatus;
+  manifest: Manifest;
+}
+export interface MyAgentsResponse {
+  agentId: string;
+  agentName: string;
+  category: string;
+  versions: AgentVersionResponse[];
+}
+
+export interface ConnectionResponse {
+  id: string;
+  agentId: string;
+  grantedScopes: string[];
+  spendCap: number;
+  status: ConnectionStatus;
+}
+export interface ConnectionSummaryResponse extends ConnectionResponse {
+  agentName: string;
+}
+
+export interface RunResponse {
+  id: string;
+  status: RunStatus;
+}
+export interface RunStepResponse {
+  kind: RunStepKind;
+  detail: string;
+  createdAt: string;
+}
+export interface RunDetailResponse {
+  id: string;
+  status: RunStatus;
+  costCap: number;
+  totalCharged: number;
+  steps: RunStepResponse[];
+}
+export interface RunSummaryResponse {
+  id: string;
+  agentName: string;
+  status: RunStatus;
+  totalCharged: number;
+  startedAt: string;
+}
+
+export interface StatementLineResponse {
+  runId: string;
+  agentName: string;
+  amount: number;
+  type: LedgerEntryType;
+  createdAt: string;
+}
+export interface WalletResponse {
+  balance: number;
+  cap: number | null;
+}
+
+export interface ReviewItemResponse {
+  id: string;
+  agentVersionId: string;
+  agentName: string;
+  versionNumber: string;
+  status: ReviewStatus;
+}
+export interface ReviewItemDetailResponse extends ReviewItemResponse {
+  manifest: Manifest;
+  notes: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+}
