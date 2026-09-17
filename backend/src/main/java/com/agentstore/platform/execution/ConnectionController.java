@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -71,6 +72,15 @@ public class ConnectionController {
     @PreAuthorize("hasRole('BUYER_ADMIN')")
     public void storeSecret(@PathVariable java.util.UUID connectionId, @RequestBody StoreSecretRequest request) {
         secretService.store(connectionId, request.name(), request.value());
+    }
+
+    @GetMapping("/mine")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    public List<ConnectionSummaryResponse> mine() {
+        var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return connectionRepository.findByBuyerOrgId(claims.orgId()).stream()
+                .map(ConnectionSummaryResponse::from)
+                .toList();
     }
 
     public record StoreSecretRequest(String name, String value) {
