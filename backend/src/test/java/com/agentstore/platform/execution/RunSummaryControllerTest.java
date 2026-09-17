@@ -11,6 +11,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -49,10 +50,15 @@ class RunSummaryControllerTest extends AbstractIntegrationTest {
         Connection connection = connectionRepository.save(new Connection(null, buyer, agent, List.of("bank_statement"),
                 new BigDecimal("500.00"), ConnectionStatus.ACTIVE));
 
-        runRepository.save(new Run(null, connection, version, RunStatus.RUNNING, new BigDecimal("500.00"),
-                BigDecimal.ZERO, "sandbox-1", "token-1"));
-        runRepository.save(new Run(null, connection, version, RunStatus.AWAITING_APPROVAL, new BigDecimal("500.00"),
-                new BigDecimal("10.00"), "sandbox-2", "token-2"));
+        Run run1 = new Run(null, connection, version, RunStatus.RUNNING, new BigDecimal("500.00"),
+                BigDecimal.ZERO, "sandbox-1", "token-1");
+        run1.setStartedAt(Instant.parse("2026-09-17T10:00:00Z"));
+        runRepository.save(run1);
+
+        Run run2 = new Run(null, connection, version, RunStatus.AWAITING_APPROVAL, new BigDecimal("500.00"),
+                new BigDecimal("10.00"), "sandbox-2", "token-2");
+        run2.setStartedAt(Instant.parse("2026-09-17T11:00:00Z"));
+        UUID run2Id = runRepository.save(run2).getId();
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), buyer.getId(), UserRole.BUYER_ADMIN));
@@ -60,6 +66,7 @@ class RunSummaryControllerTest extends AbstractIntegrationTest {
         var all = rest.exchange(url("/api/v1/runs/mine"), HttpMethod.GET, new HttpEntity<>(headers),
                 new ParameterizedTypeReference<List<RunSummaryResponse>>() {});
         assertThat(all.getBody()).hasSize(2);
+        assertThat(all.getBody().get(0).id()).isEqualTo(run2Id);
 
         var waiting = rest.exchange(url("/api/v1/runs/mine?status=AWAITING_APPROVAL"), HttpMethod.GET,
                 new HttpEntity<>(headers), new ParameterizedTypeReference<List<RunSummaryResponse>>() {});
