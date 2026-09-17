@@ -18,9 +18,9 @@ class UserRepositoryTest extends AbstractIntegrationTest {
     void savesAndFindsUserByEmail() {
         Org org = orgRepository.save(new Org(null, "Acme SMB", OrgType.BUYER));
         User user = userRepository.save(
-                new User(null, org, "finance@acme.example", "hashed-pw", UserRole.BUYER_ADMIN));
+                new User(null, org, "finance-repo@acme.example", "hashed-pw", UserRole.BUYER_ADMIN));
 
-        var found = userRepository.findByEmail("finance@acme.example");
+        var found = userRepository.findByEmail("finance-repo@acme.example");
 
         assertThat(found).isPresent();
         assertThat(found.get().getId()).isEqualTo(user.getId());

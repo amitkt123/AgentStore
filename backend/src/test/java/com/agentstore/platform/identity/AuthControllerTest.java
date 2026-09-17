@@ -23,12 +23,12 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
     @Test
     void signupThenLoginReturnsWorkingToken() {
-        var signup = new SignupRequest("Acme SMB", OrgType.BUYER, "finance@acme.example", "s3cret-pw", UserRole.BUYER_ADMIN);
+        var signup = new SignupRequest("Acme SMB", OrgType.BUYER, "finance-auth@acme.example", "s3cret-pw", UserRole.BUYER_ADMIN);
         var signupResponse = rest.postForEntity(url("/api/v1/auth/signup"), signup, AuthResponse.class);
         assertThat(signupResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(signupResponse.getBody().token()).isNotBlank();
 
-        var login = new LoginRequest("finance@acme.example", "s3cret-pw");
+        var login = new LoginRequest("finance-auth@acme.example", "s3cret-pw");
         var loginResponse = rest.postForEntity(url("/api/v1/auth/login"), login, AuthResponse.class);
         assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(loginResponse.getBody().token()).isNotBlank();

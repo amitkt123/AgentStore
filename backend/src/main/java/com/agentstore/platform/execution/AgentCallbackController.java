@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -58,7 +59,7 @@ public class AgentCallbackController {
                 var manifest = manifestParser.parse(run.getAgentVersion().getManifestJson());
                 BigDecimal quantity = new BigDecimal(String.valueOf(request.detail().getOrDefault("quantity", "0")));
                 BigDecimal unitCost = manifest.costEnvelope().unitPrice();
-                BigDecimal amount = quantity.multiply(unitCost);
+                BigDecimal amount = quantity.multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
 
                 UsageEvent usageEvent = usageEventRepository.save(new UsageEvent(null, run.getId(),
                         run.getConnection().getBuyerOrg().getId(), quantity, unitCost, amount));

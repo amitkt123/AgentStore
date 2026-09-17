@@ -79,10 +79,10 @@ class EndToEndTierATest extends AbstractIntegrationTest {
 
         // 2. Buyer signs up, funds a wallet, connects, and triggers a run.
         var buyerSignup = rest.postForEntity(url("/api/v1/auth/signup"),
-                new SignupRequest("Acme SMB", OrgType.BUYER, "finance@acme.example", "pw", UserRole.BUYER_ADMIN),
+                new SignupRequest("Acme SMB", OrgType.BUYER, "finance-e2e-a@acme.example", "pw", UserRole.BUYER_ADMIN),
                 AuthResponse.class).getBody();
         var buyerLogin = rest.postForEntity(url("/api/v1/auth/login"),
-                new LoginRequest("finance@acme.example", "pw"), AuthResponse.class).getBody();
+                new LoginRequest("finance-e2e-a@acme.example", "pw"), AuthResponse.class).getBody();
 
         UUID buyerOrgId = extractOrgId(buyerLogin.token());
         Wallet wallet = new Wallet(null, buyerOrgId, new BigDecimal("1000.00"), null);
