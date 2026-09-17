@@ -16,6 +16,16 @@ describe("decodeSessionToken", () => {
   it("returns null for a malformed token", () => {
     expect(decodeSessionToken("not-a-jwt")).toBeNull();
   });
+
+  it("returns null for an expired token", () => {
+    const token = fakeJwt({ sub: "user-1", orgId: "org-1", role: "BUYER_ADMIN", exp: Math.floor(Date.now() / 1000) - 60 });
+    expect(decodeSessionToken(token)).toBeNull();
+  });
+
+  it("accepts a token with a future exp claim", () => {
+    const token = fakeJwt({ sub: "user-1", orgId: "org-1", role: "BUYER_ADMIN", exp: Math.floor(Date.now() / 1000) + 3600 });
+    expect(decodeSessionToken(token)).toEqual({ userId: "user-1", orgId: "org-1", role: "BUYER_ADMIN" });
+  });
 });
 
 describe("roleHome", () => {

@@ -9,7 +9,7 @@ const ROLE_PREFIXES: [string, UserRole[]][] = [
   ["/agents", ["BUYER_ADMIN", "BUYER_APPROVER"]],
   ["/connect", ["BUYER_ADMIN", "BUYER_APPROVER"]],
   ["/runs", ["BUYER_ADMIN", "BUYER_APPROVER"]],
-  ["/billing", ["BUYER_ADMIN", "BUYER_APPROVER"]],
+  ["/billing", ["BUYER_ADMIN"]],
 ];
 
 export function resolveRedirect(pathname: string, claims: SessionClaims | null): string | null {

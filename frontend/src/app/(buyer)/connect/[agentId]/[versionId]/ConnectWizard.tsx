@@ -17,6 +17,8 @@ export function ConnectWizard({ agentId, manifest }: { agentId: string; manifest
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 
+  const spendCapExceedsMax = Number(spendCap) > manifest.costEnvelope.maxPerRun;
+
   async function handleConfirm() {
     setSubmitting(true);
     setError(null);
@@ -43,7 +45,7 @@ export function ConnectWizard({ agentId, manifest }: { agentId: string; manifest
       )}
       {step === "cap" && (
         <>
-          <h1 className="font-serif text-xl mb-2">Set a monthly spend limit</h1>
+          <h1 className="font-serif text-xl mb-2">Set a per-run spend limit</h1>
           <p className="text-ink2 mb-4">
             The agent's own declared per-run cap is {formatInr(manifest.costEnvelope.maxPerRun)} — a reasonable ceiling to start from.
           </p>
@@ -54,9 +56,18 @@ export function ConnectWizard({ agentId, manifest }: { agentId: string; manifest
             className="border border-line rounded-lg px-3 py-2 w-full"
             min={0}
           />
+          {spendCapExceedsMax && (
+            <p className="text-red mt-2 text-sm">
+              Cannot exceed the agent's declared per-run cap of {formatInr(manifest.costEnvelope.maxPerRun)}.
+            </p>
+          )}
           <div className="flex justify-between mt-6">
             <button onClick={() => setStep("grant")} className="text-ink2">Back</button>
-            <button className="bg-green text-white rounded-lg px-5 py-2 font-medium" onClick={() => setStep("confirm")}>
+            <button
+              disabled={spendCapExceedsMax}
+              className="bg-green text-white rounded-lg px-5 py-2 font-medium disabled:opacity-50"
+              onClick={() => setStep("confirm")}
+            >
               Continue
             </button>
           </div>
@@ -67,7 +78,7 @@ export function ConnectWizard({ agentId, manifest }: { agentId: string; manifest
           <h1 className="font-serif text-xl mb-2">Confirm connection</h1>
           <ul className="mb-4 text-sm text-ink2 list-disc pl-5">
             <li>Granted: {grantedResources.join(", ") || "nothing"}</li>
-            <li>Spend limit: {formatInr(Number(spendCap))}</li>
+            <li>Per-run spend limit: {formatInr(Number(spendCap))}</li>
           </ul>
           {error && <p className="text-red mb-4">{error}</p>}
           <div className="flex justify-between mt-6">

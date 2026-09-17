@@ -13,8 +13,9 @@ export function decodeSessionToken(token: string): SessionClaims | null {
   try {
     const payloadSegment = token.split(".")[1];
     const base64 = payloadSegment.replace(/-/g, "+").replace(/_/g, "/");
-    const json = JSON.parse(atob(base64)) as { sub: string; orgId: string; role: UserRole };
+    const json = JSON.parse(atob(base64)) as { sub: string; orgId: string; role: UserRole; exp?: number };
     if (!json.sub || !json.orgId || !json.role) return null;
+    if (json.exp && Date.now() / 1000 > json.exp) return null;
     return { userId: json.sub, orgId: json.orgId, role: json.role };
   } catch {
     return null;

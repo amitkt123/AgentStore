@@ -26,4 +26,14 @@ describe("resolveRedirect", () => {
     expect(resolveRedirect("/review", claims)).toBeNull();
     expect(resolveRedirect("/catalog", claims)).toBe("/review");
   });
+
+  it("bounces a buyer approver away from billing (buyer-admin only)", () => {
+    const claims: SessionClaims = { userId: "u1", orgId: "o1", role: "BUYER_APPROVER" };
+    expect(resolveRedirect("/billing", claims)).toBe("/catalog");
+  });
+
+  it("lets a buyer admin through to billing", () => {
+    const claims: SessionClaims = { userId: "u1", orgId: "o1", role: "BUYER_ADMIN" };
+    expect(resolveRedirect("/billing", claims)).toBeNull();
+  });
 });

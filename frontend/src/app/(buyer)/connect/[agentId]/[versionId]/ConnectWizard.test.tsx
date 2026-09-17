@@ -26,10 +26,22 @@ describe("ConnectWizard", () => {
     expect(screen.getByRole("heading", { name: /Grant exactly what/i })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByRole("heading", { name: /Set a monthly spend limit/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Set a per-run spend limit/i })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByRole("heading", { name: /Confirm connection/i })).toBeInTheDocument();
+  });
+
+  it("rejects a spend cap that exceeds the manifest's declared per-run cap", async () => {
+    render(<ConnectWizard agentId="a1" manifest={manifest} />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    const input = screen.getByRole("spinbutton");
+    await userEvent.clear(input);
+    await userEvent.type(input, "30000");
+
+    expect(screen.getByText(/Cannot exceed the agent's declared per-run cap/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
   it("submits the granted resources and spend cap, then redirects on success", async () => {

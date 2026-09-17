@@ -25,7 +25,7 @@ export function DashboardList({ agents }: { agents: MyAgentsResponse[] }) {
             </div>
             <StatusPill status={version.status} />
             <span className="text-sm font-medium">
-              {version.status === "IN_REVIEW" ? "View status" : version.status === "DRAFT" ? "Continue" : "Manage"}
+              {version.status === "IN_REVIEW" ? "View status" : version.status === "DRAFT" ? "Start over" : "Manage"}
             </span>
           </Link>
         )),

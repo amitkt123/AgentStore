@@ -51,4 +51,24 @@ describe("SubmissionWizard", () => {
     await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
     expect(createAgentAction).not.toHaveBeenCalled();
   });
+
+  it("does not create a second agent when retrying after a version-creation failure", async () => {
+    const { createAgentAction, createVersionAction } = await import("./submissionActions");
+    vi.mocked(createVersionAction).mockResolvedValueOnce({ ok: false, error: "Could not save version" });
+
+    render(<SubmissionWizard />);
+    await userEvent.type(screen.getByPlaceholderText("Agent name"), "Test Agent");
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+    expect(screen.getByText("Could not save version")).toBeInTheDocument();
+    expect(createAgentAction).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+    expect(createAgentAction).toHaveBeenCalledTimes(1);
+    expect(createVersionAction).toHaveBeenCalledTimes(2);
+    expect(createVersionAction).toHaveBeenLastCalledWith("a1", expect.objectContaining({ versionNumber: "1.0.0" }));
+  });
 });

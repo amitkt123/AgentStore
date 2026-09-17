@@ -28,6 +28,7 @@ export function SubmissionWizard({ existingAgent }: { existingAgent?: ExistingAg
   const [draft, setDraft] = useState<ManifestDraft>(() => emptyManifestDraft(existingAgent?.name ?? ""));
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [createdAgentId, setCreatedAgentId] = useState<string | null>(null);
   const router = useRouter();
 
   function addScope() {
@@ -54,7 +55,7 @@ export function SubmissionWizard({ existingAgent }: { existingAgent?: ExistingAg
     setError(null);
     const finalDraft: ManifestDraft = { ...draft, name: agentName, version: versionNumber };
 
-    let agentId = existingAgent?.id;
+    let agentId = existingAgent?.id ?? createdAgentId ?? undefined;
     if (!agentId) {
       const agentResult = await createAgentAction({ name: agentName, category, description });
       if (!agentResult.ok) {
@@ -63,6 +64,7 @@ export function SubmissionWizard({ existingAgent }: { existingAgent?: ExistingAg
         return;
       }
       agentId = agentResult.agentId;
+      setCreatedAgentId(agentResult.agentId);
     }
 
     const versionResult = await createVersionAction(agentId, {

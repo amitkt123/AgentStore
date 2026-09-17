@@ -4,16 +4,19 @@ import { useState } from "react";
 import { useRunPolling } from "@/components/useRunPolling";
 import { RunTraceStep } from "@/components/RunTraceStep";
 import { formatInr } from "@/lib/format";
-import type { RunDetailResponse } from "@/lib/types";
+import type { RunDetailResponse, UserRole } from "@/lib/types";
 import { approveRunAction, rejectRunAction } from "./actions";
 
-const TERMINAL_LABEL: Partial<Record<RunDetailResponse["status"], string>> = {
-  FAILED: "Stopped — spend limit reached",
-  CANCELLED: "Rejected",
-  COMPLETED: "Completed",
-};
+function terminalLabel(run: RunDetailResponse): string {
+  if (run.status === "FAILED") {
+    return run.totalCharged >= run.costCap ? "Stopped — spend limit reached" : "Failed";
+  }
+  if (run.status === "CANCELLED") return "Rejected";
+  if (run.status === "COMPLETED") return "Completed";
+  return run.status;
+}
 
-export function RunConsole({ runId, initial }: { runId: string; initial: RunDetailResponse }) {
+export function RunConsole({ runId, initial, role }: { runId: string; initial: RunDetailResponse; role?: UserRole }) {
   const { data } = useRunPolling(runId, initial);
   const [deciding, setDeciding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +39,7 @@ export function RunConsole({ runId, initial }: { runId: string; initial: RunDeta
     <div className="grid grid-cols-[1fr_320px] gap-8 items-start">
       <div>
         <h1 className="font-serif text-2xl mb-1">Run {runId.slice(0, 8)}</h1>
-        <p className="text-sm text-ink2 mb-6">{TERMINAL_LABEL[run.status] ?? run.status}</p>
+        <p className="text-sm text-ink2 mb-6">{terminalLabel(run)}</p>
         <div>
           {run.steps.map((step, i) => (
             <RunTraceStep key={i} step={step} />
@@ -44,14 +47,20 @@ export function RunConsole({ runId, initial }: { runId: string; initial: RunDeta
         </div>
         {run.status === "AWAITING_APPROVAL" && (
           <div className="mt-4 border border-amber bg-amberSoft rounded-lg p-4">
-            <p className="mb-3 text-sm">This run needs your decision before it can continue.</p>
-            {error && <p className="text-red mb-3 text-sm">{error}</p>}
-            <button disabled={deciding} onClick={() => decide(true)} className="bg-green text-white rounded-md px-4 py-2 mr-2">
-              Approve
-            </button>
-            <button disabled={deciding} onClick={() => decide(false)} className="border border-line rounded-md px-4 py-2">
-              Reject
-            </button>
+            {role === "BUYER_APPROVER" ? (
+              <>
+                <p className="mb-3 text-sm">This run needs your decision before it can continue.</p>
+                {error && <p className="text-red mb-3 text-sm">{error}</p>}
+                <button disabled={deciding} onClick={() => decide(true)} className="bg-green text-white rounded-md px-4 py-2 mr-2">
+                  Approve
+                </button>
+                <button disabled={deciding} onClick={() => decide(false)} className="border border-line rounded-md px-4 py-2">
+                  Reject
+                </button>
+              </>
+            ) : (
+              <p className="text-sm">Waiting on a buyer approver to review this run.</p>
+            )}
           </div>
         )}
       </div>

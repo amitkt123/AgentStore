@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ApprovalsBadge } from "@/components/ApprovalsBadge";
+import { logoutAction } from "@/lib/authActions";
 
 export default function BuyerLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,13 @@ export default function BuyerLayout({ children }: { children: React.ReactNode })
           <Link href="/runs" className="px-3 py-2 rounded-md text-ink2 hover:bg-paper2">Runs</Link>
           <ApprovalsBadge />
           <Link href="/billing" className="px-3 py-2 rounded-md text-ink2 hover:bg-paper2">Billing</Link>
+        </nav>
+        <nav className="flex flex-col gap-1 mt-auto">
+          <form action={logoutAction}>
+            <button type="submit" className="w-full text-left px-3 py-2 rounded-md text-ink2 hover:bg-paper2">
+              Sign out
+            </button>
+          </form>
         </nav>
       </aside>
       <main className="p-8 max-w-5xl">{children}</main>
