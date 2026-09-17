@@ -27,15 +27,17 @@ public class ConnectionController {
     private final AgentVersionRepository agentVersionRepository;
     private final OrgRepository orgRepository;
     private final ManifestParser manifestParser;
+    private final SecretService secretService;
 
     public ConnectionController(ConnectionRepository connectionRepository, AgentRepository agentRepository,
                                  AgentVersionRepository agentVersionRepository, OrgRepository orgRepository,
-                                 ManifestParser manifestParser) {
+                                 ManifestParser manifestParser, SecretService secretService) {
         this.connectionRepository = connectionRepository;
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.orgRepository = orgRepository;
         this.manifestParser = manifestParser;
+        this.secretService = secretService;
     }
 
     @PostMapping
@@ -63,5 +65,14 @@ public class ConnectionController {
         Connection saved = connectionRepository.save(new Connection(null, buyerOrg, agent, request.grantedScopes(),
                 request.spendCap(), ConnectionStatus.ACTIVE));
         return ConnectionResponse.from(saved);
+    }
+
+    @PostMapping("/{connectionId}/secrets")
+    @PreAuthorize("hasRole('BUYER_ADMIN')")
+    public void storeSecret(@PathVariable java.util.UUID connectionId, @RequestBody StoreSecretRequest request) {
+        secretService.store(connectionId, request.name(), request.value());
+    }
+
+    public record StoreSecretRequest(String name, String value) {
     }
 }
