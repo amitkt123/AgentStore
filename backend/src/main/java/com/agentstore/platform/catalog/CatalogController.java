@@ -3,6 +3,8 @@ package com.agentstore.platform.catalog;
 import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.OrgRepository;
+import com.agentstore.platform.identity.UserRole;
+import com.agentstore.platform.manifest.ManifestParser;
 import com.agentstore.platform.manifest.ManifestValidator;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,13 +23,15 @@ public class CatalogController {
     private final AgentVersionRepository agentVersionRepository;
     private final OrgRepository orgRepository;
     private final ManifestValidator manifestValidator;
+    private final ManifestParser manifestParser;
 
     public CatalogController(AgentRepository agentRepository, AgentVersionRepository agentVersionRepository,
-                              OrgRepository orgRepository, ManifestValidator manifestValidator) {
+                              OrgRepository orgRepository, ManifestValidator manifestValidator, ManifestParser manifestParser) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.orgRepository = orgRepository;
         this.manifestValidator = manifestValidator;
+        this.manifestParser = manifestParser;
     }
 
     @PostMapping
@@ -57,6 +61,30 @@ public class CatalogController {
         AgentVersion version = new AgentVersion(null, agent, request.versionNumber(), request.manifestJson(),
                 request.imageRef(), VersionStatus.DRAFT, null, request.changelog());
         return AgentVersionResponse.from(agentVersionRepository.save(version));
+    }
+
+    @GetMapping("/{agentId}/versions/{versionId}")
+    public AgentVersionDetailResponse detail(@PathVariable UUID agentId, @PathVariable UUID versionId) {
+        AgentVersion version = agentVersionRepository.findById(versionId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Version not found"));
+        if (!version.getAgent().getId().equals(agentId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "Version not found for this agent");
+        }
+
+        var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        boolean isLive = version.getStatus() == VersionStatus.LIVE;
+        boolean isOwningDeveloper = claims.role() == UserRole.DEVELOPER
+                && version.getAgent().getDeveloperOrg().getId().equals(claims.orgId());
+        boolean isAdmin = claims.role() == UserRole.ADMIN;
+        if (!isLive && !isOwningDeveloper && !isAdmin) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Version not visible to caller");
+        }
+
+        var manifest = manifestParser.parse(version.getManifestJson());
+        return AgentVersionDetailResponse.from(version, manifest);
     }
 
     private UUID currentOrgId() {
