@@ -46,4 +46,16 @@ describe("RunConsole", () => {
     renderWithClient(<RunConsole runId="r1" initial={failed} />);
     expect(screen.getByText("Stopped — spend limit reached")).toBeInTheDocument();
   });
+
+  it("re-enables the buttons and shows an error if approveRunAction rejects", async () => {
+    const { approveRunAction } = await import("./actions");
+    vi.mocked(approveRunAction).mockRejectedValueOnce(new Error("boom"));
+    renderWithClient(<RunConsole runId="r1" initial={awaitingRun} />);
+
+    const approveButton = screen.getByRole("button", { name: "Approve" });
+    await userEvent.click(approveButton);
+
+    expect(approveButton).not.toBeDisabled();
+    expect(screen.getByText("Could not record your decision. Please try again.")).toBeInTheDocument();
+  });
 });

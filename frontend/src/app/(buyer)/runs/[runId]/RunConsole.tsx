@@ -16,13 +16,20 @@ const TERMINAL_LABEL: Partial<Record<RunDetailResponse["status"], string>> = {
 export function RunConsole({ runId, initial }: { runId: string; initial: RunDetailResponse }) {
   const { data } = useRunPolling(runId, initial);
   const [deciding, setDeciding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const run = data ?? initial;
 
   async function decide(approve: boolean) {
     setDeciding(true);
-    if (approve) await approveRunAction(runId);
-    else await rejectRunAction(runId);
-    setDeciding(false);
+    setError(null);
+    try {
+      if (approve) await approveRunAction(runId);
+      else await rejectRunAction(runId);
+    } catch {
+      setError("Could not record your decision. Please try again.");
+    } finally {
+      setDeciding(false);
+    }
   }
 
   return (
@@ -38,6 +45,7 @@ export function RunConsole({ runId, initial }: { runId: string; initial: RunDeta
         {run.status === "AWAITING_APPROVAL" && (
           <div className="mt-4 border border-amber bg-amberSoft rounded-lg p-4">
             <p className="mb-3 text-sm">This run needs your decision before it can continue.</p>
+            {error && <p className="text-red mb-3 text-sm">{error}</p>}
             <button disabled={deciding} onClick={() => decide(true)} className="bg-green text-white rounded-md px-4 py-2 mr-2">
               Approve
             </button>
