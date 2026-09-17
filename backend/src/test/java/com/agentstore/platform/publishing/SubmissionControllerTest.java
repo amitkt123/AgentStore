@@ -38,7 +38,7 @@ class SubmissionControllerTest extends AbstractIntegrationTest {
     void submittingDraftMovesItToInReview() throws Exception {
         Org developer = orgRepository.save(new Org(null, "DevCo", OrgType.DEVELOPER));
         Agent agent = agentRepository.save(new Agent(null, developer, "Bank Reconciliation", "reconciliation", "d"));
-        String manifest = Files.readString(Path.of("src/test/resources/manifest/valid-tier-a.json"));
+        String manifest = Files.readString(Path.of("src/test/resources/manifest/valid-tier-b.json"));
         AgentVersion version = agentVersionRepository.save(new AgentVersion(null, agent, "1.0.0", manifest,
                 "template-v1", VersionStatus.DRAFT, null, "cl"));
 
