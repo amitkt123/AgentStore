@@ -1,4 +1,4 @@
-import { backend } from "@/lib/backend";
+import { backend, BackendError } from "@/lib/backend";
 import { getSession } from "@/lib/session";
 import type { ConnectionSummaryResponse, RunSummaryResponse, WalletResponse } from "@/lib/types";
 import { RunsList } from "./RunsList";
@@ -9,10 +9,21 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
   const session = await getSession();
   if (!session) return null;
 
+  // Only BUYER_ADMIN can read the org wallet (matches WalletController's
+  // role check); other roles, and orgs with no wallet row yet, fall back
+  // to an unknown balance rather than crashing the page.
+  const walletPromise: Promise<WalletResponse | null> =
+    session.role === "BUYER_ADMIN"
+      ? backend.get<WalletResponse>(`/api/v1/orgs/${session.orgId}/wallet`).catch((e) => {
+          if (e instanceof BackendError) return null;
+          throw e;
+        })
+      : Promise.resolve(null);
+
   const [runs, connections, wallet] = await Promise.all([
     backend.get<RunSummaryResponse[]>("/api/v1/runs/mine"),
     backend.get<ConnectionSummaryResponse[]>("/api/v1/connections/mine"),
-    backend.get<WalletResponse>(`/api/v1/orgs/${session.orgId}/wallet`),
+    walletPromise,
   ]);
   return (
     <div>
@@ -22,7 +33,7 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
           Could not start that run — your organization's wallet balance is too low for this connection's spend cap.
         </div>
       )}
-      <StartRun connections={connections} walletBalance={wallet.balance} />
+      <StartRun connections={connections} walletBalance={wallet?.balance ?? null} />
       <RunsList runs={runs} />
     </div>
   );

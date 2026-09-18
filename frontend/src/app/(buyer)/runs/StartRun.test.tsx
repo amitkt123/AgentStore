@@ -37,4 +37,11 @@ describe("StartRun", () => {
     const { container } = render(<StartRun connections={[]} walletBalance={50000} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("does not gate on balance when the wallet balance is unknown (e.g. a non-BUYER_ADMIN role)", () => {
+    render(<StartRun connections={connections} walletBalance={null} />);
+    const button = screen.getByRole("button", { name: /GSTR-2B Reconciler/i });
+    expect(button).not.toBeDisabled();
+    expect(screen.getByText("Run now")).toBeInTheDocument();
+  });
 });

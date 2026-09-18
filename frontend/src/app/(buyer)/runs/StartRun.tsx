@@ -2,7 +2,13 @@ import { formatInr } from "@/lib/format";
 import type { ConnectionSummaryResponse } from "@/lib/types";
 import { triggerRunAction } from "./actions";
 
-export function StartRun({ connections, walletBalance }: { connections: ConnectionSummaryResponse[]; walletBalance: number }) {
+export function StartRun({
+  connections,
+  walletBalance,
+}: {
+  connections: ConnectionSummaryResponse[];
+  walletBalance: number | null;
+}) {
   const active = connections.filter((c) => c.status === "ACTIVE");
   if (active.length === 0) return null;
   return (
@@ -10,8 +16,8 @@ export function StartRun({ connections, walletBalance }: { connections: Connecti
       <h2 className="font-semibold text-sm mb-3">Start a run</h2>
       <div className="flex flex-col gap-2">
         {active.map((c) => {
-          const shortfall = c.spendCap - walletBalance;
-          const insufficient = shortfall > 0;
+          const shortfall = walletBalance === null ? 0 : c.spendCap - walletBalance;
+          const insufficient = walletBalance !== null && shortfall > 0;
           return (
             <form key={c.id} action={triggerRunAction.bind(null, c.id)}>
               <button
