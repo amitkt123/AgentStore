@@ -69,13 +69,14 @@ public class RunController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Agent has no LIVE version"));
         var manifest = manifestParser.parse(version.getManifestJson());
 
+        String rawToken = runTokenService.generate();
         Run run = runRepository.save(new Run(null, connection, version, RunStatus.PENDING, connection.getSpendCap(),
-                BigDecimal.ZERO, null, runTokenService.generate()));
+                BigDecimal.ZERO, null, RunTokenService.hash(rawToken)));
 
         Map<String, String> envVars = new HashMap<>();
         envVars.put("AGENT_RUN_ID", run.getId().toString());
         envVars.put("AGENT_CALLBACK_URL", callbackBaseUrl + "/internal/agent-callback/runs/" + run.getId());
-        envVars.put("AGENT_CALLBACK_TOKEN", run.getCallbackToken());
+        envVars.put("AGENT_CALLBACK_TOKEN", rawToken);
         for (Secret secret : secretRepository.findByConnectionId(connection.getId())) {
             envVars.put("AGENT_SECRET_" + secret.getName(), secretService.reveal(connection.getId(), secret.getName()));
         }

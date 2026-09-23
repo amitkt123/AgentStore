@@ -56,7 +56,7 @@ class RunDetailControllerTest extends AbstractIntegrationTest {
         Connection connection = connectionRepository.save(new Connection(null, buyer, agent,
                 List.of("bank_statement"), new BigDecimal("500.00"), ConnectionStatus.ACTIVE));
         Run run = runRepository.save(new Run(null, connection, version, RunStatus.RUNNING, new BigDecimal("500.00"),
-                new BigDecimal("10.00"), "fake-sandbox-trace", "tok-trace"));
+                new BigDecimal("10.00"), "fake-sandbox-trace", RunTokenService.hash("tok-trace")));
 
         HttpHeaders callbackHeaders = new HttpHeaders();
         callbackHeaders.setBearerAuth("tok-trace");

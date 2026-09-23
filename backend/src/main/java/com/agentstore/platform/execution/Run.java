@@ -35,12 +35,12 @@ public class Run {
     private BigDecimal costCap;
     private BigDecimal totalCharged;
     private String sandboxId;
-    private String callbackToken;
+    private String callbackTokenHash;
     private Instant startedAt;
     private Instant completedAt;
 
     public Run(UUID id, Connection connection, AgentVersion agentVersion, RunStatus status, BigDecimal costCap,
-               BigDecimal totalCharged, String sandboxId, String callbackToken) {
+               BigDecimal totalCharged, String sandboxId, String callbackTokenHash) {
         this.id = id;
         this.connection = connection;
         this.agentVersion = agentVersion;
@@ -48,6 +48,6 @@ public class Run {
         this.costCap = costCap;
         this.totalCharged = totalCharged;
         this.sandboxId = sandboxId;
-        this.callbackToken = callbackToken;
+        this.callbackTokenHash = callbackTokenHash;
     }
 }

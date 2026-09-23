@@ -66,7 +66,7 @@ class AgentCallbackCompletionTest extends AbstractIntegrationTest {
         Connection connection = connectionRepository.save(new Connection(null, buyer, agent,
                 List.of("bank_statement"), new BigDecimal("500.00"), ConnectionStatus.ACTIVE));
         Run run = runRepository.save(new Run(null, connection, version, RunStatus.RUNNING, new BigDecimal("500.00"),
-                BigDecimal.ZERO, "fake-sandbox-complete", "tok-complete"));
+                BigDecimal.ZERO, "fake-sandbox-complete", RunTokenService.hash("tok-complete")));
 
         rest.postForEntity(url("/internal/agent-callback/runs/" + run.getId() + "/events"),
                 eventRequest("COST", Map.of("quantity", 5)), Void.class);

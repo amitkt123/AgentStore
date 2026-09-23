@@ -34,4 +34,12 @@ public class FakeSandboxProvider implements SandboxProvider {
     public boolean wasKilled(String sandboxId) {
         return killed.contains(sandboxId);
     }
+
+    /** The spec used for the given run's sandbox (latest if created more than once). Tests read the raw token from it. */
+    public SandboxSpec specForRun(UUID runId) {
+        return created.stream()
+                .filter(spec -> runId.toString().equals(spec.envVars().get("AGENT_RUN_ID")))
+                .reduce((first, second) -> second)
+                .orElseThrow(() -> new IllegalStateException("No sandbox created for run " + runId));
+    }
 }

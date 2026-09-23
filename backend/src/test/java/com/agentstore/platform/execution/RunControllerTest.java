@@ -75,12 +75,14 @@ class RunControllerTest extends AbstractIntegrationTest {
 
         Run saved = runRepository.findById(response.getBody().id()).orElseThrow();
         assertThat(saved.getSandboxId()).isNotBlank();
-        assertThat(saved.getCallbackToken()).isNotBlank();
 
         var lastSpec = fakeSandboxProvider.createdSpecs().get(fakeSandboxProvider.createdSpecs().size() - 1);
         assertThat(lastSpec.templateId()).isEqualTo("collections-template-v1");
         assertThat(lastSpec.allowOut()).contains("graph.facebook.com");
         assertThat(lastSpec.envVars()).containsEntry("AGENT_RUN_ID", saved.getId().toString());
-        assertThat(lastSpec.envVars()).containsEntry("AGENT_CALLBACK_TOKEN", saved.getCallbackToken());
+
+        String rawToken = fakeSandboxProvider.specForRun(saved.getId()).envVars().get("AGENT_CALLBACK_TOKEN");
+        assertThat(rawToken).isNotBlank();
+        assertThat(saved.getCallbackTokenHash()).isEqualTo(RunTokenService.hash(rawToken)).isNotEqualTo(rawToken);
     }
 }

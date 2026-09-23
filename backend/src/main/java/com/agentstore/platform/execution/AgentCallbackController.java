@@ -102,7 +102,7 @@ public class AgentCallbackController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found"));
         String token = authorizationHeader != null && authorizationHeader.startsWith("Bearer ")
                 ? authorizationHeader.substring(7) : "";
-        if (!run.getCallbackToken().equals(token)) {
+        if (!RunTokenService.matches(token, run.getCallbackTokenHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid callback token");
         }
         return run;

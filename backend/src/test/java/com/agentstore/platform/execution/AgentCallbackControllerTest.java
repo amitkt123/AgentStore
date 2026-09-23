@@ -64,7 +64,7 @@ class AgentCallbackControllerTest extends AbstractIntegrationTest {
         wallet.setUpdatedAt(Instant.now());
         walletRepository.save(wallet);
         Run run = new Run(null, connection, version, RunStatus.RUNNING, costCap, BigDecimal.ZERO,
-                sandboxId, "tok-123");
+                sandboxId, RunTokenService.hash("tok-123"));
         run.setStartedAt(Instant.now());
         return runRepository.save(run);
     }

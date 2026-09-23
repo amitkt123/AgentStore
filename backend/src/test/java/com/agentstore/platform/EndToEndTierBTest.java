@@ -35,6 +35,8 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
     WalletRepository walletRepository;
     @Autowired
     RunRepository runRepository;
+    @Autowired
+    FakeSandboxProvider fakeSandboxProvider;
 
     String url(String path) {
         return "http://localhost:" + port + path;
@@ -98,7 +100,7 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
         var run = rest.postForEntity(url("/api/v1/runs"),
                 new HttpEntity<>(new TriggerRunRequest(connection.id()), bearer(buyerLogin.token())), RunResponse.class).getBody();
 
-        String callbackToken = runRepository.findById(run.id()).orElseThrow().getCallbackToken();
+        String callbackToken = fakeSandboxProvider.specForRun(run.id()).envVars().get("AGENT_CALLBACK_TOKEN");
         HttpHeaders agentHeaders = bearer(callbackToken);
 
         rest.postForEntity(url("/internal/agent-callback/runs/" + run.id() + "/events"),
