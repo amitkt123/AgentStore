@@ -134,21 +134,40 @@ public class RunLifecycleService {
     }
 
     private void recordCost(Run run, Map<String, Object> detail) {
-        step(run, RunStepKind.COST, detail);
+        BigDecimal quantity = parseQuantity(detail.get("quantity"));
         var manifest = manifestParser.parse(run.getAgentVersion().getManifestJson());
-        BigDecimal quantity = new BigDecimal(String.valueOf(detail.getOrDefault("quantity", "0")));
         BigDecimal unitCost = manifest.costEnvelope().unitPrice();
-        BigDecimal amount = quantity.multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal requested = quantity.multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal remaining = run.getCostCap().subtract(run.getTotalCharged()).max(BigDecimal.ZERO);
+        BigDecimal charged = requested.min(remaining);
 
-        UsageEvent usageEvent = usageEventRepository.save(new UsageEvent(null, run.getId(),
-                run.getConnection().getBuyerOrg().getId(), quantity, unitCost, amount));
-        ledgerService.chargeUsageEvent(usageEvent.getId());
+        step(run, RunStepKind.COST, detail);
+        if (charged.signum() > 0) {
+            UsageEvent usageEvent = usageEventRepository.save(new UsageEvent(null, run.getId(),
+                    run.getConnection().getBuyerOrg().getId(), quantity, unitCost, charged));
+            ledgerService.chargeUsageEvent(usageEvent.getId());
+            run.setTotalCharged(run.getTotalCharged().add(charged));
+        }
 
-        run.setTotalCharged(run.getTotalCharged().add(amount));
-        if (run.getTotalCharged().compareTo(run.getCostCap()) > 0) {
+        if (requested.compareTo(remaining) > 0) {
+            step(run, RunStepKind.COST_CAP_REACHED, Map.of(
+                    "summary", "Spend limit reached; run stopped",
+                    "requested", requested, "charged", charged, "costCap", run.getCostCap()));
             finish(run, RunStatus.FAILED);
         } else {
             runRepository.save(run);
+        }
+    }
+
+    private BigDecimal parseQuantity(Object raw) {
+        try {
+            BigDecimal quantity = new BigDecimal(String.valueOf(raw));
+            if (quantity.signum() <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "quantity must be positive");
+            }
+            return quantity;
+        } catch (NumberFormatException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "quantity must be a number");
         }
     }
 

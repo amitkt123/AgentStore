@@ -5,9 +5,12 @@ import com.agentstore.platform.catalog.*;
 import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.OrgRepository;
 import com.agentstore.platform.identity.OrgType;
+import com.agentstore.platform.ledger.UsageEventRepository;
 import com.agentstore.platform.ledger.Wallet;
 import com.agentstore.platform.ledger.WalletRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -44,6 +47,8 @@ class AgentCallbackControllerTest extends AbstractIntegrationTest {
     FakeSandboxProvider fakeSandboxProvider;
     @Autowired
     WalletRepository walletRepository;
+    @Autowired
+    UsageEventRepository usageEventRepository;
 
     String url(String path) {
         return "http://localhost:" + port + path;
@@ -93,18 +98,52 @@ class AgentCallbackControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void costEventExceedingCapKillsSandboxAndFailsRun() throws Exception {
+    void costEventCrossingTheCapChargesOnlyUpToTheCapThenStopsTheRun() throws Exception {
         Run run = newRunningRun(new BigDecimal("10.00"), "fake-sandbox-over-cap");
 
         rest.postForEntity(url("/internal/agent-callback/runs/" + run.getId() + "/events"),
-                eventRequest("tok-123", "COST", Map.of("quantity", 3)), Void.class);
+                eventRequest("tok-123", "COST", Map.of("quantity", 3)), Void.class);   // 6.00
         rest.postForEntity(url("/internal/agent-callback/runs/" + run.getId() + "/events"),
-                eventRequest("tok-123", "COST", Map.of("quantity", 3)), Void.class);
+                eventRequest("tok-123", "COST", Map.of("quantity", 3)), Void.class);   // 6.00 requested, 4.00 left
 
         Run updated = runRepository.findById(run.getId()).orElseThrow();
-        assertThat(updated.getTotalCharged()).isEqualByComparingTo(new BigDecimal("12.00"));
+        assertThat(updated.getTotalCharged()).isEqualByComparingTo(new BigDecimal("10.00"));
         assertThat(updated.getStatus()).isEqualTo(RunStatus.FAILED);
         assertThat(fakeSandboxProvider.wasKilled("fake-sandbox-over-cap")).isTrue();
+        assertThat(runStepRepository.findByRunIdOrderByCreatedAtAsc(run.getId())).extracting(RunStep::getKind)
+                .containsExactly(RunStepKind.COST, RunStepKind.COST, RunStepKind.COST_CAP_REACHED);
+    }
+
+    @Test
+    void singleOversizedCostEventNeverChargesBeyondTheCap() throws Exception {
+        Run run = newRunningRun(new BigDecimal("10.00"), "fake-sandbox-oversized");
+        var buyerOrgId = run.getConnection().getBuyerOrg().getId();
+
+        rest.postForEntity(url("/internal/agent-callback/runs/" + run.getId() + "/events"),
+                eventRequest("tok-123", "COST", Map.of("quantity", 50)), Void.class);  // 100.00 requested
+
+        Run updated = runRepository.findById(run.getId()).orElseThrow();
+        assertThat(updated.getTotalCharged()).isEqualByComparingTo(new BigDecimal("10.00"));
+        assertThat(updated.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(walletRepository.findByOrgId(buyerOrgId).orElseThrow().getBalance())
+                .isEqualByComparingTo(new BigDecimal("990.00"));
+        assertThat(usageEventRepository.findByRunId(run.getId())).singleElement()
+                .satisfies(e -> assertThat(e.getAmount()).isEqualByComparingTo(new BigDecimal("10.00")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-5", "0", "abc"})
+    void nonPositiveOrNonNumericQuantityIsRejectedWithoutCharging(String quantity) throws Exception {
+        Run run = newRunningRun(new BigDecimal("10.00"), "fake-sandbox-bad-qty-" + quantity);
+
+        var response = rest.postForEntity(url("/internal/agent-callback/runs/" + run.getId() + "/events"),
+                eventRequest("tok-123", "COST", Map.of("quantity", quantity)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        Run updated = runRepository.findById(run.getId()).orElseThrow();
+        assertThat(updated.getTotalCharged()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(updated.getStatus()).isEqualTo(RunStatus.RUNNING);
+        assertThat(usageEventRepository.findByRunId(run.getId())).isEmpty();
     }
 
     @Test
