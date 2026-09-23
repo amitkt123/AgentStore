@@ -38,6 +38,9 @@ public class Run {
     private String callbackTokenHash;
     private Instant startedAt;
     private Instant completedAt;
+    private Instant deadlineAt;
+    private Instant lastHeartbeatAt;
+    private Instant awaitingSince;
 
     public Run(UUID id, Connection connection, AgentVersion agentVersion, RunStatus status, BigDecimal costCap,
                BigDecimal totalCharged, String sandboxId, String callbackTokenHash) {

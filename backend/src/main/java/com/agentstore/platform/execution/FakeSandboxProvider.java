@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 @Profile("!e2b")
@@ -15,11 +16,19 @@ public class FakeSandboxProvider implements SandboxProvider {
 
     private final List<SandboxSpec> created = new CopyOnWriteArrayList<>();
     private final Set<String> killed = ConcurrentHashMap.newKeySet();
+    private final AtomicBoolean failNextCreate = new AtomicBoolean(false);
 
     @Override
     public SandboxHandle create(SandboxSpec spec) {
+        if (failNextCreate.getAndSet(false)) {
+            throw new IllegalStateException("Simulated sandbox provider failure");
+        }
         created.add(spec);
         return new SandboxHandle("fake-sandbox-" + UUID.randomUUID());
+    }
+
+    public void failNextCreate() {
+        failNextCreate.set(true);
     }
 
     @Override

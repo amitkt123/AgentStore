@@ -4,8 +4,9 @@ public record GateStatusResponse(String decision) {
     static GateStatusResponse from(RunStatus status) {
         return switch (status) {
             case AWAITING_APPROVAL -> new GateStatusResponse("PENDING");
-            case CANCELLED -> new GateStatusResponse("REJECTED");
-            default -> new GateStatusResponse("APPROVED");
+            case RUNNING, COMPLETED -> new GateStatusResponse("APPROVED");
+            // Cancelled, failed, timed out or expired: the agent must not proceed.
+            default -> new GateStatusResponse("REJECTED");
         };
     }
 }

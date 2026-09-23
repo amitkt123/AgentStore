@@ -14,6 +14,7 @@ import org.springframework.http.*;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -42,9 +43,18 @@ class RunControllerTest extends AbstractIntegrationTest {
     FakeSandboxProvider fakeSandboxProvider;
     @Autowired
     WalletRepository walletRepository;
+    @Autowired
+    ExecutionFixtures fixtures;
 
     String url(String path) {
         return "http://localhost:" + port + path;
+    }
+
+    HttpHeaders buyerAdmin(UUID orgId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), orgId, UserRole.BUYER_ADMIN));
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
     }
 
     @Test
@@ -84,5 +94,35 @@ class RunControllerTest extends AbstractIntegrationTest {
         String rawToken = fakeSandboxProvider.specForRun(saved.getId()).envVars().get("AGENT_CALLBACK_TOKEN");
         assertThat(rawToken).isNotBlank();
         assertThat(saved.getCallbackTokenHash()).isEqualTo(RunTokenService.hash(rawToken)).isNotEqualTo(rawToken);
+    }
+
+    @Test
+    void triggeredRunGetsADeadlineMatchingTheSandboxTimeout() {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+
+        var response = rest.postForEntity(url("/api/v1/runs"),
+                new HttpEntity<>(new TriggerRunRequest(s.connection().getId()), buyerAdmin(s.buyer().getId())),
+                RunResponse.class);
+
+        Run saved = runRepository.findById(response.getBody().id()).orElseThrow();
+        assertThat(Duration.between(saved.getStartedAt(), saved.getDeadlineAt()))
+                .isEqualTo(Duration.ofSeconds(RunController.SANDBOX_TIMEOUT_SECONDS));
+    }
+
+    @Test
+    void sandboxCreationFailureFailsTheRunAndReturnsBadGateway() {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+        fakeSandboxProvider.failNextCreate();
+
+        var response = rest.postForEntity(url("/api/v1/runs"),
+                new HttpEntity<>(new TriggerRunRequest(s.connection().getId()), buyerAdmin(s.buyer().getId())),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        var runs = runRepository.findByConnectionBuyerOrgIdOrderByStartedAtDesc(s.buyer().getId());
+        assertThat(runs).singleElement().satisfies(r -> {
+            assertThat(r.getStatus()).isEqualTo(RunStatus.FAILED);
+            assertThat(r.getCompletedAt()).isNotNull();
+        });
     }
 }

@@ -3,26 +3,27 @@ package com.agentstore.platform.execution;
 import com.agentstore.platform.catalog.AgentVersion;
 import com.agentstore.platform.catalog.AgentVersionRepository;
 import com.agentstore.platform.catalog.VersionStatus;
+import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.ledger.WalletRepository;
 import com.agentstore.platform.manifest.ManifestParser;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/v1/runs")
 public class RunController {
+
+    static final int SANDBOX_TIMEOUT_SECONDS = 900;
 
     private final ConnectionRepository connectionRepository;
     private final AgentVersionRepository agentVersionRepository;
@@ -34,11 +35,13 @@ public class RunController {
     private final RunTokenService runTokenService;
     private final String callbackBaseUrl;
     private final WalletRepository walletRepository;
+    private final RunLifecycleService runLifecycleService;
 
     public RunController(ConnectionRepository connectionRepository, AgentVersionRepository agentVersionRepository,
-                          RunRepository runRepository, SecretRepository secretRepository, SecretService secretService,
-                          ManifestParser manifestParser, SandboxProvider sandboxProvider, RunTokenService runTokenService,
-                          @Value("${agentstore.callback.base-url}") String callbackBaseUrl, WalletRepository walletRepository) {
+                         RunRepository runRepository, SecretRepository secretRepository, SecretService secretService,
+                         ManifestParser manifestParser, SandboxProvider sandboxProvider, RunTokenService runTokenService,
+                         @Value("${agentstore.callback.base-url}") String callbackBaseUrl,
+                         WalletRepository walletRepository, RunLifecycleService runLifecycleService) {
         this.connectionRepository = connectionRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.runRepository = runRepository;
@@ -49,6 +52,7 @@ public class RunController {
         this.runTokenService = runTokenService;
         this.callbackBaseUrl = callbackBaseUrl;
         this.walletRepository = walletRepository;
+        this.runLifecycleService = runLifecycleService;
     }
 
     @PostMapping
@@ -70,9 +74,18 @@ public class RunController {
         var manifest = manifestParser.parse(version.getManifestJson());
 
         String rawToken = runTokenService.generate();
-        Run run = runRepository.save(new Run(null, connection, version, RunStatus.PENDING, connection.getSpendCap(),
-                BigDecimal.ZERO, null, RunTokenService.hash(rawToken)));
+        Instant now = Instant.now();
+        Run pending = new Run(null, connection, version, RunStatus.PENDING, connection.getSpendCap(),
+                BigDecimal.ZERO, null, RunTokenService.hash(rawToken));
+        pending.setStartedAt(now);
+        pending.setDeadlineAt(now.plusSeconds(SANDBOX_TIMEOUT_SECONDS));
+        Run run = runRepository.save(pending);
 
+        return launch(run, connection, version, manifest.networkAllowlist(), rawToken);
+    }
+
+    private RunResponse launch(Run run, Connection connection, AgentVersion version, List<String> manifestAllowlist,
+                               String rawToken) {
         Map<String, String> envVars = new HashMap<>();
         envVars.put("AGENT_RUN_ID", run.getId().toString());
         envVars.put("AGENT_CALLBACK_URL", callbackBaseUrl + "/internal/agent-callback/runs/" + run.getId());
@@ -83,47 +96,41 @@ public class RunController {
 
         List<String> allowOut = new ArrayList<>();
         allowOut.add(URI.create(callbackBaseUrl).getHost());
-        allowOut.addAll(manifest.networkAllowlist());
+        allowOut.addAll(manifestAllowlist);
 
-        SandboxHandle handle = sandboxProvider.create(new SandboxSpec(version.getImageRef(), 900, envVars, allowOut));
-
-        run.setSandboxId(handle.sandboxId());
-        run.setStatus(RunStatus.RUNNING);
-        run.setStartedAt(Instant.now());
-        run = runRepository.save(run);
-
-        return RunResponse.from(run);
+        SandboxHandle handle;
+        try {
+            handle = sandboxProvider.create(new SandboxSpec(version.getImageRef(), SANDBOX_TIMEOUT_SECONDS, envVars,
+                    allowOut));
+        } catch (RuntimeException e) {
+            runLifecycleService.terminate(run.getId(), RunStatus.FAILED, RunStepKind.FAILED,
+                    Map.of("summary", "Sandbox could not be started"));
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Sandbox could not be started", e);
+        }
+        runLifecycleService.markStarted(run.getId(), handle.sandboxId());
+        return RunResponse.from(runRepository.findById(run.getId()).orElseThrow());
     }
 
     @PostMapping("/{runId}/approve")
     @PreAuthorize("hasRole('BUYER_APPROVER')")
-    public RunResponse approve(@PathVariable java.util.UUID runId, @RequestBody ApproveRunRequest request) {
-        Run run = ownedAwaitingApprovalRun(runId);
-        run.setStatus(RunStatus.RUNNING);
-        return RunResponse.from(runRepository.save(run));
+    public RunResponse approve(@PathVariable UUID runId, @RequestBody ApproveRunRequest request) {
+        requireOwnedByCaller(runId);
+        return RunResponse.from(runLifecycleService.approveGate(runId));
     }
 
     @PostMapping("/{runId}/reject")
     @PreAuthorize("hasRole('BUYER_APPROVER')")
-    public RunResponse reject(@PathVariable java.util.UUID runId, @RequestBody ApproveRunRequest request) {
-        Run run = ownedAwaitingApprovalRun(runId);
-        run.setStatus(RunStatus.CANCELLED);
-        run.setCompletedAt(Instant.now());
-        sandboxProvider.kill(run.getSandboxId());
-        return RunResponse.from(runRepository.save(run));
+    public RunResponse reject(@PathVariable UUID runId, @RequestBody ApproveRunRequest request) {
+        requireOwnedByCaller(runId);
+        return RunResponse.from(runLifecycleService.rejectGate(runId));
     }
 
-    private Run ownedAwaitingApprovalRun(java.util.UUID runId) {
+    private void requireOwnedByCaller(UUID runId) {
         Run run = runRepository.findById(runId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found"));
-        var claims = (com.agentstore.platform.identity.JwtService.Claims)
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (!run.getConnection().getBuyerOrg().getId().equals(claims.orgId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Run not owned by caller's org");
         }
-        if (run.getStatus() != RunStatus.AWAITING_APPROVAL) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Run is not awaiting approval: " + run.getStatus());
-        }
-        return run;
     }
 }
