@@ -1,8 +1,12 @@
 package com.agentstore.platform.identity;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,17 +19,22 @@ import java.util.UUID;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+
     private final UserRepository userRepository;
     private final OrgMembershipRepository membershipRepository;
     private final IdentityService identityService;
     private final RefreshTokenService refreshTokenService;
+    private final UserTokenService userTokenService;
 
     public AuthController(UserRepository userRepository, OrgMembershipRepository membershipRepository,
-                          IdentityService identityService, RefreshTokenService refreshTokenService) {
+                          IdentityService identityService, RefreshTokenService refreshTokenService,
+                          UserTokenService userTokenService) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.identityService = identityService;
         this.refreshTokenService = refreshTokenService;
+        this.userTokenService = userTokenService;
     }
 
     /** Issues an access token, and when {@code remember} is set, a new refresh token family alongside it. */
@@ -38,6 +47,12 @@ public class AuthController {
     @PostMapping("/signup")
     public AuthResponse signup(@Valid @RequestBody SignupRequest request) {
         OrgMembership membership = identityService.signup(request);
+        try {
+            userTokenService.sendVerification(membership.getUser());
+        } catch (Exception e) {
+            // The account is already created; the user can request another link via /auth/email/resend.
+            log.warn("Failed to send verification email to user {}", membership.getUser().getId(), e);
+        }
         return AuthResponse.access(identityService.accessTokenFor(membership));
     }
 
@@ -81,6 +96,37 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
         refreshTokenService.revokeFamilyOf(request.refreshToken());
+        return ResponseEntity.noContent().build();
+    }
+
+    public record TokenRequest(@NotBlank String token) {}
+
+    public record ForgotPasswordRequest(@NotBlank @Email String email) {}
+
+    public record ResetPasswordRequest(@NotBlank String token, @NotBlank @Size(min = 8, max = 200) String password) {}
+
+    @PostMapping("/email/verify")
+    public ResponseEntity<Void> verifyEmail(@Valid @RequestBody TokenRequest request) {
+        userTokenService.verifyEmail(request.token());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/email/resend")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> resendVerification() {
+        userRepository.findById(MeController.currentClaims().userId()).ifPresent(userTokenService::sendVerification);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/password/forgot")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        userTokenService.sendPasswordReset(request.email());
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        userTokenService.resetPassword(request.token(), request.password());
         return ResponseEntity.noContent().build();
     }
 }
