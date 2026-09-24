@@ -1085,7 +1085,7 @@ ALTER TABLE app_user ALTER COLUMN password_hash DROP NOT NULL;      -- Google-on
 CREATE TABLE org_membership (
   user_id UUID NOT NULL REFERENCES app_user(id),
   org_id UUID NOT NULL REFERENCES org(id),
-  role VARCHAR(30) NOT NULL,                     -- BUYER_ADMIN, BUYER_APPROVER, BUYER_MEMBER, DEVELOPER_OWNER, DEVELOPER, ADMIN
+  role VARCHAR(30) NOT NULL,                     -- BUYER_ADMIN, BUYER_APPROVER, DEVELOPER, ADMIN (ADMIN only via agentstore.identity.admin-emails)
   title VARCHAR(100),                            -- "Finance lead"
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, org_id)
@@ -1104,14 +1104,31 @@ ALTER TABLE org ADD COLUMN billing_address JSONB;
 ALTER TABLE org ADD COLUMN sso_required BOOLEAN NOT NULL DEFAULT false;
 ```
 
+`org.gstin`, `org.billing_address` are added by WS10 (first reader); `org.sso_required` arrives with workspace SSO in M3.
+
 **APIs**
 - `POST /auth/signup {fullName, orgName, email, password, side: BUYER|DEVELOPER}` creates the user, org and membership.
 - `POST /auth/login {…, remember}`. The JWT access token stays short (15 min). With `remember`, a 30-day rotating refresh token is set as an httpOnly cookie through the Next.js proxy. `POST /auth/refresh`, `POST /auth/logout` (revokes it).
-- `GET /auth/google/start`, `GET /auth/google/callback` (OIDC, verified email only; links to an existing user by email only when that email is verified on both sides).
+- `POST /auth/google {idToken, side?, orgName?, remember}`: the web app gets the ID token from Google Identity Services; the backend checks signature, issuer, audience and `email_verified`. 409 `ACCOUNT_EXISTS_UNVERIFIED`, 422 `SIGNUP_DETAILS_REQUIRED`.
 - `POST /auth/password/forgot`, `POST /auth/password/reset {token, password}`, `POST /auth/email/verify {token}`.
 - `GET /me` → user plus memberships. `POST /auth/switch-org {orgId}` issues a token for that org. The JWT carries one active `orgId` and `role`, so existing `@PreAuthorize` checks keep working.
 - `POST /orgs/{id}/invitations`, `POST /invitations/{token}/accept`, `GET/PATCH/DELETE /orgs/{id}/members/{userId}` (role and title).
 - `POST /me/orgs {side, orgName}` covers "add the other later".
+
+*Access tokens stay 60 minutes until the new frontend refreshes them; member removal takes effect at the next token, and gate decisions re-check membership in the database (WS15).*
+
+**As built, differs from this spec in these ways:**
+- The refresh token is returned in the login/refresh/Google response body, not set as a cookie by the backend; the Next.js proxy is expected to read it and store it as an httpOnly cookie itself.
+- `refresh_token` adds a `family_id` (rotation family, revoked together on reuse) and has no `device_label`.
+- The `invitation` table uses `invited_by_user_id` (not `invited_by`) and adds `revoked_at` and `created_at`, with a `UNIQUE` `token_hash`.
+- Extra endpoints beyond those listed above: `GET /api/v1/invitations/{token}` (preview before accepting), `GET` and `DELETE /api/v1/orgs/{id}/invitations` (list/revoke pending invitations), `GET /api/v1/orgs/{id}/members`, `POST /api/v1/auth/email/resend`. All identity routes are under `/api/v1/...`, not `/...` as written above.
+- The "approver picker" mentioned in Acceptance is delivered by WS15 on top of the `GET /api/v1/orgs/{id}/members` list; WS13 does not build a picker itself.
+
+**Operational note:** operators must register every email in `agentstore.identity.admin-emails` before launch. A password signup from a listed address gets the side's ordinary role at signup; it is upgraded to `ADMIN` only once that user completes a password reset (which proves control of the inbox and replaces whatever password an impostor may have set — verifying the email alone is not enough), and only in the org that address created at signup, never one it later joins by invitation. Google sign-in grants `ADMIN` immediately for a listed address because it already requires a verified email at account creation.
+
+**Known gap:** only `POST /auth/password/reset` enforces an 8-character minimum password at the API today; signup and invite-accept do not (the frontend enforces 8 for both). Tightening the API validation is left to a later pass.
+
+**Security fixes made during implementation review, relevant to later workstreams:** refresh tokens and email-verification/password-reset links are redeemed under a row lock, so concurrent redemptions cannot both succeed (single use is enforced at the DB, not just in application code); `POST /auth/password/forgot` returns 202 even when the reset email fails to send; Google sign-in refuses with 409 `ACCOUNT_LINKED_TO_OTHER_GOOGLE` when the email is already linked to a different Google subject; the members endpoints (`PATCH`/`DELETE /orgs/{id}/members/{userId}`, invitations) check the caller's current role in the database, not the role baked into their JWT, so a demoted or removed admin cannot keep managing members until their token expires.
 
 **Acceptance:** one email holds a buyer membership and a developer membership and switches between them; a Google sign-in never takes over a password account whose email is unverified; a revoked refresh token cannot mint a new access token; an invited approver appears in the approver picker for connections.
 
@@ -1380,6 +1397,7 @@ FE-2, FE-3 and FE-4 each list the API shapes they assume. The implementation pla
 - **Eval cases**: revision 1 gave each case its own bindings. The UI links cases to profiles, so cases now reference a profile.
 - **Review outcome**: "Send back" is `CHANGES_REQUESTED`, separate from `REJECTED`.
 - **Migration numbers**: revision 1 put WS1 at `V12`, which clashes with the WS0 plan (`V12`–`V16`). Numbers in this doc are now placeholders (§3.2).
+- **Refresh serialization**: WS13's rotating refresh token treats reuse of an already-rotated token as theft and revokes the whole family. Two browser tabs racing to refresh the same token at once look identical to reuse, so the Next.js proxy (FE-1) must serialize refreshes per session (one in-flight refresh at a time, others wait for its result) rather than letting each tab call `/auth/refresh` independently.
 
 ### 10.2 Deliberately not built from the mockups
 

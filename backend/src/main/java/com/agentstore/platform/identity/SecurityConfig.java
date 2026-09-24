@@ -26,7 +26,7 @@ public class SecurityConfig {
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(handling -> handling.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/v1/auth/**", "/actuator/**", "/internal/**").permitAll()
+                    .requestMatchers("/api/v1/auth/**", "/api/v1/invitations/**", "/actuator/**", "/internal/**").permitAll()
                     .requestMatchers("/api/v1/**").authenticated()
                     .anyRequest().permitAll())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

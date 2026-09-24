@@ -10,15 +10,18 @@ export interface SignupState {
 }
 
 export async function signupAction(_prevState: SignupState, formData: FormData): Promise<SignupState> {
+  const fullName = String(formData.get("fullName") ?? "");
   const orgName = String(formData.get("orgName") ?? "");
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+  const side = formData.get("side") === "DEVELOPER" ? "DEVELOPER" : "BUYER";
 
   const res = await fetch(`${process.env.BACKEND_URL}/api/v1/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ orgName, orgType: "BUYER", email, password, role: "BUYER_ADMIN" }),
+    body: JSON.stringify({ fullName, orgName, email, password, side }),
   });
+  if (res.status === 409) return { error: "An account with this email already exists — sign in instead" };
   if (!res.ok) return { error: "Could not create an account — check your details" };
 
   const { token } = (await res.json()) as AuthResponse;
