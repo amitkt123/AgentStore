@@ -10,20 +10,24 @@ class UserRepositoryTest extends AbstractIntegrationTest {
 
     @Autowired
     OrgRepository orgRepository;
-
     @Autowired
     UserRepository userRepository;
+    @Autowired
+    OrgMembershipRepository membershipRepository;
 
     @Test
-    void savesAndFindsUserByEmail() {
+    void membershipLinksAUserToAnOrgWithARoleAndTitle() {
         Org org = orgRepository.save(new Org(null, "Acme SMB", OrgType.BUYER));
-        User user = userRepository.save(
-                new User(null, org, "finance-repo@acme.example", "hashed-pw", UserRole.BUYER_ADMIN));
+        User user = userRepository.save(new User(null, "finance-repo@acme.example", "hashed-pw", "Arjun Mehta"));
+        membershipRepository.save(new OrgMembership(user, org, UserRole.BUYER_APPROVER, "Accounts manager"));
 
-        var found = userRepository.findByEmail("finance-repo@acme.example");
-
+        var found = userRepository.findByEmailIgnoreCase("Finance-Repo@Acme.example");
         assertThat(found).isPresent();
-        assertThat(found.get().getId()).isEqualTo(user.getId());
-        assertThat(found.get().getOrg().getName()).isEqualTo("Acme SMB");
+        assertThat(membershipRepository.findByIdUserIdOrderByCreatedAtAsc(found.get().getId()))
+                .singleElement().satisfies(m -> {
+                    assertThat(m.getOrg().getName()).isEqualTo("Acme SMB");
+                    assertThat(m.getRole()).isEqualTo(UserRole.BUYER_APPROVER);
+                    assertThat(m.getTitle()).isEqualTo("Accounts manager");
+                });
     }
 }

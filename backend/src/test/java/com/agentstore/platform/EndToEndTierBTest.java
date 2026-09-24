@@ -57,7 +57,7 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
     @Test
     void tierBAgentRequiresManualApprovalAndPausesOnGate() throws Exception {
         var devLogin = rest.postForEntity(url("/api/v1/auth/signup"),
-                new SignupRequest("DevCo", OrgType.DEVELOPER, "dev2@devco.example", "pw", UserRole.DEVELOPER),
+                new SignupRequest("Dev Two", "DevCo", "dev2@devco.example", "pw", SignupSide.DEVELOPER),
                 AuthResponse.class).getBody();
 
         var agent = rest.postForEntity(url("/api/v1/agents"),
@@ -77,7 +77,7 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
         assertThat(catalogBeforeApproval).extracting(CatalogListingResponse::agentId).doesNotContain(agent.id());
 
         var adminLogin = rest.postForEntity(url("/api/v1/auth/signup"),
-                new SignupRequest("Platform", OrgType.DEVELOPER, "admin@platform.example", "pw", UserRole.ADMIN),
+                new SignupRequest("Karya Admin", "Platform", "admin@platform.example", "pw", SignupSide.DEVELOPER),
                 AuthResponse.class).getBody();
         var queue = rest.exchange(url("/api/v1/review/queue"), HttpMethod.GET,
                 new HttpEntity<>(bearer(adminLogin.token())), new ParameterizedTypeReference<List<ReviewItemResponse>>() {}).getBody();
@@ -86,7 +86,7 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
                 new HttpEntity<>(new ReviewDecisionRequest("looks safe"), bearer(adminLogin.token())), ReviewItemResponse.class);
 
         var buyerLogin = rest.postForEntity(url("/api/v1/auth/signup"),
-                new SignupRequest("Acme SMB 2", OrgType.BUYER, "finance2@acme.example", "pw", UserRole.BUYER_ADMIN),
+                new SignupRequest("Finance Two", "Acme SMB 2", "finance2@acme.example", "pw", SignupSide.BUYER),
                 AuthResponse.class).getBody();
         UUID buyerOrgId = orgIdOf(buyerLogin.token());
         Wallet wallet = new Wallet(null, buyerOrgId, new BigDecimal("1000.00"), null);
@@ -111,9 +111,6 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
         assertThat(pausedRun.getBody().get("status")).isEqualTo("AWAITING_APPROVAL");
 
         // A second BUYER_APPROVER user in the same org approves the gate.
-        var approverLogin = rest.postForEntity(url("/api/v1/auth/signup"),
-                new SignupRequest("Acme SMB 2", OrgType.BUYER, "approver@acme.example", "pw", UserRole.BUYER_APPROVER),
-                AuthResponse.class).getBody();
         // NOTE: signup always creates a NEW org; to keep this test focused on the gate mechanics
         // rather than multi-user-per-org account management (out of scope for this plan), the
         // approval is issued by an approver token scoped to the SAME buyer org via a JWT minted

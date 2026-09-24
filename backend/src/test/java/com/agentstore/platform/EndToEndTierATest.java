@@ -5,9 +5,8 @@ import com.agentstore.platform.execution.RunResponse;
 import com.agentstore.platform.execution.RunStatus;
 import com.agentstore.platform.identity.AuthResponse;
 import com.agentstore.platform.identity.LoginRequest;
-import com.agentstore.platform.identity.OrgType;
 import com.agentstore.platform.identity.SignupRequest;
-import com.agentstore.platform.identity.UserRole;
+import com.agentstore.platform.identity.SignupSide;
 import com.agentstore.platform.catalog.*;
 import com.agentstore.platform.execution.ConnectionResponse;
 import com.agentstore.platform.execution.CreateConnectionRequest;
@@ -56,10 +55,10 @@ class EndToEndTierATest extends AbstractIntegrationTest {
     void publishConnectRunAndBillEndToEnd() throws Exception {
         // 1. Developer signs up and publishes a Tier A agent, which auto-approves to LIVE.
         var devSignup = rest.postForEntity(url("/api/v1/auth/signup"),
-                new SignupRequest("DevCo", OrgType.DEVELOPER, "dev@devco.example", "pw", UserRole.DEVELOPER),
+                new SignupRequest("Dev One", "DevCo", "dev@devco.example", "pw", SignupSide.DEVELOPER),
                 AuthResponse.class).getBody();
         var devLogin = rest.postForEntity(url("/api/v1/auth/login"),
-                new LoginRequest("dev@devco.example", "pw"), AuthResponse.class).getBody();
+                new LoginRequest("dev@devco.example", "pw", false), AuthResponse.class).getBody();
 
         var agent = rest.postForEntity(url("/api/v1/agents"),
                 new HttpEntity<>(new CreateAgentRequest("Bank Reconciliation", "reconciliation", "d"), bearer(devLogin.token())),
@@ -80,10 +79,10 @@ class EndToEndTierATest extends AbstractIntegrationTest {
 
         // 2. Buyer signs up, funds a wallet, connects, and triggers a run.
         var buyerSignup = rest.postForEntity(url("/api/v1/auth/signup"),
-                new SignupRequest("Acme SMB", OrgType.BUYER, "finance-e2e-a@acme.example", "pw", UserRole.BUYER_ADMIN),
+                new SignupRequest("Finance One", "Acme SMB", "finance-e2e-a@acme.example", "pw", SignupSide.BUYER),
                 AuthResponse.class).getBody();
         var buyerLogin = rest.postForEntity(url("/api/v1/auth/login"),
-                new LoginRequest("finance-e2e-a@acme.example", "pw"), AuthResponse.class).getBody();
+                new LoginRequest("finance-e2e-a@acme.example", "pw", false), AuthResponse.class).getBody();
 
         UUID buyerOrgId = extractOrgId(buyerLogin.token());
         Wallet wallet = new Wallet(null, buyerOrgId, new BigDecimal("1000.00"), null);

@@ -19,28 +19,26 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "org_id")
-    private Org org;
-
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    /** Null for users who only ever signed in with Google. */
+    @Column(name = "password_hash")
     private String passwordHash;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private UserRole role;
+    private String fullName;
+    private Instant emailVerifiedAt;
+
+    /** The org a login lands in. Updated on signup, switch-org and accepting an invitation. */
+    private UUID lastOrgId;
 
     private Instant createdAt;
 
-    public User(UUID id, Org org, String email, String passwordHash, UserRole role) {
+    public User(UUID id, String email, String passwordHash, String fullName) {
         this.id = id;
-        this.org = org;
         this.email = email;
         this.passwordHash = passwordHash;
-        this.role = role;
+        this.fullName = fullName;
     }
 
     @PrePersist

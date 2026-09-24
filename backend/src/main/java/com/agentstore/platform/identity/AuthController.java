@@ -1,39 +1,37 @@
 package com.agentstore.platform.identity;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    private final OrgRepository orgRepository;
     private final UserRepository userRepository;
-    private final JwtService jwtService;
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final IdentityService identityService;
 
-    public AuthController(OrgRepository orgRepository, UserRepository userRepository, JwtService jwtService) {
-        this.orgRepository = orgRepository;
+    public AuthController(UserRepository userRepository, IdentityService identityService) {
         this.userRepository = userRepository;
-        this.jwtService = jwtService;
+        this.identityService = identityService;
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
-        Org org = orgRepository.save(new Org(null, request.orgName(), request.orgType()));
-        User user = userRepository.save(new User(null, org, request.email(),
-                passwordEncoder.encode(request.password()), request.role()));
-        return ResponseEntity.ok(new AuthResponse(jwtService.issue(user.getId(), org.getId(), user.getRole())));
+    public AuthResponse signup(@Valid @RequestBody SignupRequest request) {
+        OrgMembership membership = identityService.signup(request);
+        return new AuthResponse(identityService.accessTokenFor(membership));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return userRepository.findByEmail(request.email())
-                .filter(user -> passwordEncoder.matches(request.password(), user.getPasswordHash()))
-                .map(user -> ResponseEntity.ok(new AuthResponse(
-                        jwtService.issue(user.getId(), user.getOrg().getId(), user.getRole()))))
-                .orElseGet(() -> ResponseEntity.status(401).build());
+        User user = userRepository.findByEmailIgnoreCase(IdentityService.normalizeEmail(request.email()))
+                .filter(u -> identityService.passwordMatches(u, request.password()))
+                .orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        OrgMembership membership = identityService.requireLandingMembership(user);
+        return ResponseEntity.ok(new AuthResponse(identityService.accessTokenFor(membership)));
     }
 }

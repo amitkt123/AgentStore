@@ -16,6 +16,8 @@ agentstore:
   jwt:
     secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef-0123456789}
     expiration-minutes: 60
+  identity:
+    admin-emails: ${ADMIN_EMAILS:}
   secrets:
     encryption-key-base64: ${SECRET_ENCRYPTION_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
   e2b:
