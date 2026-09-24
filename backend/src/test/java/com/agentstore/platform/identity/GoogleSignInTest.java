@@ -158,6 +158,37 @@ class GoogleSignInTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void aVerifiedGoogleUserWithNoMembershipMustPickAWorkspaceThenGetsBackIn() {
+        String email = email();
+        OrgMembership admin = identity.buyerAdmin(email);
+        User user = admin.getUser();
+        user.setEmailVerifiedAt(Instant.now());
+        userRepository.save(user);
+        OrgMembership second = identity.member(admin.getOrg(), "second-" + UUID.randomUUID() + "@acme.example",
+                UserRole.BUYER_ADMIN, null);
+        rest.exchange(url("/api/v1/orgs/" + admin.getOrg().getId() + "/members/" + user.getId()),
+                org.springframework.http.HttpMethod.DELETE,
+                new org.springframework.http.HttpEntity<>(bearerFor(second)), Void.class);
+
+        String idToken = registered(email, true);
+        var first = rest.postForEntity(url("/api/v1/auth/google"), body(idToken, null, null), Map.class);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(first.getBody().get("code")).isEqualTo("NO_WORKSPACE");
+
+        var second_ = rest.postForEntity(url("/api/v1/auth/google"), body(idToken, "DEVELOPER", "New Co"),
+                AuthResponse.class);
+        assertThat(second_.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(jwtService.parse(second_.getBody().token()).orElseThrow().role()).isEqualTo(UserRole.DEVELOPER);
+    }
+
+    private org.springframework.http.HttpHeaders bearerFor(OrgMembership membership) {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setBearerAuth(identity.tokenFor(membership));
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        return headers;
+    }
+
+    @Test
     void googleAccountsWithNoEmailClaimAreRejected() {
         String idToken = "id-" + UUID.randomUUID();
         google.register(idToken, new GoogleIdentity("sub-" + UUID.randomUUID(), null, true, "No Email"));

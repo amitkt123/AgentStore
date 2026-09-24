@@ -84,4 +84,27 @@ class RefreshTokenTest extends AbstractIntegrationTest {
         var response = rest.postForEntity(url("/api/v1/auth/refresh"), Map.of("refreshToken", "nope"), String.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
+
+    @Test
+    void refreshingAfterLosingAllMembershipsIsStillForbidden() {
+        OrgMembership admin = identity.buyerAdmin(email());
+        OrgMembership second = identity.member(admin.getOrg(), email(), UserRole.BUYER_ADMIN, null);
+        String refreshToken = login(admin.getUser().getEmail(), true).refreshToken();
+
+        rest.exchange(url("/api/v1/orgs/" + admin.getOrg().getId() + "/members/" + admin.getUser().getId()),
+                org.springframework.http.HttpMethod.DELETE,
+                new org.springframework.http.HttpEntity<>(bearer(second)), Void.class);
+
+        var response = rest.postForEntity(url("/api/v1/auth/refresh"), Map.of("refreshToken", refreshToken),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    private org.springframework.http.HttpHeaders bearer(OrgMembership membership) {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setBearerAuth(identity.tokenFor(membership));
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        return headers;
+    }
 }

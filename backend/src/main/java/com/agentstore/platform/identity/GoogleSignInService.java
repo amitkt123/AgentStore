@@ -25,18 +25,6 @@ public class GoogleSignInService {
         this.identityService = identityService;
     }
 
-    /** Raised as 409/422 with a stable {@code code} the web app can act on. */
-    public static class SignInProblem extends RuntimeException {
-        public final HttpStatus status;
-        public final String code;
-
-        SignInProblem(HttpStatus status, String code, String message) {
-            super(message);
-            this.status = status;
-            this.code = code;
-        }
-    }
-
     @Transactional
     public OrgMembership signIn(String idToken, SignupSide side, String orgName) {
         GoogleIdentity google = verifier.verify(idToken)
@@ -78,6 +66,6 @@ public class GoogleSignInService {
             identityRepository.save(new UserIdentity(PROVIDER, google.subject(), user.getId()));
         }
 
-        return identityService.requireLandingMembership(user);
+        return identityService.landOrCreateWorkspace(user, side, orgName);
     }
 }
