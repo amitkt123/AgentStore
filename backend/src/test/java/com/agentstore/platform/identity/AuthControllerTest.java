@@ -1,12 +1,14 @@
 package com.agentstore.platform.identity;
 
 import com.agentstore.platform.AbstractIntegrationTest;
+import com.agentstore.platform.common.RecordingEmailSender;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,6 +25,8 @@ class AuthControllerTest extends AbstractIntegrationTest {
     UserRepository userRepository;
     @Autowired
     OrgMembershipRepository membershipRepository;
+    @Autowired
+    RecordingEmailSender emails;
 
     String url(String path) {
         return "http://localhost:" + port + path;
@@ -66,15 +70,37 @@ class AuthControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void listedAdminEmailsBecomePlatformAdmins() {
+    void listedAdminEmailIsNotPlatformAdminUntilItVerifiesThenLoginIsAdmin() {
         // application-test.yml lists admin-auth-test@platform.example (EndToEndTierBTest uses admin@platform.example;
         // the test database is shared across classes, so each test class needs its own address)
-        var response = rest.postForEntity(url("/api/v1/auth/signup"),
-                new SignupRequest("Karya Admin", "Karya", "Admin-Auth-Test@Platform.example", "s3cret-pw",
-                        SignupSide.DEVELOPER),
+        String email = "Admin-Auth-Test@Platform.example";
+        var signup = rest.postForEntity(url("/api/v1/auth/signup"),
+                new SignupRequest("Karya Admin", "Karya", email, "s3cret-pw", SignupSide.DEVELOPER),
                 AuthResponse.class);
+        assertThat(claimsOf(signup.getBody()).role()).isEqualTo(UserRole.DEVELOPER);
 
-        assertThat(claimsOf(response.getBody()).role()).isEqualTo(UserRole.ADMIN);
+        String token = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "verify-email");
+        rest.postForEntity(url("/api/v1/auth/email/verify"), Map.of("token", token), Void.class);
+
+        var login = rest.postForEntity(url("/api/v1/auth/login"),
+                new LoginRequest(email, "s3cret-pw", false), AuthResponse.class);
+        assertThat(claimsOf(login.getBody()).role()).isEqualTo(UserRole.ADMIN);
+    }
+
+    @Test
+    void anUnlistedEmailThatVerifiesStaysTheOrdinaryRole() {
+        String email = unique("notadmin");
+        var signup = rest.postForEntity(url("/api/v1/auth/signup"),
+                new SignupRequest("Not Admin", "Karya", email, "s3cret-pw", SignupSide.DEVELOPER),
+                AuthResponse.class);
+        assertThat(claimsOf(signup.getBody()).role()).isEqualTo(UserRole.DEVELOPER);
+
+        String token = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "verify-email");
+        rest.postForEntity(url("/api/v1/auth/email/verify"), Map.of("token", token), Void.class);
+
+        var login = rest.postForEntity(url("/api/v1/auth/login"),
+                new LoginRequest(email, "s3cret-pw", false), AuthResponse.class);
+        assertThat(claimsOf(login.getBody()).role()).isEqualTo(UserRole.DEVELOPER);
     }
 
     @Test

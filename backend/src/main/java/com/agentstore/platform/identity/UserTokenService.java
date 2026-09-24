@@ -57,6 +57,7 @@ public class UserTokenService {
             user.setEmailVerifiedAt(Instant.now());
             userRepository.save(user);
         }
+        identityService.promoteToAdminIfListed(user);
     }
 
     /**
@@ -86,6 +87,7 @@ public class UserTokenService {
         // Receiving the reset link proves the inbox, so the address counts as verified too.
         if (user.getEmailVerifiedAt() == null) user.setEmailVerifiedAt(Instant.now());
         userRepository.save(user);
+        identityService.promoteToAdminIfListed(user);
         refreshTokenService.revokeAllFor(user.getId());
     }
 

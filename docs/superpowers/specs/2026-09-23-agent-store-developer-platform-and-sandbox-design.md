@@ -1124,7 +1124,7 @@ ALTER TABLE org ADD COLUMN sso_required BOOLEAN NOT NULL DEFAULT false;
 - Extra endpoints beyond those listed above: `GET /api/v1/invitations/{token}` (preview before accepting), `GET` and `DELETE /api/v1/orgs/{id}/invitations` (list/revoke pending invitations), `GET /api/v1/orgs/{id}/members`, `POST /api/v1/auth/email/resend`. All identity routes are under `/api/v1/...`, not `/...` as written above.
 - The "approver picker" mentioned in Acceptance is delivered by WS15 on top of the `GET /api/v1/orgs/{id}/members` list; WS13 does not build a picker itself.
 
-**Operational note:** operators must register every email in `agentstore.identity.admin-emails` before launch — a listed email is granted `ADMIN` at signup, before its address is verified.
+**Operational note:** operators must register every email in `agentstore.identity.admin-emails` before launch. A password signup from a listed address gets the side's ordinary role at signup and is only upgraded to `ADMIN` once that address is verified (the email-verify link, or a completed password reset, either of which proves control of the inbox); Google sign-in grants `ADMIN` immediately for a listed address because it already requires a verified email.
 
 **Known gap:** only `POST /auth/password/reset` enforces an 8-character minimum password at the API today; signup and invite-accept do not (the frontend enforces 8 for both). Tightening the API validation is left to a later pass.
 

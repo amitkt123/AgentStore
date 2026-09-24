@@ -78,9 +78,16 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
                 new HttpEntity<>(bearer(devLogin.token())), new ParameterizedTypeReference<List<CatalogListingResponse>>() {}).getBody();
         assertThat(catalogBeforeApproval).extracting(CatalogListingResponse::agentId).doesNotContain(agent.id());
 
-        var adminLogin = rest.postForEntity(url("/api/v1/auth/signup"),
+        rest.postForEntity(url("/api/v1/auth/signup"),
                 new SignupRequest("Karya Admin", "Platform", "admin@platform.example", "pw", SignupSide.DEVELOPER),
-                AuthResponse.class).getBody();
+                AuthResponse.class);
+        // A listed admin-emails address is not platform ADMIN until it verifies (I1): confirm the email,
+        // then log back in for a token that actually carries ADMIN.
+        String adminVerifyToken = com.agentstore.platform.common.RecordingEmailSender.tokenFromLink(
+                emails.lastTo("admin@platform.example").orElseThrow(), "verify-email");
+        rest.postForEntity(url("/api/v1/auth/email/verify"), Map.of("token", adminVerifyToken), Void.class);
+        var adminLogin = rest.postForEntity(url("/api/v1/auth/login"),
+                new LoginRequest("admin@platform.example", "pw", false), AuthResponse.class).getBody();
         var queue = rest.exchange(url("/api/v1/review/queue"), HttpMethod.GET,
                 new HttpEntity<>(bearer(adminLogin.token())), new ParameterizedTypeReference<List<ReviewItemResponse>>() {}).getBody();
         var pending = queue.stream().filter(i -> i.agentVersionId().equals(version.id())).findFirst().orElseThrow();

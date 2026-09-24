@@ -54,20 +54,45 @@ public class IdentityService {
             // Two signups for the same email raced past the exists check.
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
         }
-        UserRole role = adminAwareRole(request.side(), email);
+        // A password signup never grants ADMIN before the email is verified, even for a listed address
+        // (I1): it gets the side's ordinary role, and promoteToAdminIfListed upgrades it once
+        // verifyEmail or resetPassword proves control of the inbox.
+        UserRole role = OrgRoles.adminRoleOf(request.side().orgType());
         return addOrg(user, request.side(), request.orgName(), role);
     }
 
     /**
-     * The role a brand-new org on this side grants the given email: {@code ADMIN} for a developer-side
-     * signup from an address listed in {@code agentstore.identity.admin-emails}, otherwise the side's
-     * ordinary admin role. The one place signup (and later Google new-user provisioning) computes this,
-     * so {@code ADMIN} is never granted anywhere else.
+     * The role a brand-new Google-signup org on this side grants the given email: {@code ADMIN} for a
+     * developer-side signup from an address listed in {@code agentstore.identity.admin-emails}, otherwise
+     * the side's ordinary admin role. Safe to grant immediately here because Google sign-in already
+     * requires a verified email before a new account is created. Password signup does not use this; see
+     * {@link #promoteToAdminIfListed}.
      */
-    public UserRole adminAwareRole(SignupSide side, String email) {
+    UserRole adminAwareRole(SignupSide side, String email) {
         return side == SignupSide.DEVELOPER && adminEmails.contains(normalizeEmail(email))
                 ? UserRole.ADMIN
                 : OrgRoles.adminRoleOf(side.orgType());
+    }
+
+    /**
+     * Upgrades a user's first (self-created) membership to platform {@code ADMIN} once their email is
+     * verified, if that email is listed in {@code agentstore.identity.admin-emails}. Callers must only
+     * invoke this once verification is established: a redeemed email-verify link, or a completed
+     * password reset (which also proves control of the inbox). A no-op for an unlisted email, an
+     * already-ADMIN membership, or a first membership that isn't a developer org (matching
+     * {@link #adminAwareRole}, which never grants ADMIN on the buyer side). Idempotent.
+     */
+    @Transactional
+    public void promoteToAdminIfListed(User user) {
+        if (!adminEmails.contains(normalizeEmail(user.getEmail()))) return;
+        membershipRepository.findByIdUserIdOrderByCreatedAtAsc(user.getId()).stream()
+                .findFirst()
+                .filter(m -> m.getOrg().getType() == OrgType.DEVELOPER)
+                .filter(m -> m.getRole() != UserRole.ADMIN)
+                .ifPresent(m -> {
+                    m.setRole(UserRole.ADMIN);
+                    membershipRepository.save(m);
+                });
     }
 
     /** Creates an org of the given side with this user as its first member, and makes it the landing org. */
