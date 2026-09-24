@@ -5,3 +5,5 @@ agentstore:
     encryption-key-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
   e2b:
     api-key: test-key
+  jobs:
+    enabled: false

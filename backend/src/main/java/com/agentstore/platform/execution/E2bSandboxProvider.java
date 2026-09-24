@@ -4,7 +4,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.util.Map;
 
@@ -48,5 +50,21 @@ public class E2bSandboxProvider implements SandboxProvider {
                 .header("X-API-Key", apiKey)
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    @Override
+    public SandboxStatus status(String sandboxId) {
+        try {
+            restClient.get()
+                    .uri("/sandboxes/{id}", sandboxId)
+                    .header("X-API-Key", apiKey)
+                    .retrieve()
+                    .toBodilessEntity();
+            return SandboxStatus.RUNNING;
+        } catch (HttpClientErrorException.NotFound e) {
+            return SandboxStatus.EXITED;
+        } catch (RestClientException e) {
+            return SandboxStatus.UNKNOWN;
+        }
     }
 }

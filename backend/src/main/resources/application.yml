@@ -23,6 +23,11 @@ agentstore:
     base-url: https://api.e2b.app
   callback:
     base-url: ${CALLBACK_BASE_URL:http://localhost:8080}
+  jobs:
+    enabled: ${AGENTSTORE_JOBS_ENABLED:true}
+  runs:
+    gate-timeout: PT30M
+    reaper-interval: PT30S
 
 management:
   endpoints:

@@ -16,6 +16,7 @@ public class FakeSandboxProvider implements SandboxProvider {
 
     private final List<SandboxSpec> created = new CopyOnWriteArrayList<>();
     private final Set<String> killed = ConcurrentHashMap.newKeySet();
+    private final Set<String> exited = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean failNextCreate = new AtomicBoolean(false);
 
     @Override
@@ -42,6 +43,15 @@ public class FakeSandboxProvider implements SandboxProvider {
 
     public boolean wasKilled(String sandboxId) {
         return killed.contains(sandboxId);
+    }
+
+    @Override
+    public SandboxStatus status(String sandboxId) {
+        return killed.contains(sandboxId) || exited.contains(sandboxId) ? SandboxStatus.EXITED : SandboxStatus.RUNNING;
+    }
+
+    public void markExited(String sandboxId) {
+        exited.add(sandboxId);
     }
 
     /** The spec used for the given run's sandbox (latest if created more than once). Tests read the raw token from it. */

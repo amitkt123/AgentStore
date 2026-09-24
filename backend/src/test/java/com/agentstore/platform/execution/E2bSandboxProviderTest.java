@@ -2,6 +2,7 @@ package com.agentstore.platform.execution;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -11,6 +12,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class E2bSandboxProviderTest {
@@ -47,5 +49,26 @@ class E2bSandboxProviderTest {
         provider.kill("sbx-123");
 
         server.verify();
+    }
+
+    @Test
+    void statusReportsRunningForALiveSandbox() {
+        server.expect(requestTo("https://api.e2b.app/sandboxes/sbx-1")).andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"sandboxID\":\"sbx-1\"}", MediaType.APPLICATION_JSON));
+        assertThat(provider.status("sbx-1")).isEqualTo(SandboxStatus.RUNNING);
+    }
+
+    @Test
+    void statusReportsExitedWhenE2bNoLongerKnowsTheSandbox() {
+        server.expect(requestTo("https://api.e2b.app/sandboxes/sbx-2")).andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThat(provider.status("sbx-2")).isEqualTo(SandboxStatus.EXITED);
+    }
+
+    @Test
+    void statusReportsUnknownOnProviderErrors() {
+        server.expect(requestTo("https://api.e2b.app/sandboxes/sbx-3")).andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+        assertThat(provider.status("sbx-3")).isEqualTo(SandboxStatus.UNKNOWN);
     }
 }
