@@ -21,6 +21,8 @@ agentstore:
   e2b:
     api-key: ${E2B_API_KEY:}
     base-url: https://api.e2b.app
+    connect-timeout: PT5S
+    read-timeout: PT30S
   callback:
     base-url: ${CALLBACK_BASE_URL:http://localhost:8080}
   jobs:

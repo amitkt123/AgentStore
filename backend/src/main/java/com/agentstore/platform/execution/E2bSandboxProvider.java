@@ -1,13 +1,16 @@
 package com.agentstore.platform.execution;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -29,11 +32,33 @@ public class E2bSandboxProvider implements SandboxProvider {
     private final RestClient restClient;
     private final String apiKey;
 
+    @Autowired
     public E2bSandboxProvider(RestClient.Builder builder,
                                @Value("${agentstore.e2b.base-url}") String baseUrl,
-                               @Value("${agentstore.e2b.api-key}") String apiKey) {
+                               @Value("${agentstore.e2b.api-key}") String apiKey,
+                               @Value("${agentstore.e2b.connect-timeout:PT5S}") Duration connectTimeout,
+                               @Value("${agentstore.e2b.read-timeout:PT30S}") Duration readTimeout) {
+        // Boot's auto-configured RestClient.Builder falls back to SimpleClientHttpRequestFactory in production
+        // (httpclient5 is test-scoped), which has no timeout by default. An unbounded call here would hang the
+        // single-threaded reaper and every other lifecycle call queued on the run row lock.
+        this.restClient = builder.baseUrl(baseUrl)
+                .requestFactory(timeoutRequestFactory(connectTimeout, readTimeout))
+                .build();
+        this.apiKey = apiKey;
+    }
+
+    /** Test-only: builds against a caller-supplied {@link RestClient.Builder} (e.g. one wired to a mock server) without
+     * overriding whatever request factory the caller already configured on it. */
+    E2bSandboxProvider(RestClient.Builder builder, String baseUrl, String apiKey) {
         this.restClient = builder.baseUrl(baseUrl).build();
         this.apiKey = apiKey;
+    }
+
+    private static SimpleClientHttpRequestFactory timeoutRequestFactory(Duration connectTimeout, Duration readTimeout) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout((int) connectTimeout.toMillis());
+        requestFactory.setReadTimeout((int) readTimeout.toMillis());
+        return requestFactory;
     }
 
     @Override

@@ -29,7 +29,8 @@ class E2bSandboxProviderLiveTest {
         String apiKey = System.getenv("E2B_API_KEY");
         assumeTrue(apiKey != null && !apiKey.isBlank(), "E2B_API_KEY not set");
         String template = System.getenv().getOrDefault("E2B_SMOKE_TEMPLATE", "base");
-        var provider = new E2bSandboxProvider(RestClient.builder(), "https://api.e2b.app", apiKey);
+        var provider = new E2bSandboxProvider(RestClient.builder(), "https://api.e2b.app", apiKey,
+                Duration.ofSeconds(5), Duration.ofSeconds(30));
 
         SandboxHandle handle = provider.create(new SandboxSpec(template, 60, Map.of(), List.of("example.com")));
         try {

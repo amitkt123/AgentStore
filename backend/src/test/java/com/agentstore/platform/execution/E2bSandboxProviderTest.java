@@ -6,11 +6,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -72,5 +77,32 @@ class E2bSandboxProviderTest {
         server.expect(requestTo("https://api.e2b.app/sandboxes/sbx-3")).andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
         assertThat(provider.status("sbx-3")).isEqualTo(SandboxStatus.UNKNOWN);
+    }
+
+    @Test
+    void readTimeoutFailsFastInsteadOfHangingForeverWhenE2bStalls() throws IOException {
+        // A raw socket that accepts the connection but never writes a response, simulating a hung/degraded E2B.
+        try (ServerSocket serverSocket = new ServerSocket(0)) {
+            Thread stallingServer = new Thread(() -> {
+                try (var socket = serverSocket.accept()) {
+                    Thread.sleep(5_000);
+                } catch (Exception ignored) {
+                    // test teardown or the client giving up first; nothing to do.
+                }
+            });
+            stallingServer.setDaemon(true);
+            stallingServer.start();
+
+            E2bSandboxProvider hangingProvider = new E2bSandboxProvider(RestClient.builder(),
+                    "http://localhost:" + serverSocket.getLocalPort(), "test-api-key",
+                    Duration.ofMillis(300), Duration.ofMillis(300));
+
+            long startNanos = System.nanoTime();
+            assertThatThrownBy(() -> hangingProvider.create(new SandboxSpec("t", 900, Map.of(), List.of())))
+                    .isInstanceOf(RestClientException.class);
+            long elapsedMs = Duration.ofNanos(System.nanoTime() - startNanos).toMillis();
+
+            assertThat(elapsedMs).isLessThan(4_000);
+        }
     }
 }
