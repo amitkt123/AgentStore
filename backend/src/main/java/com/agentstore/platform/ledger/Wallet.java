@@ -25,6 +25,7 @@ public class Wallet {
 
     private BigDecimal balance;
     private BigDecimal cap;
+    private BigDecimal reserved = BigDecimal.ZERO;
     private Instant createdAt;
     private Instant updatedAt;
 

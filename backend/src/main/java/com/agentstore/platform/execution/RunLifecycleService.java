@@ -3,6 +3,7 @@ package com.agentstore.platform.execution;
 import com.agentstore.platform.ledger.LedgerService;
 import com.agentstore.platform.ledger.UsageEvent;
 import com.agentstore.platform.ledger.UsageEventRepository;
+import com.agentstore.platform.ledger.WalletReservationService;
 import com.agentstore.platform.manifest.ManifestParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -38,17 +39,20 @@ public class RunLifecycleService {
     private final LedgerService ledgerService;
     private final ManifestParser manifestParser;
     private final SandboxProvider sandboxProvider;
+    private final WalletReservationService walletReservationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RunLifecycleService(RunRepository runRepository, RunStepRepository runStepRepository,
                                UsageEventRepository usageEventRepository, LedgerService ledgerService,
-                               ManifestParser manifestParser, SandboxProvider sandboxProvider) {
+                               ManifestParser manifestParser, SandboxProvider sandboxProvider,
+                               WalletReservationService walletReservationService) {
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.usageEventRepository = usageEventRepository;
         this.ledgerService = ledgerService;
         this.manifestParser = manifestParser;
         this.sandboxProvider = sandboxProvider;
+        this.walletReservationService = walletReservationService;
     }
 
     @Transactional
@@ -143,10 +147,14 @@ public class RunLifecycleService {
 
         step(run, RunStepKind.COST, detail);
         if (charged.signum() > 0) {
-            UsageEvent usageEvent = usageEventRepository.save(new UsageEvent(null, run.getId(),
-                    run.getConnection().getBuyerOrg().getId(), quantity, unitCost, charged));
+            UUID buyerOrgId = run.getConnection().getBuyerOrg().getId();
+            UsageEvent usageEvent = usageEventRepository.save(new UsageEvent(null, run.getId(), buyerOrgId,
+                    quantity, unitCost, charged));
             ledgerService.chargeUsageEvent(usageEvent.getId());
             run.setTotalCharged(run.getTotalCharged().add(charged));
+            BigDecimal consumed = charged.min(run.getReservedAmount());
+            walletReservationService.release(buyerOrgId, consumed);
+            run.setReservedAmount(run.getReservedAmount().subtract(consumed));
         }
 
         if (requested.compareTo(remaining) > 0) {
@@ -172,6 +180,10 @@ public class RunLifecycleService {
     }
 
     private void finish(Run run, RunStatus status) {
+        if (run.getReservedAmount().signum() > 0) {
+            walletReservationService.release(run.getConnection().getBuyerOrg().getId(), run.getReservedAmount());
+            run.setReservedAmount(BigDecimal.ZERO);
+        }
         run.setStatus(status);
         run.setCompletedAt(Instant.now());
         run.setAwaitingSince(null);

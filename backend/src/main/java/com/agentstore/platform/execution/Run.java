@@ -34,6 +34,7 @@ public class Run {
 
     private BigDecimal costCap;
     private BigDecimal totalCharged;
+    private BigDecimal reservedAmount = BigDecimal.ZERO;
     private String sandboxId;
     private String callbackTokenHash;
     private Instant startedAt;

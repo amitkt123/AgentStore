@@ -4,7 +4,8 @@ import com.agentstore.platform.catalog.AgentVersion;
 import com.agentstore.platform.catalog.AgentVersionRepository;
 import com.agentstore.platform.catalog.VersionStatus;
 import com.agentstore.platform.identity.JwtService;
-import com.agentstore.platform.ledger.WalletRepository;
+import com.agentstore.platform.ledger.InsufficientFundsException;
+import com.agentstore.platform.ledger.WalletReservationService;
 import com.agentstore.platform.manifest.ManifestParser;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,14 +35,14 @@ public class RunController {
     private final SandboxProvider sandboxProvider;
     private final RunTokenService runTokenService;
     private final String callbackBaseUrl;
-    private final WalletRepository walletRepository;
+    private final WalletReservationService walletReservationService;
     private final RunLifecycleService runLifecycleService;
 
     public RunController(ConnectionRepository connectionRepository, AgentVersionRepository agentVersionRepository,
                          RunRepository runRepository, SecretRepository secretRepository, SecretService secretService,
                          ManifestParser manifestParser, SandboxProvider sandboxProvider, RunTokenService runTokenService,
                          @Value("${agentstore.callback.base-url}") String callbackBaseUrl,
-                         WalletRepository walletRepository, RunLifecycleService runLifecycleService) {
+                         WalletReservationService walletReservationService, RunLifecycleService runLifecycleService) {
         this.connectionRepository = connectionRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.runRepository = runRepository;
@@ -51,7 +52,7 @@ public class RunController {
         this.sandboxProvider = sandboxProvider;
         this.runTokenService = runTokenService;
         this.callbackBaseUrl = callbackBaseUrl;
-        this.walletRepository = walletRepository;
+        this.walletReservationService = walletReservationService;
         this.runLifecycleService = runLifecycleService;
     }
 
@@ -63,23 +64,33 @@ public class RunController {
         if (connection.getStatus() != ConnectionStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Connection not active");
         }
-        var wallet = walletRepository.findByOrgId(connection.getBuyerOrg().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "No wallet for org"));
-        if (wallet.getBalance().compareTo(connection.getSpendCap()) < 0) {
-            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient wallet balance for spend cap");
-        }
         AgentVersion version = agentVersionRepository
                 .findFirstByAgentIdAndStatusOrderByApprovedAtDesc(connection.getAgent().getId(), VersionStatus.LIVE)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Agent has no LIVE version"));
         var manifest = manifestParser.parse(version.getManifestJson());
 
+        UUID buyerOrgId = connection.getBuyerOrg().getId();
+        BigDecimal spendCap = connection.getSpendCap();
+        try {
+            walletReservationService.reserve(buyerOrgId, spendCap);
+        } catch (InsufficientFundsException e) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, e.getMessage());
+        }
+
         String rawToken = runTokenService.generate();
         Instant now = Instant.now();
-        Run pending = new Run(null, connection, version, RunStatus.PENDING, connection.getSpendCap(),
-                BigDecimal.ZERO, null, RunTokenService.hash(rawToken));
+        Run pending = new Run(null, connection, version, RunStatus.PENDING, spendCap, BigDecimal.ZERO, null,
+                RunTokenService.hash(rawToken));
+        pending.setReservedAmount(spendCap);
         pending.setStartedAt(now);
         pending.setDeadlineAt(now.plusSeconds(SANDBOX_TIMEOUT_SECONDS));
-        Run run = runRepository.save(pending);
+        Run run;
+        try {
+            run = runRepository.save(pending);
+        } catch (RuntimeException e) {
+            walletReservationService.release(buyerOrgId, spendCap);
+            throw e;
+        }
 
         return launch(run, connection, version, manifest.networkAllowlist(), rawToken);
     }
