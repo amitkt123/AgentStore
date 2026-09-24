@@ -14,7 +14,7 @@
 - **Stack and layering.** The app stays Next.js 14 App Router. Server components fetch from the Spring backend through `lib/backend.ts`, with the JWT read from an httpOnly cookie. Client components render and call server actions, and polling goes through thin `/api/*` proxy routes. Every screen follows the existing split: `page.tsx` (server, fetches) → `XxxView.tsx` (client, renders, tested with React Testing Library) → `actions.ts` (server actions that return `ActionResult`).
 - **Design system.** Tokens are CSS variables mapped into Tailwind. The primitives are small, dependency-free React components in `src/components/ui/`.
 - **Legacy screens.** Old token names stay as aliases of the new palette, so developer and admin screens that FE-3 and FE-4 have not rebuilt yet keep rendering.
-- **Sessions.** When a person asks to stay signed in, a refresh-token cookie is stored. The middleware refreshes the access token on page navigations only (never on prefetches or API polls), so concurrent refreshes, which WS13 treats as token theft, stay rare.
+- **Sessions.** When a person asks to stay signed in, a refresh-token cookie is stored. The middleware refreshes the access token on page navigations only (never on prefetches or API polls), so concurrent refreshes, which WS13 treats as token theft, stay rare. This is not sufficient on its own: two tabs of the same session can still both hit a navigation at once and race to call `/auth/refresh` with the same token, and WS13's rotation treats the loser's reuse of the now-rotated token as theft, signing both tabs out. The proxy must therefore serialize refreshes per session — one in-flight refresh at a time, with any concurrent caller awaiting its result instead of issuing its own `/auth/refresh` call.
 
 **Tech Stack:** Next.js 14.2 (App Router, server actions), React 18, TypeScript 5, Tailwind CSS 3.4, TanStack Query 5, `next/font/google` (Instrument Sans), `geist` (Geist Mono), Vitest 5 + React Testing Library + jsdom, Playwright.
 
@@ -823,6 +823,7 @@ git commit -m "feat(frontend): Karya design tokens, fonts, formatting helpers an
 
 **Interfaces:**
 - Consumes: `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout` (WS13).
+- Assumption: `refreshSession`/the middleware's refresh path is called at most once at a time per session — concurrent callers (e.g. two tabs navigating together) must be serialized (a shared in-flight promise, or equivalent) in front of it, not each call `/auth/refresh` independently, because WS13 revokes the whole refresh-token family on reuse of an already-rotated token.
 - Produces:
   - `backend.get/post/put/patch/delete<T>(path, body?)`. `BackendError` moves to `lib/backendError.ts` and is re-exported from `lib/backend.ts`.
   - `problemCode(e): string | undefined`, `problemMessage(e, fallback): string`.

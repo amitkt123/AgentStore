@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-and-sandbox-design.md` §5 **WS13** (read it first), plus §10 rows 1, 2 and 4.
 
-**Prerequisite:** the WS0 plan (`2026-09-23-ws0-execution-defect-fixes.md`) is merged. This plan touches `EndToEndTierATest`/`EndToEndTierBTest` only at their signup lines, which WS0 does not change.
+**Prerequisite:** the WS0 plan (`2026-09-23-ws0-execution-defect-fixes.md`) is merged. This plan touches `EndToEndTierATest`/`EndToEndTierBTest` only at their signup lines and their approver block (Task 3 replaces the minted approver token with a real invited teammate), neither of which WS0 changes.
 
 ## Global Constraints
 
