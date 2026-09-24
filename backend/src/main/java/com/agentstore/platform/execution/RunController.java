@@ -58,6 +58,10 @@ public class RunController {
     public RunResponse trigger(@Valid @RequestBody TriggerRunRequest request) {
         Connection connection = connectionRepository.findById(request.connectionId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Connection not found"));
+        var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!connection.getBuyerOrg().getId().equals(claims.orgId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Connection not owned by caller's org");
+        }
         if (connection.getStatus() != ConnectionStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Connection not active");
         }

@@ -72,6 +72,12 @@ public class ConnectionController {
     @PostMapping("/{connectionId}/secrets")
     @PreAuthorize("hasRole('BUYER_ADMIN')")
     public void storeSecret(@PathVariable java.util.UUID connectionId, @RequestBody StoreSecretRequest request) {
+        Connection connection = connectionRepository.findById(connectionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Connection not found"));
+        var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!connection.getBuyerOrg().getId().equals(claims.orgId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Connection not owned by caller's org");
+        }
         secretService.store(connectionId, request.name(), request.value());
     }
 
