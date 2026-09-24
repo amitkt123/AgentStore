@@ -4,6 +4,8 @@ import com.agentstore.platform.AbstractIntegrationTest;
 import com.agentstore.platform.catalog.*;
 import com.agentstore.platform.identity.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -77,6 +79,24 @@ class ConnectionControllerTest extends AbstractIntegrationTest {
         headers.setContentType(MediaType.APPLICATION_JSON);
         var request = new HttpEntity<>(
                 new CreateConnectionRequest(agent.getId(), List.of("gst_portal_login"), new BigDecimal("500.00")), headers);
+
+        var response = rest.postForEntity(url("/api/v1/connections"), request, String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-500.00", "0"})
+    void buyerCannotCreateAConnectionWithANonPositiveSpendCap(String spendCap) throws Exception {
+        Org developer = orgRepository.save(new Org(null, "DevCo3", OrgType.DEVELOPER));
+        Org buyer = orgRepository.save(new Org(null, "Acme SMB 3", OrgType.BUYER));
+        Agent agent = liveBankReconAgent(developer);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), buyer.getId(), UserRole.BUYER_ADMIN));
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        var request = new HttpEntity<>(
+                new CreateConnectionRequest(agent.getId(), List.of("bank_statement"), new BigDecimal(spendCap)), headers);
 
         var response = rest.postForEntity(url("/api/v1/connections"), request, String.class);
 

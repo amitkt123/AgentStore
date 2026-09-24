@@ -19,6 +19,9 @@ public class WalletReservationService {
 
     @Transactional
     public void reserve(UUID orgId, BigDecimal amount) {
+        if (amount.signum() < 0) {
+            throw new IllegalArgumentException("Reservation amount must not be negative: " + amount);
+        }
         Wallet wallet = walletRepository.findByOrgId(orgId)   // PESSIMISTIC_WRITE row lock
                 .orElseThrow(() -> new InsufficientFundsException("No wallet for org"));
         BigDecimal available = wallet.getBalance().subtract(wallet.getReserved());
@@ -32,7 +35,10 @@ public class WalletReservationService {
 
     @Transactional
     public void release(UUID orgId, BigDecimal amount) {
-        if (amount.signum() <= 0) {
+        if (amount.signum() < 0) {
+            throw new IllegalArgumentException("Release amount must not be negative: " + amount);
+        }
+        if (amount.signum() == 0) {
             return;
         }
         Wallet wallet = walletRepository.findByOrgId(orgId)
