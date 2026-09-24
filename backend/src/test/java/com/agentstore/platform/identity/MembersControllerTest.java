@@ -94,6 +94,23 @@ class MembersControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void aDemotedAdminsOldTokenLosesManagerRightsImmediately() {
+        OrgMembership admin = identity.buyerAdmin(email());
+        OrgMembership secondAdmin = identity.member(admin.getOrg(), email(), UserRole.BUYER_ADMIN, null);
+        String staleAdminToken = identity.tokenFor(admin);   // minted while `admin` still held BUYER_ADMIN
+
+        // A second admin demotes the first. `staleAdminToken` still carries role=BUYER_ADMIN.
+        rest.exchange(members(admin) + "/" + admin.getUser().getId(), HttpMethod.PATCH,
+                new HttpEntity<>(Map.of("role", "BUYER_APPROVER"), bearer(identity.tokenFor(secondAdmin))),
+                Void.class);
+
+        var response = rest.exchange(members(admin) + "/" + secondAdmin.getUser().getId(), HttpMethod.PATCH,
+                new HttpEntity<>(Map.of("title", "New title"), bearer(staleAdminToken)), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     void removingAMemberDeletesTheMembershipOnly() {
         OrgMembership admin = identity.buyerAdmin(email());
         OrgMembership approver = identity.member(admin.getOrg(), email(), UserRole.BUYER_APPROVER, null);

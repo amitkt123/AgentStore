@@ -56,6 +56,7 @@ public class MembersController {
     public Member update(@PathVariable UUID orgId, @PathVariable UUID userId,
                          @Valid @RequestBody UpdateMemberRequest request) {
         requireManager(orgId);
+        orgRepository.findByIdForUpdate(orgId);   // lock the org row before reading any membership's role
         OrgMembership membership = membershipRepository.findById(new OrgMembershipId(userId, orgId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
         if (request.role() != null && request.role() != membership.getRole()) {
@@ -76,6 +77,7 @@ public class MembersController {
     @Transactional
     public ResponseEntity<Void> remove(@PathVariable UUID orgId, @PathVariable UUID userId) {
         requireManager(orgId);
+        orgRepository.findByIdForUpdate(orgId);   // lock the org row before reading any membership's role
         OrgMembership membership = membershipRepository.findById(new OrgMembershipId(userId, orgId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
         requireAnotherAdminRemains(membership);
@@ -120,20 +122,32 @@ public class MembersController {
         return claims;
     }
 
+    /**
+     * Requires the caller to hold a manager role in this org RIGHT NOW, per the database, not per the JWT.
+     * A JWT's role is a snapshot from login time; if the caller was demoted or removed since, their token
+     * can be up to {@code agentstore.jwt.expiration-minutes} stale, and trusting it would let a demoted
+     * admin keep managing members (including re-promoting themselves) until it expires.
+     */
     private JwtService.Claims requireManager(UUID orgId) {
         var claims = requireSameOrg(orgId);
-        if (!OrgRoles.canManageMembers(claims.role())) {
+        OrgMembership current = membershipRepository.findById(new OrgMembershipId(claims.userId(), orgId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Only workspace admins can manage members"));
+        if (!OrgRoles.canManageMembers(current.getRole())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only workspace admins can manage members");
         }
         return claims;
     }
 
     /**
-     * Refuses to leave an org without anyone holding its admin role. Locks the org row first so two admins
-     * removing each other at the same moment cannot both pass the count. Both callers are @Transactional.
+     * Refuses to leave an org without anyone holding its admin role. Callers MUST lock the org row via
+     * {@link OrgRepository#findByIdForUpdate} and only load {@code membership} afterwards, in the same
+     * transaction, before calling this: an entity loaded before the lock keeps whatever role it had at load
+     * time even after the lock is acquired (JPA's persistence-context cache does not re-fetch it), so reading
+     * a pre-lock snapshot here could see a membership as non-admin when a concurrent request has since
+     * promoted it, letting two admin-count checks each pass on a workspace that ends up with zero admins.
      */
     private void requireAnotherAdminRemains(OrgMembership membership) {
-        orgRepository.findByIdForUpdate(membership.getId().getOrgId());
         UserRole adminRole = OrgRoles.adminRoleOf(membership.getOrg().getType());
         if (membership.getRole() == adminRole
                 && membershipRepository.countByIdOrgIdAndRole(membership.getId().getOrgId(), adminRole) <= 1) {
