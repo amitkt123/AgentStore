@@ -50,6 +50,7 @@ public class ExecutionFixtures {
         version = agentVersionRepository.save(version);
         Connection connection = new Connection(null, buyer, agent, List.of("bank_statement"), spendCap,
                 ConnectionStatus.ACTIVE);
+        connection.setAgentVersion(version);
         connection = connectionRepository.save(connection);
         Wallet wallet = new Wallet(null, buyer.getId(), walletBalance, null);
         wallet.setUpdatedAt(Instant.now());

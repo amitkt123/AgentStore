@@ -1,7 +1,6 @@
 package com.agentstore.platform.execution;
 
 import com.agentstore.platform.catalog.AgentVersion;
-import com.agentstore.platform.catalog.AgentVersionRepository;
 import com.agentstore.platform.catalog.VersionStatus;
 import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.ledger.InsufficientFundsException;
@@ -27,7 +26,6 @@ public class RunController {
     static final int SANDBOX_TIMEOUT_SECONDS = 900;
 
     private final ConnectionRepository connectionRepository;
-    private final AgentVersionRepository agentVersionRepository;
     private final RunRepository runRepository;
     private final SecretRepository secretRepository;
     private final SecretService secretService;
@@ -38,13 +36,12 @@ public class RunController {
     private final WalletReservationService walletReservationService;
     private final RunLifecycleService runLifecycleService;
 
-    public RunController(ConnectionRepository connectionRepository, AgentVersionRepository agentVersionRepository,
-                         RunRepository runRepository, SecretRepository secretRepository, SecretService secretService,
+    public RunController(ConnectionRepository connectionRepository, RunRepository runRepository,
+                         SecretRepository secretRepository, SecretService secretService,
                          ManifestParser manifestParser, SandboxProvider sandboxProvider, RunTokenService runTokenService,
                          @Value("${agentstore.callback.base-url}") String callbackBaseUrl,
                          WalletReservationService walletReservationService, RunLifecycleService runLifecycleService) {
         this.connectionRepository = connectionRepository;
-        this.agentVersionRepository = agentVersionRepository;
         this.runRepository = runRepository;
         this.secretRepository = secretRepository;
         this.secretService = secretService;
@@ -64,9 +61,14 @@ public class RunController {
         if (connection.getStatus() != ConnectionStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Connection not active");
         }
-        AgentVersion version = agentVersionRepository
-                .findFirstByAgentIdAndStatusOrderByApprovedAtDesc(connection.getAgent().getId(), VersionStatus.LIVE)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Agent has no LIVE version"));
+        AgentVersion version = connection.getAgentVersion();
+        if (version == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Connection is not pinned to an agent version; reconnect to the agent");
+        }
+        if (version.getStatus() != VersionStatus.LIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Pinned agent version is no longer LIVE");
+        }
         var manifest = manifestParser.parse(version.getManifestJson());
 
         UUID buyerOrgId = connection.getBuyerOrg().getId();

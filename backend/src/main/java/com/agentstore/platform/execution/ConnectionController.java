@@ -63,9 +63,10 @@ public class ConnectionController {
         var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Org buyerOrg = orgRepository.getReferenceById(claims.orgId());
 
-        Connection saved = connectionRepository.save(new Connection(null, buyerOrg, agent, request.grantedScopes(),
-                request.spendCap(), ConnectionStatus.ACTIVE));
-        return ConnectionResponse.from(saved);
+        Connection connection = new Connection(null, buyerOrg, agent, request.grantedScopes(), request.spendCap(),
+                ConnectionStatus.ACTIVE);
+        connection.setAgentVersion(liveVersion);
+        return ConnectionResponse.from(connectionRepository.save(connection));
     }
 
     @PostMapping("/{connectionId}/secrets")

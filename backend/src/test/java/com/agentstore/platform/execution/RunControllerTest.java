@@ -67,8 +67,10 @@ class RunControllerTest extends AbstractIntegrationTest {
                 VersionStatus.LIVE, Tier.TIER_B, "cl");
         version.setApprovedAt(Instant.now());
         agentVersionRepository.save(version);
-        Connection connection = connectionRepository.save(new Connection(null, buyer, agent,
-                List.of("invoice", "whatsapp_message"), new BigDecimal("200.00"), ConnectionStatus.ACTIVE));
+        Connection connection = new Connection(null, buyer, agent,
+                List.of("invoice", "whatsapp_message"), new BigDecimal("200.00"), ConnectionStatus.ACTIVE);
+        connection.setAgentVersion(version);
+        connection = connectionRepository.save(connection);
         Wallet wallet = new Wallet(null, buyer.getId(), new BigDecimal("1000.00"), null);
         wallet.setUpdatedAt(Instant.now());
         walletRepository.save(wallet);
