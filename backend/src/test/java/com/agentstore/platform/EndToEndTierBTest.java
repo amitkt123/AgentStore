@@ -81,13 +81,16 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
         rest.postForEntity(url("/api/v1/auth/signup"),
                 new SignupRequest("Karya Admin", "Platform", "admin@platform.example", "pw", SignupSide.DEVELOPER),
                 AuthResponse.class);
-        // A listed admin-emails address is not platform ADMIN until it verifies (I1): confirm the email,
-        // then log back in for a token that actually carries ADMIN.
-        String adminVerifyToken = com.agentstore.platform.common.RecordingEmailSender.tokenFromLink(
-                emails.lastTo("admin@platform.example").orElseThrow(), "verify-email");
-        rest.postForEntity(url("/api/v1/auth/email/verify"), Map.of("token", adminVerifyToken), Void.class);
+        // A listed admin-emails address is not platform ADMIN just by signing up, or even by verifying
+        // the email (I1 round 2): only a completed password reset proves control of the account and
+        // promotes it. Drive that flow, then log back in for a token that actually carries ADMIN.
+        rest.postForEntity(url("/api/v1/auth/password/forgot"), Map.of("email", "admin@platform.example"), Void.class);
+        String adminResetToken = com.agentstore.platform.common.RecordingEmailSender.tokenFromLink(
+                emails.lastTo("admin@platform.example").orElseThrow(), "reset-password");
+        rest.postForEntity(url("/api/v1/auth/password/reset"),
+                Map.of("token", adminResetToken, "password", "new-admin-pw"), Void.class);
         var adminLogin = rest.postForEntity(url("/api/v1/auth/login"),
-                new LoginRequest("admin@platform.example", "pw", false), AuthResponse.class).getBody();
+                new LoginRequest("admin@platform.example", "new-admin-pw", false), AuthResponse.class).getBody();
         var queue = rest.exchange(url("/api/v1/review/queue"), HttpMethod.GET,
                 new HttpEntity<>(bearer(adminLogin.token())), new ParameterizedTypeReference<List<ReviewItemResponse>>() {}).getBody();
         var pending = queue.stream().filter(i -> i.agentVersionId().equals(version.id())).findFirst().orElseThrow();

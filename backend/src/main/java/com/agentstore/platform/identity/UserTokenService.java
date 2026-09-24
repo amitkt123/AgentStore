@@ -57,7 +57,9 @@ public class UserTokenService {
             user.setEmailVerifiedAt(Instant.now());
             userRepository.save(user);
         }
-        identityService.promoteToAdminIfListed(user);
+        // ADMIN is not granted here (I1 round 2): verifying an unsolicited link doesn't prove this
+        // caller controls the account's password, only its inbox. See promoteToAdminIfListed, called
+        // only from resetPassword, which replaces the password and revokes existing sessions too.
     }
 
     /**

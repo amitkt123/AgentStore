@@ -6,7 +6,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 
 import java.util.Map;
 import java.util.UUID;
@@ -27,6 +31,8 @@ class AuthControllerTest extends AbstractIntegrationTest {
     OrgMembershipRepository membershipRepository;
     @Autowired
     RecordingEmailSender emails;
+    @Autowired
+    IdentityFixtures identity;
 
     String url(String path) {
         return "http://localhost:" + port + path;
@@ -38,6 +44,13 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
     JwtService.Claims claimsOf(AuthResponse response) {
         return jwtService.parse(response.token()).orElseThrow();
+    }
+
+    HttpHeaders bearer(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
     }
 
     @Test
@@ -70,7 +83,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void listedAdminEmailIsNotPlatformAdminUntilItVerifiesThenLoginIsAdmin() {
+    void listedAdminEmailIsPromotedToAdminOnlyByACompletedPasswordResetNotByVerifyingAlone() {
         // application-test.yml lists admin-auth-test@platform.example (EndToEndTierBTest uses admin@platform.example;
         // the test database is shared across classes, so each test class needs its own address)
         String email = "Admin-Auth-Test@Platform.example";
@@ -79,28 +92,69 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 AuthResponse.class);
         assertThat(claimsOf(signup.getBody()).role()).isEqualTo(UserRole.DEVELOPER);
 
-        String token = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "verify-email");
-        rest.postForEntity(url("/api/v1/auth/email/verify"), Map.of("token", token), Void.class);
-
-        var login = rest.postForEntity(url("/api/v1/auth/login"),
+        // Verifying the email alone (I1 round 2) never promotes: an impostor could have signed up with
+        // this address first, and confirming an unsolicited link doesn't prove control of the password.
+        String verifyToken = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "verify-email");
+        rest.postForEntity(url("/api/v1/auth/email/verify"), Map.of("token", verifyToken), Void.class);
+        var loginAfterVerify = rest.postForEntity(url("/api/v1/auth/login"),
                 new LoginRequest(email, "s3cret-pw", false), AuthResponse.class);
-        assertThat(claimsOf(login.getBody()).role()).isEqualTo(UserRole.ADMIN);
+        assertThat(claimsOf(loginAfterVerify.getBody()).role()).isEqualTo(UserRole.DEVELOPER);
+
+        // A completed password reset proves control of the inbox and replaces the password, so it does.
+        rest.postForEntity(url("/api/v1/auth/password/forgot"), Map.of("email", email), Void.class);
+        String resetToken = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "reset-password");
+        rest.postForEntity(url("/api/v1/auth/password/reset"),
+                Map.of("token", resetToken, "password", "new-s3cret-pw"), Void.class);
+        var loginAfterReset = rest.postForEntity(url("/api/v1/auth/login"),
+                new LoginRequest(email, "new-s3cret-pw", false), AuthResponse.class);
+        assertThat(claimsOf(loginAfterReset.getBody()).role()).isEqualTo(UserRole.ADMIN);
     }
 
     @Test
-    void anUnlistedEmailThatVerifiesStaysTheOrdinaryRole() {
+    void anUnlistedEmailStaysTheOrdinaryRoleAfterVerifyingAndResetting() {
         String email = unique("notadmin");
         var signup = rest.postForEntity(url("/api/v1/auth/signup"),
                 new SignupRequest("Not Admin", "Karya", email, "s3cret-pw", SignupSide.DEVELOPER),
                 AuthResponse.class);
         assertThat(claimsOf(signup.getBody()).role()).isEqualTo(UserRole.DEVELOPER);
 
-        String token = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "verify-email");
-        rest.postForEntity(url("/api/v1/auth/email/verify"), Map.of("token", token), Void.class);
+        String verifyToken = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "verify-email");
+        rest.postForEntity(url("/api/v1/auth/email/verify"), Map.of("token", verifyToken), Void.class);
+
+        rest.postForEntity(url("/api/v1/auth/password/forgot"), Map.of("email", email), Void.class);
+        String resetToken = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "reset-password");
+        rest.postForEntity(url("/api/v1/auth/password/reset"),
+                Map.of("token", resetToken, "password", "new-s3cret-pw"), Void.class);
 
         var login = rest.postForEntity(url("/api/v1/auth/login"),
-                new LoginRequest(email, "s3cret-pw", false), AuthResponse.class);
+                new LoginRequest(email, "new-s3cret-pw", false), AuthResponse.class);
         assertThat(claimsOf(login.getBody()).role()).isEqualTo(UserRole.DEVELOPER);
+    }
+
+    @Test
+    void aListedEmailWhoseAccountCameFromAcceptingAnInvitationIsNeverPromotedByAReset() {
+        // admin-invited-test@platform.example is listed only for this test: the user is never created by
+        // IdentityService.signup/addOrg, so it has no signup org of its own (I1 round 2) — it joins a
+        // stranger's org through a real invitation instead.
+        String email = "admin-invited-test@platform.example";
+        OrgMembership inviter = identity.buyerAdmin("inviter-" + UUID.randomUUID() + "@acme.example");
+        var invite = rest.exchange(url("/api/v1/orgs/" + inviter.getOrg().getId() + "/invitations"), HttpMethod.POST,
+                new HttpEntity<>(Map.of("email", email, "role", "BUYER_APPROVER"), bearer(identity.tokenFor(inviter))),
+                String.class);
+        assertThat(invite.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String inviteToken = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "invite");
+        var accepted = rest.postForEntity(url("/api/v1/invitations/" + inviteToken + "/accept"),
+                Map.of("fullName", "Invited Admin", "password", "s3cret-pw"), AuthResponse.class);
+        assertThat(claimsOf(accepted.getBody()).role()).isEqualTo(UserRole.BUYER_APPROVER);
+
+        rest.postForEntity(url("/api/v1/auth/password/forgot"), Map.of("email", email), Void.class);
+        String resetToken = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "reset-password");
+        rest.postForEntity(url("/api/v1/auth/password/reset"),
+                Map.of("token", resetToken, "password", "new-s3cret-pw"), Void.class);
+
+        var login = rest.postForEntity(url("/api/v1/auth/login"),
+                new LoginRequest(email, "new-s3cret-pw", false), AuthResponse.class);
+        assertThat(claimsOf(login.getBody()).role()).isEqualTo(UserRole.BUYER_APPROVER);
     }
 
     @Test

@@ -55,8 +55,8 @@ public class IdentityService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
         }
         // A password signup never grants ADMIN before the email is verified, even for a listed address
-        // (I1): it gets the side's ordinary role, and promoteToAdminIfListed upgrades it once
-        // verifyEmail or resetPassword proves control of the inbox.
+        // (I1): it gets the side's ordinary role, and promoteToAdminIfListed upgrades it once a
+        // completed password reset proves control of the inbox.
         UserRole role = OrgRoles.adminRoleOf(request.side().orgType());
         return addOrg(user, request.side(), request.orgName(), role);
     }
@@ -75,18 +75,21 @@ public class IdentityService {
     }
 
     /**
-     * Upgrades a user's first (self-created) membership to platform {@code ADMIN} once their email is
-     * verified, if that email is listed in {@code agentstore.identity.admin-emails}. Callers must only
-     * invoke this once verification is established: a redeemed email-verify link, or a completed
-     * password reset (which also proves control of the inbox). A no-op for an unlisted email, an
-     * already-ADMIN membership, or a first membership that isn't a developer org (matching
-     * {@link #adminAwareRole}, which never grants ADMIN on the buyer side). Idempotent.
+     * Upgrades a user's own signup-org membership ({@link User#getSignupOrgId()}) to platform
+     * {@code ADMIN}, if that user's email is listed in {@code agentstore.identity.admin-emails}. Callers
+     * must only invoke this once a completed password reset has proved control of the inbox and replaced
+     * whatever password an impostor may have set (verifying the email alone is not enough: someone else
+     * could have signed up with this address first). A no-op for an unlisted email, a user with no
+     * recorded signup org (for example one created by accepting an invitation, who never created an org
+     * of their own), a signup-org membership that no longer exists, an already-ADMIN membership, or a
+     * signup org that isn't a developer org (matching {@link #adminAwareRole}, which never grants ADMIN
+     * on the buyer side). Idempotent.
      */
     @Transactional
     public void promoteToAdminIfListed(User user) {
         if (!adminEmails.contains(normalizeEmail(user.getEmail()))) return;
-        membershipRepository.findByIdUserIdOrderByCreatedAtAsc(user.getId()).stream()
-                .findFirst()
+        if (user.getSignupOrgId() == null) return;
+        membershipRepository.findById(new OrgMembershipId(user.getId(), user.getSignupOrgId()))
                 .filter(m -> m.getOrg().getType() == OrgType.DEVELOPER)
                 .filter(m -> m.getRole() != UserRole.ADMIN)
                 .ifPresent(m -> {
@@ -95,12 +98,17 @@ public class IdentityService {
                 });
     }
 
-    /** Creates an org of the given side with this user as its first member, and makes it the landing org. */
+    /**
+     * Creates an org of the given side with this user as its first member, and makes it the landing org.
+     * Also records it as the user's signup org, the first time this runs for them (never overwritten by
+     * a later {@code /me/orgs} call), so {@link #promoteToAdminIfListed} can find it again.
+     */
     @Transactional
     public OrgMembership addOrg(User user, SignupSide side, String orgName, UserRole role) {
         Org org = orgRepository.save(new Org(null, orgName.trim(), side.orgType()));
         OrgMembership membership = membershipRepository.save(new OrgMembership(user, org, role, null));
         user.setLastOrgId(org.getId());
+        if (user.getSignupOrgId() == null) user.setSignupOrgId(org.getId());
         userRepository.save(user);
         return membership;
     }
