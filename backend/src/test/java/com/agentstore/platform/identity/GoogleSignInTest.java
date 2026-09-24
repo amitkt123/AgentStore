@@ -29,6 +29,8 @@ class GoogleSignInTest extends AbstractIntegrationTest {
     IdentityFixtures identity;
     @Autowired
     UserRepository userRepository;
+    @Autowired
+    UserIdentityRepository userIdentityRepository;
 
     @AfterEach
     void resetVerifier() {
@@ -135,5 +137,37 @@ class GoogleSignInTest extends AbstractIntegrationTest {
                 body(registered(email(), true), "BUYER", "Org"), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void aRecycledEmailCannotTakeOverAnAccountAlreadyLinkedToADifferentGoogleSubject() {
+        String email = email();
+        var created = rest.postForEntity(url("/api/v1/auth/google"), body(registered(email, true), "BUYER", "Org"),
+                AuthResponse.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.OK);
+        UUID userId = jwtService.parse(created.getBody().token()).orElseThrow().userId();
+        assertThat(linksFor(userId)).isEqualTo(1);
+
+        // Same email, but a different Google subject (as if the address were deleted and re-issued).
+        var response = rest.postForEntity(url("/api/v1/auth/google"),
+                body(registered(email, true), null, null), Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().get("code")).isEqualTo("ACCOUNT_LINKED_TO_OTHER_GOOGLE");
+        assertThat(linksFor(userId)).isEqualTo(1);
+    }
+
+    @Test
+    void googleAccountsWithNoEmailClaimAreRejected() {
+        String idToken = "id-" + UUID.randomUUID();
+        google.register(idToken, new GoogleIdentity("sub-" + UUID.randomUUID(), null, true, "No Email"));
+
+        var response = rest.postForEntity(url("/api/v1/auth/google"), body(idToken, "BUYER", "Org"), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    private long linksFor(UUID userId) {
+        return userIdentityRepository.findAll().stream().filter(link -> link.getUserId().equals(userId)).count();
     }
 }

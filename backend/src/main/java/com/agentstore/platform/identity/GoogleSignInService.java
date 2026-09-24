@@ -41,6 +41,7 @@ public class GoogleSignInService {
     public OrgMembership signIn(String idToken, SignupSide side, String orgName) {
         GoogleIdentity google = verifier.verify(idToken)
                 .filter(GoogleIdentity::emailVerified)
+                .filter(g -> g.email() != null && !g.email().isBlank())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google sign-in failed"));
 
         User user = identityRepository.findByProviderAndSubject(PROVIDER, google.subject())
@@ -54,6 +55,12 @@ public class GoogleSignInService {
                 if (existing.getEmailVerifiedAt() == null) {
                     throw new SignInProblem(HttpStatus.CONFLICT, "ACCOUNT_EXISTS_UNVERIFIED",
                             "Sign in with your password and confirm your email first");
+                }
+                if (identityRepository.existsByProviderAndUserId(PROVIDER, existing.getId())) {
+                    // The email now points at a recycled or re-assigned address; the account is already
+                    // keyed to a different Google subject, so this token must not take it over.
+                    throw new SignInProblem(HttpStatus.CONFLICT, "ACCOUNT_LINKED_TO_OTHER_GOOGLE",
+                            "This account is already linked to a different Google sign-in");
                 }
                 user = existing;
             } else {
