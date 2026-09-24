@@ -1,5 +1,6 @@
 package com.agentstore.platform;
 
+import com.agentstore.platform.execution.FakeSandboxProvider;
 import com.agentstore.platform.execution.RunResponse;
 import com.agentstore.platform.execution.RunStatus;
 import com.agentstore.platform.identity.AuthResponse;
@@ -143,8 +144,10 @@ class EndToEndTierATest extends AbstractIntegrationTest {
 
     @Autowired
     com.agentstore.platform.execution.RunRepository runRepository;
+    @Autowired
+    FakeSandboxProvider fakeSandboxProvider;
 
     private String fetchCallbackToken(UUID runId) {
-        return runRepository.findById(runId).orElseThrow().getCallbackToken();
+        return fakeSandboxProvider.specForRun(runId).envVars().get("AGENT_CALLBACK_TOKEN");
     }
 }

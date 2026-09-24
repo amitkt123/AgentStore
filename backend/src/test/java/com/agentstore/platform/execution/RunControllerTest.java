@@ -14,6 +14,7 @@ import org.springframework.http.*;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -42,9 +43,20 @@ class RunControllerTest extends AbstractIntegrationTest {
     FakeSandboxProvider fakeSandboxProvider;
     @Autowired
     WalletRepository walletRepository;
+    @Autowired
+    SecretRepository secretRepository;
+    @Autowired
+    ExecutionFixtures fixtures;
 
     String url(String path) {
         return "http://localhost:" + port + path;
+    }
+
+    HttpHeaders buyerAdmin(UUID orgId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), orgId, UserRole.BUYER_ADMIN));
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
     }
 
     @Test
@@ -57,8 +69,10 @@ class RunControllerTest extends AbstractIntegrationTest {
                 VersionStatus.LIVE, Tier.TIER_B, "cl");
         version.setApprovedAt(Instant.now());
         agentVersionRepository.save(version);
-        Connection connection = connectionRepository.save(new Connection(null, buyer, agent,
-                List.of("invoice", "whatsapp_message"), new BigDecimal("200.00"), ConnectionStatus.ACTIVE));
+        Connection connection = new Connection(null, buyer, agent,
+                List.of("invoice", "whatsapp_message"), new BigDecimal("200.00"), ConnectionStatus.ACTIVE);
+        connection.setAgentVersion(version);
+        connection = connectionRepository.save(connection);
         Wallet wallet = new Wallet(null, buyer.getId(), new BigDecimal("1000.00"), null);
         wallet.setUpdatedAt(Instant.now());
         walletRepository.save(wallet);
@@ -75,12 +89,66 @@ class RunControllerTest extends AbstractIntegrationTest {
 
         Run saved = runRepository.findById(response.getBody().id()).orElseThrow();
         assertThat(saved.getSandboxId()).isNotBlank();
-        assertThat(saved.getCallbackToken()).isNotBlank();
 
         var lastSpec = fakeSandboxProvider.createdSpecs().get(fakeSandboxProvider.createdSpecs().size() - 1);
         assertThat(lastSpec.templateId()).isEqualTo("collections-template-v1");
         assertThat(lastSpec.allowOut()).contains("graph.facebook.com");
         assertThat(lastSpec.envVars()).containsEntry("AGENT_RUN_ID", saved.getId().toString());
-        assertThat(lastSpec.envVars()).containsEntry("AGENT_CALLBACK_TOKEN", saved.getCallbackToken());
+
+        String rawToken = fakeSandboxProvider.specForRun(saved.getId()).envVars().get("AGENT_CALLBACK_TOKEN");
+        assertThat(rawToken).isNotBlank();
+        assertThat(saved.getCallbackTokenHash()).isEqualTo(RunTokenService.hash(rawToken)).isNotEqualTo(rawToken);
+    }
+
+    @Test
+    void triggeredRunGetsADeadlineMatchingTheSandboxTimeout() {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+
+        var response = rest.postForEntity(url("/api/v1/runs"),
+                new HttpEntity<>(new TriggerRunRequest(s.connection().getId()), buyerAdmin(s.buyer().getId())),
+                RunResponse.class);
+
+        Run saved = runRepository.findById(response.getBody().id()).orElseThrow();
+        assertThat(Duration.between(saved.getStartedAt(), saved.getDeadlineAt()))
+                .isEqualTo(Duration.ofSeconds(RunController.SANDBOX_TIMEOUT_SECONDS));
+    }
+
+    @Test
+    void sandboxCreationFailureFailsTheRunAndReturnsBadGateway() {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+        fakeSandboxProvider.failNextCreate();
+
+        var response = rest.postForEntity(url("/api/v1/runs"),
+                new HttpEntity<>(new TriggerRunRequest(s.connection().getId()), buyerAdmin(s.buyer().getId())),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        var runs = runRepository.findByConnectionBuyerOrgIdOrderByStartedAtDesc(s.buyer().getId());
+        assertThat(runs).singleElement().satisfies(r -> {
+            assertThat(r.getStatus()).isEqualTo(RunStatus.FAILED);
+            assertThat(r.getCompletedAt()).isNotNull();
+        });
+    }
+
+    @Test
+    void secretRevealFailureFailsTheRunAndReleasesTheReservation() {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+        // A corrupted secret row: reveal() will fail to decrypt it, mimicking a decryption failure after key
+        // rotation or a corrupted row, well before sandboxProvider.create is ever reached.
+        secretRepository.save(new Secret(null, s.connection(), "broken",
+                "not-a-valid-ciphertext".getBytes(), new byte[12]));
+
+        var response = rest.postForEntity(url("/api/v1/runs"),
+                new HttpEntity<>(new TriggerRunRequest(s.connection().getId()), buyerAdmin(s.buyer().getId())),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        var runs = runRepository.findByConnectionBuyerOrgIdOrderByStartedAtDesc(s.buyer().getId());
+        assertThat(runs).singleElement().satisfies(r -> {
+            assertThat(r.getStatus()).isEqualTo(RunStatus.FAILED);
+            assertThat(r.getCompletedAt()).isNotNull();
+        });
+        Wallet wallet = walletRepository.findByOrgId(s.buyer().getId()).orElseThrow();
+        assertThat(wallet.getReserved()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }

@@ -12,4 +12,9 @@ describe("StatusPill", () => {
     render(<StatusPill status="SOMETHING_NEW" />);
     expect(screen.getByText("something new")).toBeInTheDocument();
   });
+
+  it("styles expired runs as a stop, not neutral", () => {
+    render(<StatusPill status="EXPIRED" />);
+    expect(screen.getByText("expired").className).toContain("text-red");
+  });
 });

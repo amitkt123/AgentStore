@@ -16,4 +16,10 @@ describe("RunTraceStep", () => {
     render(<RunTraceStep step={step} />);
     expect(screen.getByText("not json")).toBeInTheDocument();
   });
+
+  it("labels platform-recorded stops", () => {
+    render(<RunTraceStep step={{ kind: "COST_CAP_REACHED", detail: '{"summary":"Spend limit reached; run stopped"}', createdAt: "2026-09-23T10:00:00Z" }} />);
+    expect(screen.getByText("Spend limit reached")).toBeInTheDocument();
+    expect(screen.getByText("Spend limit reached; run stopped")).toBeInTheDocument();
+  });
 });

@@ -1,0 +1,4 @@
+ALTER TABLE run ADD COLUMN deadline_at TIMESTAMPTZ;
+ALTER TABLE run ADD COLUMN last_heartbeat_at TIMESTAMPTZ;
+ALTER TABLE run ADD COLUMN awaiting_since TIMESTAMPTZ;
+CREATE INDEX run_active_status_idx ON run (status) WHERE status IN ('PENDING', 'RUNNING', 'AWAITING_APPROVAL');

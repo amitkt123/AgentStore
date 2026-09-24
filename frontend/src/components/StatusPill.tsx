@@ -12,6 +12,8 @@ const STYLES: Record<string, string> = {
   REJECTED: "bg-redSoft text-red",
   FAILED: "bg-redSoft text-red",
   CANCELLED: "bg-redSoft text-red",
+  TIMED_OUT: "bg-redSoft text-red",
+  EXPIRED: "bg-redSoft text-red",
 };
 
 export function StatusPill({ status }: { status: string }) {

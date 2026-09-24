@@ -1,8 +1,8 @@
 package com.agentstore.platform.execution;
 
 import com.agentstore.platform.AbstractIntegrationTest;
-import com.agentstore.platform.catalog.*;
-import com.agentstore.platform.identity.*;
+import com.agentstore.platform.identity.JwtService;
+import com.agentstore.platform.identity.UserRole;
 import com.agentstore.platform.ledger.Wallet;
 import com.agentstore.platform.ledger.WalletRepository;
 import org.junit.jupiter.api.Test;
@@ -12,11 +12,10 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
 
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,43 +28,105 @@ class RunControllerWalletTest extends AbstractIntegrationTest {
     @Autowired
     JwtService jwtService;
     @Autowired
-    OrgRepository orgRepository;
-    @Autowired
-    AgentRepository agentRepository;
-    @Autowired
-    AgentVersionRepository agentVersionRepository;
-    @Autowired
-    ConnectionRepository connectionRepository;
+    ExecutionFixtures fixtures;
     @Autowired
     WalletRepository walletRepository;
+    @Autowired
+    RunRepository runRepository;
+    @Autowired
+    FakeSandboxProvider fakeSandboxProvider;
 
     String url(String path) {
         return "http://localhost:" + port + path;
     }
 
-    @Test
-    void triggeringWithInsufficientWalletBalanceIsRejected() throws Exception {
-        Org developer = orgRepository.save(new Org(null, "DevCo", OrgType.DEVELOPER));
-        Org buyer = orgRepository.save(new Org(null, "Acme", OrgType.BUYER));
-        Agent agent = agentRepository.save(new Agent(null, developer, "Bank Reconciliation", "reconciliation", "d"));
-        String manifest = Files.readString(Path.of("src/test/resources/manifest/valid-tier-a.json"));
-        AgentVersion version = new AgentVersion(null, agent, "1.0.0", manifest, "template-v1",
-                VersionStatus.LIVE, Tier.TIER_A, "cl");
-        version.setApprovedAt(Instant.now());
-        agentVersionRepository.save(version);
-        Connection connection = connectionRepository.save(new Connection(null, buyer, agent,
-                List.of("bank_statement"), new BigDecimal("500.00"), ConnectionStatus.ACTIVE));
-        Wallet wallet = new Wallet(null, buyer.getId(), new BigDecimal("10.00"), null);
-        wallet.setUpdatedAt(Instant.now());
-        walletRepository.save(wallet);
-
+    HttpHeaders buyerAdmin(UUID orgId) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), buyer.getId(), UserRole.BUYER_ADMIN));
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), orgId, UserRole.BUYER_ADMIN));
         headers.setContentType(MediaType.APPLICATION_JSON);
-        var request = new HttpEntity<>(new TriggerRunRequest(connection.getId()), headers);
+        return headers;
+    }
 
-        var response = rest.postForEntity(url("/api/v1/runs"), request, String.class);
+    <T> ResponseEntity<T> trigger(ExecutionFixtures.Scenario s, Class<T> type) {
+        return rest.postForEntity(url("/api/v1/runs"),
+                new HttpEntity<>(new TriggerRunRequest(s.connection().getId()), buyerAdmin(s.buyer().getId())), type);
+    }
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYMENT_REQUIRED);
+    Wallet wallet(ExecutionFixtures.Scenario s) {
+        return walletRepository.findByOrgId(s.buyer().getId()).orElseThrow();
+    }
+
+    void agentEvent(UUID runId, String kind, Map<String, Object> detail) {
+        String token = fakeSandboxProvider.specForRun(runId).envVars().get("AGENT_CALLBACK_TOKEN");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        rest.postForEntity(url("/internal/agent-callback/runs/" + runId + "/events"),
+                new HttpEntity<>(Map.of("kind", kind, "detail", detail), headers), Void.class);
+    }
+
+    @Test
+    void triggeringWithInsufficientWalletBalanceIsRejected() {
+        var s = fixtures.liveTierA(new BigDecimal("500.00"), new BigDecimal("10.00"));
+
+        assertThat(trigger(s, String.class).getStatusCode()).isEqualTo(HttpStatus.PAYMENT_REQUIRED);
+        assertThat(wallet(s).getReserved()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void triggerReservesTheSpendCap() {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+
+        var run = trigger(s, RunResponse.class).getBody();
+
+        assertThat(wallet(s).getReserved()).isEqualByComparingTo(new BigDecimal("200.00"));
+        assertThat(runRepository.findById(run.id()).orElseThrow().getReservedAmount())
+                .isEqualByComparingTo(new BigDecimal("200.00"));
+    }
+
+    @Test
+    void concurrentTriggersCannotReserveMoreThanTheWalletHolds() throws Exception {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("300.00"));
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch start = new CountDownLatch(1);
+            Callable<HttpStatusCode> call = () -> {
+                start.await();
+                return trigger(s, String.class).getStatusCode();
+            };
+            Future<HttpStatusCode> a = pool.submit(call);
+            Future<HttpStatusCode> b = pool.submit(call);
+            start.countDown();
+            assertThat(List.of(a.get(30, TimeUnit.SECONDS), b.get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(HttpStatus.OK, HttpStatus.PAYMENT_REQUIRED);
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(wallet(s).getReserved()).isEqualByComparingTo(new BigDecimal("200.00"));
+    }
+
+    @Test
+    void chargesConsumeTheReservationAndCompletionReleasesTheRest() {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+        UUID runId = trigger(s, RunResponse.class).getBody().id();
+
+        agentEvent(runId, "COST", Map.of("quantity", 5));   // 5 × 2.00 = 10.00
+        assertThat(wallet(s).getBalance()).isEqualByComparingTo(new BigDecimal("990.00"));
+        assertThat(wallet(s).getReserved()).isEqualByComparingTo(new BigDecimal("190.00"));
+
+        agentEvent(runId, "COMPLETE", Map.of());
+        assertThat(wallet(s).getBalance()).isEqualByComparingTo(new BigDecimal("990.00"));
+        assertThat(wallet(s).getReserved()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(runRepository.findById(runId).orElseThrow().getReservedAmount())
+                .isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void sandboxCreationFailureReleasesTheReservation() {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+        fakeSandboxProvider.failNextCreate();
+
+        assertThat(trigger(s, String.class).getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        assertThat(wallet(s).getReserved()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }

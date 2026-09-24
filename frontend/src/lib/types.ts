@@ -4,8 +4,9 @@ export type VersionStatus = "DRAFT" | "IN_REVIEW" | "LIVE" | "REJECTED";
 export type ScopeType = "READ" | "WRITE";
 export type PricingUnit = "METERED" | "OUTCOME" | "SUBSCRIPTION";
 export type ConnectionStatus = "ACTIVE" | "REVOKED";
-export type RunStatus = "PENDING" | "RUNNING" | "AWAITING_APPROVAL" | "COMPLETED" | "FAILED" | "CANCELLED";
-export type RunStepKind = "READ" | "WRITE" | "GATE" | "COST" | "COMPLETE" | "FAILED";
+export type RunStatus =
+  | "PENDING" | "RUNNING" | "AWAITING_APPROVAL" | "COMPLETED" | "FAILED" | "CANCELLED" | "TIMED_OUT" | "EXPIRED";
+export type RunStepKind = "READ" | "WRITE" | "GATE" | "COST" | "COMPLETE" | "FAILED" | "TIMEOUT" | "COST_CAP_REACHED";
 export type LedgerEntryType = "CHARGE" | "REVERSAL" | "FEE";
 export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -130,6 +131,7 @@ export interface StatementLineResponse {
 export interface WalletResponse {
   balance: number;
   cap: number | null;
+  reserved: number;
 }
 
 export interface ReviewItemResponse {

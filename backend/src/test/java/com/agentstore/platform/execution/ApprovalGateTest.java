@@ -58,7 +58,7 @@ class ApprovalGateTest extends AbstractIntegrationTest {
         Connection connection = connectionRepository.save(new Connection(null, buyer, agent,
                 List.of("invoice", "whatsapp_message"), new BigDecimal("200.00"), ConnectionStatus.ACTIVE));
         Run run = runRepository.save(new Run(null, connection, version, RunStatus.RUNNING, new BigDecimal("200.00"),
-                BigDecimal.ZERO, "fake-sandbox-gate", "tok-gate"));
+                BigDecimal.ZERO, "fake-sandbox-gate", RunTokenService.hash("tok-gate")));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth("tok-gate");

@@ -3,6 +3,7 @@ package com.agentstore.platform.ledger;
 import com.agentstore.platform.AbstractIntegrationTest;
 import com.agentstore.platform.catalog.*;
 import com.agentstore.platform.execution.*;
+import com.agentstore.platform.execution.RunTokenService;
 import com.agentstore.platform.identity.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,7 +59,7 @@ class StatementControllerTest extends AbstractIntegrationTest {
         Connection connection = connectionRepository.save(new Connection(null, buyer, agent,
                 List.of("bank_statement"), new BigDecimal("500.00"), ConnectionStatus.ACTIVE));
         Run run = runRepository.save(new Run(null, connection, version, RunStatus.COMPLETED, new BigDecimal("500.00"),
-                new BigDecimal("10.00"), "sbx", "tok"));
+                new BigDecimal("10.00"), "sbx", RunTokenService.hash("tok")));
         ledgerEntryRepository.save(new LedgerEntry(null, UUID.randomUUID(), run.getId(), buyer.getId(),
                 new BigDecimal("10.00"), LedgerEntryType.CHARGE));
 

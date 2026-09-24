@@ -13,6 +13,8 @@ function terminalLabel(run: RunDetailResponse): string {
   }
   if (run.status === "CANCELLED") return "Rejected";
   if (run.status === "COMPLETED") return "Completed";
+  if (run.status === "TIMED_OUT") return "Stopped — ran past its time limit";
+  if (run.status === "EXPIRED") return "Expired — no approval in time";
   return run.status;
 }
 

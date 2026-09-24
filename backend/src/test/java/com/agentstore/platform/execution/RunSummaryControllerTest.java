@@ -51,12 +51,12 @@ class RunSummaryControllerTest extends AbstractIntegrationTest {
                 new BigDecimal("500.00"), ConnectionStatus.ACTIVE));
 
         Run run1 = new Run(null, connection, version, RunStatus.RUNNING, new BigDecimal("500.00"),
-                BigDecimal.ZERO, "sandbox-1", "token-1");
+                BigDecimal.ZERO, "sandbox-1", RunTokenService.hash("token-1"));
         run1.setStartedAt(Instant.parse("2026-09-17T10:00:00Z"));
         runRepository.save(run1);
 
         Run run2 = new Run(null, connection, version, RunStatus.AWAITING_APPROVAL, new BigDecimal("500.00"),
-                new BigDecimal("10.00"), "sandbox-2", "token-2");
+                new BigDecimal("10.00"), "sandbox-2", RunTokenService.hash("token-2"));
         run2.setStartedAt(Instant.parse("2026-09-17T11:00:00Z"));
         UUID run2Id = runRepository.save(run2).getId();
 

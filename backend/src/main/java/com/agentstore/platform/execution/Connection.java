@@ -1,6 +1,7 @@
 package com.agentstore.platform.execution;
 
 import com.agentstore.platform.catalog.Agent;
+import com.agentstore.platform.catalog.AgentVersion;
 import com.agentstore.platform.identity.Org;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,6 +37,11 @@ public class Connection {
     @ManyToOne(optional = false)
     @JoinColumn(name = "agent_id")
     private Agent agent;
+
+    /** The version the buyer consented to. Runs always use this; upgrading is an explicit buyer action (WS11). */
+    @ManyToOne
+    @JoinColumn(name = "agent_version_id")
+    private AgentVersion agentVersion;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "granted_scopes", columnDefinition = "jsonb")
