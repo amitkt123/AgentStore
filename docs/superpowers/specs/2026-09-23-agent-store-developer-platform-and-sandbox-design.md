@@ -82,7 +82,7 @@ Packaging/build pipeline, Agent Runtime API + SDKs, data plane (datasets, scope-
                          ┌──────────────────────────── Web (Next.js) ────────────────────────────┐
                          │ Buyer console · Developer portal (+ Sandbox) · Admin/review console   │
                          └───────────────────────────────┬───────────────────────────────────────┘
-                                                         │ REST /að pi/v1 (JWT)
+                                                         │ REST /api/v1 (JWT)
  Developer laptop                                        ▼
  ┌───────────────────────┐   REST /api/v1   ┌───────────────────────── Spring Boot monolith (Java 21) ─────────────────────────┐
  │ agentstore CLI        │ ───────────────▶ │ identity   catalog   manifest   publishing   ledger                              │
