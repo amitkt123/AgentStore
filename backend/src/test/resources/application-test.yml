@@ -2,7 +2,7 @@ agentstore:
   jwt:
     secret: test-only-secret-not-for-prod-0123456789abcdef
   identity:
-    admin-emails: admin@platform.example,admin-auth-test@platform.example
+    admin-emails: admin@platform.example,admin-auth-test@platform.example,admin-me-orgs-test@platform.example
   secrets:
     encryption-key-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
   e2b:
