@@ -34,6 +34,10 @@ class ConnectionControllerTest extends AbstractIntegrationTest {
     AgentRepository agentRepository;
     @Autowired
     AgentVersionRepository agentVersionRepository;
+    @Autowired
+    ExecutionFixtures fixtures;
+    @Autowired
+    SecretRepository secretRepository;
 
     String url(String path) {
         return "http://localhost:" + port + path;
@@ -101,5 +105,21 @@ class ConnectionControllerTest extends AbstractIntegrationTest {
         var response = rest.postForEntity(url("/api/v1/connections"), request, String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void buyerCannotStoreASecretOnAnotherOrgsConnection() {
+        var victim = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+        Org attacker = orgRepository.save(new Org(null, "Mallory", OrgType.BUYER));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), attacker.getId(), UserRole.BUYER_ADMIN));
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        var response = rest.postForEntity(url("/api/v1/connections/" + victim.connection().getId() + "/secrets"),
+                new HttpEntity<>(new ConnectionController.StoreSecretRequest("TALLY_KEY", "attacker-value"), headers),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(secretRepository.findByConnectionId(victim.connection().getId())).isEmpty();
     }
 }

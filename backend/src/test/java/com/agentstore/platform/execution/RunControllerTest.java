@@ -151,4 +151,19 @@ class RunControllerTest extends AbstractIntegrationTest {
         Wallet wallet = walletRepository.findByOrgId(s.buyer().getId()).orElseThrow();
         assertThat(wallet.getReserved()).isEqualByComparingTo(BigDecimal.ZERO);
     }
+
+    @Test
+    void buyerCannotTriggerAnotherOrgsConnection() {
+        var victim = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+        Org attacker = orgRepository.save(new Org(null, "Mallory", OrgType.BUYER));
+
+        var response = rest.postForEntity(url("/api/v1/runs"),
+                new HttpEntity<>(new TriggerRunRequest(victim.connection().getId()), buyerAdmin(attacker.getId())),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(runRepository.findByConnectionBuyerOrgIdOrderByStartedAtDesc(victim.buyer().getId())).isEmpty();
+        Wallet wallet = walletRepository.findByOrgId(victim.buyer().getId()).orElseThrow();
+        assertThat(wallet.getReserved()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
 }
