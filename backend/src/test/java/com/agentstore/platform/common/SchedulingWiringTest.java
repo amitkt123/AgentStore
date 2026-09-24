@@ -6,11 +6,19 @@ import net.javacrumbs.shedlock.core.LockProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@TestPropertySource(properties = "agentstore.jobs.enabled=true")
+/**
+ * Enabling jobs spins up a live {@code @Scheduled} reaper against the shared Testcontainers Postgres. The
+ * interval is set far beyond this test's runtime so it doesn't fire on its own, and {@code @DirtiesContext}
+ * closes this context (and its scheduler) once the class is done, instead of leaving it cached and ticking in
+ * the background for the rest of the build where it could reap runs other test classes are still using.
+ */
+@DirtiesContext
+@TestPropertySource(properties = {"agentstore.jobs.enabled=true", "agentstore.runs.reaper-interval=PT1H"})
 class SchedulingWiringTest extends AbstractIntegrationTest {
 
     @Autowired

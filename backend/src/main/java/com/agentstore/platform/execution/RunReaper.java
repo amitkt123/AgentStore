@@ -50,24 +50,31 @@ public class RunReaper {
         return reaped;
     }
 
+    /**
+     * {@code run} is a snapshot read outside any lock; it may be stale by the time the terminate call below
+     * acquires the row lock (a buyer decision or an agent callback can land in between). Every terminate call
+     * passes the snapshot status as {@code expectedStatus} so a stale decision is a no-op rather than clobbering
+     * whatever actually happened to the run since it was read.
+     */
     private boolean reap(Run run, Instant now) {
+        RunStatus snapshotStatus = run.getStatus();
         boolean deadlinePassed = run.getDeadlineAt() != null && run.getDeadlineAt().isBefore(now);
-        if (run.getStatus() == RunStatus.AWAITING_APPROVAL) {
+        if (snapshotStatus == RunStatus.AWAITING_APPROVAL) {
             boolean gateExpired = run.getAwaitingSince() != null
                     && run.getAwaitingSince().plus(gateTimeout).isBefore(now);
             if (!gateExpired && !deadlinePassed) {
                 return false;
             }
-            return runLifecycleService.terminate(run.getId(), RunStatus.EXPIRED, RunStepKind.TIMEOUT,
+            return runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.EXPIRED, RunStepKind.TIMEOUT,
                     Map.of("summary", "No approval decision in time; run stopped"));
         }
         if (deadlinePassed) {
-            return runLifecycleService.terminate(run.getId(), RunStatus.TIMED_OUT, RunStepKind.TIMEOUT,
+            return runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.TIMED_OUT, RunStepKind.TIMEOUT,
                     Map.of("summary", "Run exceeded its time limit"));
         }
-        if (run.getStatus() == RunStatus.RUNNING && run.getSandboxId() != null
+        if (snapshotStatus == RunStatus.RUNNING && run.getSandboxId() != null
                 && sandboxProvider.status(run.getSandboxId()) == SandboxStatus.EXITED) {
-            return runLifecycleService.terminate(run.getId(), RunStatus.FAILED, RunStepKind.FAILED,
+            return runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.FAILED, RunStepKind.FAILED,
                     Map.of("summary", "Agent stopped without reporting completion"));
         }
         return false;

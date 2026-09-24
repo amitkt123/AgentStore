@@ -14,6 +14,7 @@ import org.springframework.http.*;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +31,8 @@ class RunReaperTest extends AbstractIntegrationTest {
     ExecutionFixtures fixtures;
     @Autowired
     RunReaper reaper;
+    @Autowired
+    RunLifecycleService runLifecycleService;
     @Autowired
     RunRepository runRepository;
     @Autowired
@@ -129,6 +132,40 @@ class RunReaperTest extends AbstractIntegrationTest {
 
         assertThat(walletRepository.findByOrgId(s.buyer().getId()).orElseThrow().getReserved())
                 .isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void aStaleSnapshotDoesNotClobberAnApprovalThatWonTheRace() {
+        var s = scenario();
+        String sandboxId = sandbox();
+        Wallet wallet = walletRepository.findByOrgId(s.buyer().getId()).orElseThrow();
+        wallet.setReserved(new BigDecimal("200.00"));
+        walletRepository.save(wallet);
+        Run run = run(s, RunStatus.AWAITING_APPROVAL, sandboxId, now.plusSeconds(600),
+                now.minus(Duration.ofMinutes(31)));
+        run.setReservedAmount(new BigDecimal("200.00"));
+        runRepository.save(run);
+
+        // The reaper's sweep snapshots this run as AWAITING_APPROVAL with its gate expired...
+        RunStatus snapshotStatus = reload(run).getStatus();
+
+        // ...then, before the reaper's terminate call acquires the row lock, the buyer approves it.
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), s.buyer().getId(), UserRole.BUYER_APPROVER));
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        var response = rest.exchange(url("/api/v1/runs/" + run.getId() + "/approve"), HttpMethod.POST,
+                new HttpEntity<>(new ApproveRunRequest("approved"), headers), String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // The reaper now acts on its (stale) snapshot; the conditional terminate must be a no-op.
+        boolean reaped = runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.EXPIRED,
+                RunStepKind.TIMEOUT, Map.of("summary", "No approval decision in time; run stopped"));
+
+        assertThat(reaped).isFalse();
+        assertThat(reload(run).getStatus()).isEqualTo(RunStatus.RUNNING);
+        assertThat(fakeSandboxProvider.wasKilled(sandboxId)).isFalse();
+        assertThat(walletRepository.findByOrgId(s.buyer().getId()).orElseThrow().getReserved())
+                .isEqualByComparingTo(new BigDecimal("200.00"));
     }
 
     @Test

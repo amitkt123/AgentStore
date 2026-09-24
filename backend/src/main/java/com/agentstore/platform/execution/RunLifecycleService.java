@@ -123,11 +123,25 @@ public class RunLifecycleService {
     /** Moves a run to a terminal status. Returns false (and changes nothing) if it was already terminal. */
     @Transactional
     public boolean terminate(UUID runId, RunStatus terminalStatus, RunStepKind stepKind, Map<String, Object> detail) {
+        return terminate(runId, null, terminalStatus, stepKind, detail);
+    }
+
+    /**
+     * Moves a run to a terminal status, but only if its current (locked) status is still {@code expectedStatus}.
+     * Returns false (and changes nothing) otherwise. For callers acting on a snapshot that may be stale by the
+     * time they get the row lock (the reaper, working off a list it read before the lock) this avoids clobbering
+     * a state change — e.g. a buyer's approval — that happened after the snapshot was taken. Passing
+     * {@code expectedStatus} as null falls back to the old check: refuse only if already terminal.
+     */
+    @Transactional
+    public boolean terminate(UUID runId, RunStatus expectedStatus, RunStatus terminalStatus, RunStepKind stepKind,
+                             Map<String, Object> detail) {
         if (!terminalStatus.isTerminal()) {
             throw new IllegalArgumentException("Not a terminal status: " + terminalStatus);
         }
         Run run = lock(runId);
-        if (run.getStatus().isTerminal()) {
+        boolean blocked = expectedStatus != null ? run.getStatus() != expectedStatus : run.getStatus().isTerminal();
+        if (blocked) {
             return false;
         }
         if (stepKind != null) {
