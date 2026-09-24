@@ -110,7 +110,8 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    public record GoogleSignInRequest(@NotBlank String idToken, SignupSide side, String orgName, boolean remember) {}
+    public record GoogleSignInRequest(@NotBlank String idToken, SignupSide side, @Size(max = 255) String orgName,
+                                       boolean remember) {}
 
     @PostMapping("/google")
     public ResponseEntity<?> google(@Valid @RequestBody GoogleSignInRequest request) {
