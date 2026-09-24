@@ -3,6 +3,8 @@ package com.agentstore.platform.identity;
 import com.agentstore.platform.common.EmailMessage;
 import com.agentstore.platform.common.EmailSender;
 import com.agentstore.platform.common.TokenHasher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,8 @@ import java.time.Instant;
 
 @Service
 public class UserTokenService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserTokenService.class);
 
     static final Duration VERIFY_TTL = Duration.ofHours(24);
     static final Duration RESET_TTL = Duration.ofHours(1);
@@ -55,15 +59,22 @@ public class UserTokenService {
         }
     }
 
-    /** Always silent: the caller cannot tell whether the email has an account. */
+    /**
+     * Always silent: the caller cannot tell whether the email has an account, and can't tell whether the
+     * send itself succeeded either — a delivery failure must not leak that this address has an account.
+     */
     @Transactional
     public void sendPasswordReset(String email) {
         userRepository.findByEmailIgnoreCase(IdentityService.normalizeEmail(email)).ifPresent(user -> {
             String raw = issue(user, UserTokenPurpose.PASSWORD_RESET, RESET_TTL);
-            emailSender.send(new EmailMessage(user.getEmail(), "Reset your Karya password",
-                    "Someone asked to reset the password for this Karya account. If it was you: "
-                            + webBaseUrl + "/reset-password/" + raw
-                            + "\n\nThe link works once and expires in 1 hour. If it wasn't you, ignore this email."));
+            try {
+                emailSender.send(new EmailMessage(user.getEmail(), "Reset your Karya password",
+                        "Someone asked to reset the password for this Karya account. If it was you: "
+                                + webBaseUrl + "/reset-password/" + raw
+                                + "\n\nThe link works once and expires in 1 hour. If it wasn't you, ignore this email."));
+            } catch (Exception e) {
+                log.warn("Failed to send password reset email to user {}", user.getId(), e);
+            }
         });
     }
 
