@@ -30,7 +30,7 @@ public class InvitationController {
     public AuthResponse accept(@PathVariable String token, @RequestBody(required = false) AcceptRequest request) {
         AcceptRequest body = request == null ? new AcceptRequest(null, null) : request;
         OrgMembership membership = invitationService.accept(token, signedInUserId(), body.fullName(), body.password());
-        return new AuthResponse(identityService.accessTokenFor(membership));
+        return AuthResponse.access(identityService.accessTokenFor(membership));
     }
 
     private static UUID signedInUserId() {

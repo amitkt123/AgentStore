@@ -47,7 +47,7 @@ public class MeController {
     public AuthResponse addOrg(@Valid @RequestBody AddOrgRequest request) {
         User user = currentUser(currentClaims());
         UserRole role = OrgRoles.adminRoleOf(request.side().orgType());
-        return new AuthResponse(identityService.accessTokenFor(
+        return AuthResponse.access(identityService.accessTokenFor(
                 identityService.addOrg(user, request.side(), request.orgName(), role)));
     }
 
