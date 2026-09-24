@@ -191,4 +191,95 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
+
+    private void removeFromOrg(OrgMembership membership) {
+        var response = rest.exchange(
+                url("/api/v1/orgs/" + membership.getOrg().getId() + "/members/" + membership.getUser().getId()),
+                HttpMethod.DELETE, new HttpEntity<>(bearer(identity.tokenFor(membership))), Void.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    @Test
+    void loginWithNoMembershipAndNoWorkspaceFieldsIsRejectedWithNoWorkspace() {
+        String email = unique("orphan");
+        OrgMembership admin = identity.buyerAdmin(email);
+        // The last admin can't remove themself, so bring in a second admin to remove the first.
+        OrgMembership second = identity.member(admin.getOrg(), unique("second"), UserRole.BUYER_ADMIN, null);
+        removeFromOrg(admin);
+
+        var response = rest.postForEntity(url("/api/v1/auth/login"),
+                new LoginRequest(email, "s3cret-pw", false), Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(response.getBody().get("code")).isEqualTo("NO_WORKSPACE");
+    }
+
+    @Test
+    void loginWithNoMembershipAndWorkspaceFieldsCreatesANewWorkspaceWithTheSidesAdminRoleNotPlatformAdmin() {
+        String email = unique("rejoins");
+        OrgMembership admin = identity.buyerAdmin(email);
+        OrgMembership second = identity.member(admin.getOrg(), unique("second"), UserRole.BUYER_ADMIN, null);
+        removeFromOrg(admin);
+
+        var response = rest.postForEntity(url("/api/v1/auth/login"),
+                new LoginRequest(email, "s3cret-pw", false, SignupSide.DEVELOPER, "Fresh Start Co"),
+                AuthResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var claims = claimsOf(response.getBody());
+        assertThat(claims.role()).isEqualTo(UserRole.DEVELOPER);
+        User user = userRepository.findById(admin.getUser().getId()).orElseThrow();
+        assertThat(membershipRepository.findByIdUserIdOrderByCreatedAtAsc(user.getId()))
+                .singleElement().satisfies(m -> {
+                    assertThat(m.getOrg().getName()).isEqualTo("Fresh Start Co");
+                    assertThat(m.getOrg().getType()).isEqualTo(OrgType.DEVELOPER);
+                });
+    }
+
+    @Test
+    void wrongPasswordWithNoMembershipIsStillUnauthorizedNotNoWorkspace() {
+        String email = unique("wrongpwnomember");
+        OrgMembership admin = identity.buyerAdmin(email);
+        OrgMembership second = identity.member(admin.getOrg(), unique("second"), UserRole.BUYER_ADMIN, null);
+        removeFromOrg(admin);
+
+        var response = rest.postForEntity(url("/api/v1/auth/login"),
+                new LoginRequest(email, "not-the-password", false, SignupSide.DEVELOPER, "Fresh Start Co"),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void loginWithAnExistingMembershipIgnoresWorkspaceFieldsAndDoesNotCreateAnOrg() {
+        String email = unique("hasmembership");
+        OrgMembership admin = identity.buyerAdmin(email);
+
+        var response = rest.postForEntity(url("/api/v1/auth/login"),
+                new LoginRequest(email, "s3cret-pw", false, SignupSide.DEVELOPER, "Should Not Exist"),
+                AuthResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(claimsOf(response.getBody()).orgId()).isEqualTo(admin.getOrg().getId());
+        assertThat(membershipRepository.findByIdUserIdOrderByCreatedAtAsc(admin.getUser().getId())).hasSize(1);
+    }
+
+    @Test
+    void aListedAdminEmailRecreatingAWorkspaceThisWayDoesNotBecomeAdmin() {
+        // Listed in application-test.yml for this test class only.
+        String email = "admin-lockout-test@platform.example";
+        OrgMembership admin = identity.buyerAdmin(email);
+        User user = admin.getUser();
+        user.setEmailVerifiedAt(java.time.Instant.now());
+        userRepository.save(user);
+        OrgMembership second = identity.member(admin.getOrg(), unique("second"), UserRole.BUYER_ADMIN, null);
+        removeFromOrg(admin);
+
+        var response = rest.postForEntity(url("/api/v1/auth/login"),
+                new LoginRequest(email, "s3cret-pw", false, SignupSide.DEVELOPER, "Reclaimed Co"),
+                AuthResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(claimsOf(response.getBody()).role()).isEqualTo(UserRole.DEVELOPER);
+    }
 }

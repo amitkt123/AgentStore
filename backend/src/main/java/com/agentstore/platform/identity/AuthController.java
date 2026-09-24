@@ -63,15 +63,20 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         User user = userRepository.findByEmailIgnoreCase(IdentityService.normalizeEmail(request.email()))
                 .filter(u -> identityService.passwordMatches(u, request.password()))
                 .orElse(null);
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        OrgMembership membership = identityService.requireLandingMembership(user);
-        return ResponseEntity.ok(authResponse(membership, request.remember()));
+        try {
+            OrgMembership membership = identityService.landOrCreateWorkspace(user, request.side(), request.orgName());
+            return ResponseEntity.ok(authResponse(membership, request.remember()));
+        } catch (SignInProblem problem) {
+            return ResponseEntity.status(problem.status)
+                    .body(Map.of("code", problem.code, "message", problem.getMessage()));
+        }
     }
 
     public record SwitchOrgRequest(@NotNull UUID orgId) {}
@@ -115,7 +120,7 @@ public class AuthController {
         try {
             OrgMembership membership = googleSignInService.signIn(request.idToken(), request.side(), request.orgName());
             return ResponseEntity.ok(authResponse(membership, request.remember()));
-        } catch (GoogleSignInService.SignInProblem problem) {
+        } catch (SignInProblem problem) {
             return ResponseEntity.status(problem.status)
                     .body(Map.of("code", problem.code, "message", problem.getMessage()));
         }

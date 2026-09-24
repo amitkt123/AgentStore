@@ -129,6 +129,30 @@ public class IdentityService {
                         "You are not a member of any workspace"));
     }
 
+    /**
+     * The membership a login (password or Google) lands in, for a user whose credentials already checked
+     * out. When the user still belongs to a workspace, that membership wins and {@code side}/{@code
+     * orgName} are ignored, even if sent. When they don't — for example every membership they had was
+     * removed — {@code side} and {@code orgName} (both required, non-blank) create a brand-new workspace
+     * with them as its only member, using the side's ordinary admin role. This intentionally never calls
+     * {@link #adminAwareRole}: recreating a workspace this way must never grant platform {@code ADMIN},
+     * even to a listed email (only a completed password reset can do that; see
+     * {@link #promoteToAdminIfListed}). Missing or blank fields raise {@code NO_WORKSPACE} (422) instead of
+     * the 403 {@link #requireLandingMembership} throws, so the caller knows to prompt for a workspace name
+     * rather than send the user back to a login screen they can never get past.
+     */
+    @Transactional
+    public OrgMembership landOrCreateWorkspace(User user, SignupSide side, String orgName) {
+        return landingMembership(user)
+                .orElseGet(() -> {
+                    if (side == null || orgName == null || orgName.isBlank()) {
+                        throw new SignInProblem(HttpStatus.UNPROCESSABLE_ENTITY, "NO_WORKSPACE",
+                                "You're not a member of any workspace any more. Create one to continue.");
+                    }
+                    return addOrg(user, side, orgName, OrgRoles.adminRoleOf(side.orgType()));
+                });
+    }
+
     public String accessTokenFor(OrgMembership membership) {
         return jwtService.issue(membership.getId().getUserId(), membership.getId().getOrgId(), membership.getRole());
     }
