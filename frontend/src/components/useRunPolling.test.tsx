@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useRunPolling } from "./useRunPolling";
+import { isTerminalRunStatus, useRunPolling } from "./useRunPolling";
 import type { RunDetailResponse } from "@/lib/types";
 
 const runningRun: RunDetailResponse = { id: "r1", status: "RUNNING", costCap: 100, totalCharged: 10, steps: [] };
@@ -73,5 +73,14 @@ describe("useRunPolling", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("isTerminalRunStatus", () => {
+  it.each(["COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT", "EXPIRED"] as const)("treats %s as terminal", (s) => {
+    expect(isTerminalRunStatus(s)).toBe(true);
+  });
+  it.each(["PENDING", "RUNNING", "AWAITING_APPROVAL"] as const)("keeps polling for %s", (s) => {
+    expect(isTerminalRunStatus(s)).toBe(false);
   });
 });

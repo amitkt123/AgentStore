@@ -15,6 +15,8 @@ const KIND_LABEL: Record<RunStepResponse["kind"], string> = {
   COST: "Charged",
   COMPLETE: "Completed",
   FAILED: "Failed",
+  TIMEOUT: "Stopped by platform",
+  COST_CAP_REACHED: "Spend limit reached",
 };
 
 export function RunTraceStep({ step }: { step: RunStepResponse }) {

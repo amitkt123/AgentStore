@@ -72,4 +72,16 @@ describe("RunConsole", () => {
     expect(approveButton).not.toBeDisabled();
     expect(screen.getByText("Could not record your decision. Please try again.")).toBeInTheDocument();
   });
+
+  it("labels a timed-out run", () => {
+    const run: RunDetailResponse = { ...awaitingRun, status: "TIMED_OUT" };
+    renderWithClient(<RunConsole runId="r1" initial={run} role="BUYER_APPROVER" />);
+    expect(screen.getByText("Stopped — ran past its time limit")).toBeInTheDocument();
+  });
+
+  it("labels a run whose approval window expired", () => {
+    const run: RunDetailResponse = { ...awaitingRun, status: "EXPIRED" };
+    renderWithClient(<RunConsole runId="r1" initial={run} role="BUYER_APPROVER" />);
+    expect(screen.getByText("Expired — no approval in time")).toBeInTheDocument();
+  });
 });
