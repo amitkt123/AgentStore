@@ -15,7 +15,8 @@ public class RunReaperJob {
         this.runReaper = runReaper;
     }
 
-    @Scheduled(fixedDelayString = "${agentstore.runs.reaper-interval:PT30S}")
+    @Scheduled(fixedDelayString = "${agentstore.runs.reaper-interval:PT30S}",
+            initialDelayString = "${agentstore.runs.reaper-interval:PT30S}")
     @SchedulerLock(name = "runReaper", lockAtMostFor = "PT5M", lockAtLeastFor = "PT10S")
     public void run() {
         runReaper.reapOnce();
