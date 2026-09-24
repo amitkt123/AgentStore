@@ -27,6 +27,8 @@ agentstore:
   identity:
     admin-emails: ${ADMIN_EMAILS:}
     refresh-token-ttl: P30D
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
   web:
     base-url: ${WEB_BASE_URL:http://localhost:3000}
   email:

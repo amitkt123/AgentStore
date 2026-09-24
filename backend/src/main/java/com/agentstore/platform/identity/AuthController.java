@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -26,15 +27,20 @@ public class AuthController {
     private final IdentityService identityService;
     private final RefreshTokenService refreshTokenService;
     private final UserTokenService userTokenService;
+    private final GoogleSignInService googleSignInService;
+    private final GoogleIdTokenVerifier googleVerifier;
 
     public AuthController(UserRepository userRepository, OrgMembershipRepository membershipRepository,
                           IdentityService identityService, RefreshTokenService refreshTokenService,
-                          UserTokenService userTokenService) {
+                          UserTokenService userTokenService, GoogleSignInService googleSignInService,
+                          GoogleIdTokenVerifier googleVerifier) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.identityService = identityService;
         this.refreshTokenService = refreshTokenService;
         this.userTokenService = userTokenService;
+        this.googleSignInService = googleSignInService;
+        this.googleVerifier = googleVerifier;
     }
 
     /** Issues an access token, and when {@code remember} is set, a new refresh token family alongside it. */
@@ -97,6 +103,22 @@ public class AuthController {
     public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
         refreshTokenService.revokeFamilyOf(request.refreshToken());
         return ResponseEntity.noContent().build();
+    }
+
+    public record GoogleSignInRequest(@NotBlank String idToken, SignupSide side, String orgName, boolean remember) {}
+
+    @PostMapping("/google")
+    public ResponseEntity<?> google(@Valid @RequestBody GoogleSignInRequest request) {
+        if (!googleVerifier.isConfigured()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+        try {
+            OrgMembership membership = googleSignInService.signIn(request.idToken(), request.side(), request.orgName());
+            return ResponseEntity.ok(authResponse(membership, request.remember()));
+        } catch (GoogleSignInService.SignInProblem problem) {
+            return ResponseEntity.status(problem.status)
+                    .body(Map.of("code", problem.code, "message", problem.getMessage()));
+        }
     }
 
     public record TokenRequest(@NotBlank String token) {}
