@@ -1108,8 +1108,9 @@ ALTER TABLE org ADD COLUMN sso_required BOOLEAN NOT NULL DEFAULT false;
 
 **APIs**
 - `POST /auth/signup {fullName, orgName, email, password, side: BUYER|DEVELOPER}` creates the user, org and membership.
-- `POST /auth/login {…, remember}`. The JWT access token stays short (15 min). With `remember`, a 30-day rotating refresh token is set as an httpOnly cookie through the Next.js proxy. `POST /auth/refresh`, `POST /auth/logout` (revokes it).
+- `POST /auth/login {…, remember, side?, orgName?}`. The JWT access token stays short (15 min). With `remember`, a 30-day rotating refresh token is set as an httpOnly cookie through the Next.js proxy. `POST /auth/refresh`, `POST /auth/logout` (revokes it).
 - `POST /auth/google {idToken, side?, orgName?, remember}`: the web app gets the ID token from Google Identity Services; the backend checks signature, issuer, audience and `email_verified`. 409 `ACCOUNT_EXISTS_UNVERIFIED`, 422 `SIGNUP_DETAILS_REQUIRED`.
+- Login and Google sign-in both reject valid credentials for a user with no workspace membership left (every membership removed) with 422 `NO_WORKSPACE`, unless `side` and `orgName` are also given, in which case a new workspace is created on the spot (with the side's ordinary admin role, never platform `ADMIN`, and never affecting `signupOrgId`) and the login proceeds normally; the fields are ignored whenever the user still belongs to a workspace. `POST /auth/refresh` does not offer this — a user with no membership left must sign in again.
 - `POST /auth/password/forgot`, `POST /auth/password/reset {token, password}`, `POST /auth/email/verify {token}`.
 - `GET /me` → user plus memberships. `POST /auth/switch-org {orgId}` issues a token for that org. The JWT carries one active `orgId` and `role`, so existing `@PreAuthorize` checks keep working.
 - `POST /orgs/{id}/invitations`, `POST /invitations/{token}/accept`, `GET/PATCH/DELETE /orgs/{id}/members/{userId}` (role and title).
