@@ -99,24 +99,32 @@ public class RunController {
 
     private RunResponse launch(Run run, Connection connection, AgentVersion version, List<String> manifestAllowlist,
                                String rawToken) {
-        Map<String, String> envVars = new HashMap<>();
-        envVars.put("AGENT_RUN_ID", run.getId().toString());
-        envVars.put("AGENT_CALLBACK_URL", callbackBaseUrl + "/internal/agent-callback/runs/" + run.getId());
-        envVars.put("AGENT_CALLBACK_TOKEN", rawToken);
-        for (Secret secret : secretRepository.findByConnectionId(connection.getId())) {
-            envVars.put("AGENT_SECRET_" + secret.getName(), secretService.reveal(connection.getId(), secret.getName()));
-        }
+        Map<String, String> envVars;
+        List<String> allowOut;
+        try {
+            envVars = new HashMap<>();
+            envVars.put("AGENT_RUN_ID", run.getId().toString());
+            envVars.put("AGENT_CALLBACK_URL", callbackBaseUrl + "/internal/agent-callback/runs/" + run.getId());
+            envVars.put("AGENT_CALLBACK_TOKEN", rawToken);
+            for (Secret secret : secretRepository.findByConnectionId(connection.getId())) {
+                envVars.put("AGENT_SECRET_" + secret.getName(), secretService.reveal(connection.getId(), secret.getName()));
+            }
 
-        List<String> allowOut = new ArrayList<>();
-        allowOut.add(URI.create(callbackBaseUrl).getHost());
-        allowOut.addAll(manifestAllowlist);
+            allowOut = new ArrayList<>();
+            allowOut.add(URI.create(callbackBaseUrl).getHost());
+            allowOut.addAll(manifestAllowlist);
+        } catch (RuntimeException e) {
+            runLifecycleService.terminate(run.getId(), RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
+                    Map.of("summary", "Run could not be launched"));
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Run could not be launched", e);
+        }
 
         SandboxHandle handle;
         try {
             handle = sandboxProvider.create(new SandboxSpec(version.getImageRef(), SANDBOX_TIMEOUT_SECONDS, envVars,
                     allowOut));
         } catch (RuntimeException e) {
-            runLifecycleService.terminate(run.getId(), RunStatus.FAILED, RunStepKind.FAILED,
+            runLifecycleService.terminate(run.getId(), RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
                     Map.of("summary", "Sandbox could not be started"));
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Sandbox could not be started", e);
         }

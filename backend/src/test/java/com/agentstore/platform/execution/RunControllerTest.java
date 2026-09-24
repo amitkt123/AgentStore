@@ -44,6 +44,8 @@ class RunControllerTest extends AbstractIntegrationTest {
     @Autowired
     WalletRepository walletRepository;
     @Autowired
+    SecretRepository secretRepository;
+    @Autowired
     ExecutionFixtures fixtures;
 
     String url(String path) {
@@ -126,5 +128,27 @@ class RunControllerTest extends AbstractIntegrationTest {
             assertThat(r.getStatus()).isEqualTo(RunStatus.FAILED);
             assertThat(r.getCompletedAt()).isNotNull();
         });
+    }
+
+    @Test
+    void secretRevealFailureFailsTheRunAndReleasesTheReservation() {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+        // A corrupted secret row: reveal() will fail to decrypt it, mimicking a decryption failure after key
+        // rotation or a corrupted row, well before sandboxProvider.create is ever reached.
+        secretRepository.save(new Secret(null, s.connection(), "broken",
+                "not-a-valid-ciphertext".getBytes(), new byte[12]));
+
+        var response = rest.postForEntity(url("/api/v1/runs"),
+                new HttpEntity<>(new TriggerRunRequest(s.connection().getId()), buyerAdmin(s.buyer().getId())),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        var runs = runRepository.findByConnectionBuyerOrgIdOrderByStartedAtDesc(s.buyer().getId());
+        assertThat(runs).singleElement().satisfies(r -> {
+            assertThat(r.getStatus()).isEqualTo(RunStatus.FAILED);
+            assertThat(r.getCompletedAt()).isNotNull();
+        });
+        Wallet wallet = walletRepository.findByOrgId(s.buyer().getId()).orElseThrow();
+        assertThat(wallet.getReserved()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }
