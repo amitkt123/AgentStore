@@ -37,6 +37,8 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
     RunRepository runRepository;
     @Autowired
     FakeSandboxProvider fakeSandboxProvider;
+    @Autowired
+    com.agentstore.platform.common.RecordingEmailSender emails;
 
     String url(String path) {
         return "http://localhost:" + port + path;
@@ -110,12 +112,14 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
                 new HttpEntity<>(bearer(buyerLogin.token())), Map.class);
         assertThat(pausedRun.getBody().get("status")).isEqualTo("AWAITING_APPROVAL");
 
-        // A second BUYER_APPROVER user in the same org approves the gate.
-        // NOTE: signup always creates a NEW org; to keep this test focused on the gate mechanics
-        // rather than multi-user-per-org account management (out of scope for this plan), the
-        // approval is issued by an approver token scoped to the SAME buyer org via a JWT minted
-        // directly, mirroring what a second teammate's login would carry.
-        String approverToken = mintApproverTokenForSameOrg(buyerOrgId);
+        // A second person joins the same workspace as an approver through a real invitation.
+        rest.exchange(url("/api/v1/orgs/" + buyerOrgId + "/invitations"), HttpMethod.POST,
+                new HttpEntity<>(Map.of("email", "approver@acme.example", "role", "BUYER_APPROVER"),
+                        bearer(buyerLogin.token())), Void.class);
+        String inviteToken = com.agentstore.platform.common.RecordingEmailSender.tokenFromLink(
+                emails.lastTo("approver@acme.example").orElseThrow(), "invite");
+        String approverToken = rest.postForEntity(url("/api/v1/invitations/" + inviteToken + "/accept"),
+                Map.of("fullName", "Arjun Mehta", "password", "pw"), AuthResponse.class).getBody().token();
 
         rest.exchange(url("/api/v1/runs/" + run.id() + "/approve"), HttpMethod.POST,
                 new HttpEntity<>(new ApproveRunRequest("go ahead"), bearer(approverToken)), RunResponse.class);
@@ -123,12 +127,5 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
         var resumedRun = rest.exchange(url("/api/v1/runs/" + run.id()), HttpMethod.GET,
                 new HttpEntity<>(bearer(buyerLogin.token())), Map.class);
         assertThat(resumedRun.getBody().get("status")).isEqualTo("RUNNING");
-    }
-
-    @Autowired
-    JwtService jwtService;
-
-    private String mintApproverTokenForSameOrg(UUID orgId) {
-        return jwtService.issue(UUID.randomUUID(), orgId, UserRole.BUYER_APPROVER);
     }
 }
