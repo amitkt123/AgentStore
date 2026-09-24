@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karya — connect your ledgers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F7F4; --paper-2:#EDEFEA; --ink:#1C2430; --ink-2:#4B5563; --muted:#8A93A0;
+  --line:#D6DAD2; --green:#1D5C4A; --green-soft:#E3EFEA; --amber:#B8651B; --amber-soft:#F7EBDD;
+  --red:#A63A2B; --red-soft:#F5E3DF; --doc:#FFFFFF; --focus:#1D5C4A;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#151A20;--paper-2:#1C232B;--ink:#E9ECEF;--ink-2:#C2C8D0;--muted:#8A93A0;--line:#2C353F;
+  --green:#6FBF9E;--green-soft:#1B2E28;--amber:#E0A05C;--amber-soft:#332618;--red:#E08A7B;--red-soft:#3A2420;--doc:#1C232B;--focus:#6FBF9E;}}
+:root[data-theme="dark"]{--paper:#151A20;--paper-2:#1C232B;--ink:#E9ECEF;--ink-2:#C2C8D0;--muted:#8A93A0;--line:#2C353F;
+  --green:#6FBF9E;--green-soft:#1B2E28;--amber:#E0A05C;--amber-soft:#332618;--red:#E08A7B;--red-soft:#3A2420;--doc:#1C232B;--focus:#6FBF9E;}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input{font:inherit}
+.serif{font-family:"IBM Plex Serif",Georgia,serif}
+
+.wrap{max-width:760px;margin:0 auto;padding:34px 24px 80px}
+.top{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.top .mark{font-family:"IBM Plex Serif",serif;font-size:23px;font-weight:500}
+.top .org{font-size:12.5px;color:var(--muted)}
+.forwhom{color:var(--ink-2);font-size:14px;margin-bottom:26px}
+.forwhom b{color:var(--ink);font-weight:500}
+
+/* progress rail — a real sequence, so numbered steps are earned */
+.rail{display:flex;gap:0;margin-bottom:30px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--doc)}
+.rail .s{flex:1;padding:12px 10px;font-size:12.5px;color:var(--muted);border-right:1px solid var(--line);display:flex;gap:8px;align-items:center}
+.rail .s:last-child{border-right:0}
+.rail .s .n{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:12px;flex:none}
+.rail .s.done{color:var(--green)}.rail .s.done .n{border-color:var(--green);background:var(--green);color:#fff}
+.rail .s.now{color:var(--ink)}.rail .s.now .n{border-color:var(--ink);color:var(--ink);font-weight:600}
+
+.card{background:var(--doc);border:1px solid var(--line);border-radius:12px;padding:28px 30px}
+h1{font-family:"IBM Plex Serif",serif;font-weight:500;font-size:24px;letter-spacing:-.01em;margin:0 0 6px}
+.lede{color:var(--ink-2);margin:0 0 22px;max-width:60ch}
+.step{display:none}.step.active{display:block}
+@media (prefers-reduced-motion:no-preference){.step.active{animation:in .18s ease-out}}
+@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* source picker */
+.sources{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
+.src{border:1px solid var(--line);border-radius:10px;padding:16px 18px;text-align:left;display:flex;gap:14px;align-items:center;background:var(--paper)}
+.src:hover{border-color:var(--ink-2)}
+.src.sel{border-color:var(--green);background:var(--green-soft)}
+.src .ic{width:38px;height:38px;border-radius:8px;background:var(--doc);border:1px solid var(--line);display:grid;place-items:center;font-family:"IBM Plex Serif",serif;font-weight:500;flex:none}
+.src .nm{font-weight:600}.src .ds{font-size:13px;color:var(--ink-2)}
+.src .rq{margin-left:auto;font-size:11.5px;color:var(--green);background:var(--doc);border:1px solid var(--green);border-radius:999px;padding:2px 8px;flex:none}
+
+/* method */
+.methods{display:flex;flex-direction:column;gap:12px}
+.method{border:1px solid var(--line);border-radius:10px;padding:16px 18px;text-align:left;background:var(--paper)}
+.method:hover{border-color:var(--ink-2)}.method.sel{border-color:var(--green);background:var(--green-soft)}
+.method .h{display:flex;align-items:center;gap:10px}
+.method .h b{font-weight:600}.method .h .tag{font-size:11.5px;border-radius:999px;padding:2px 9px;margin-left:auto}
+.tag.best{background:var(--green);color:#fff}.tag.plain{background:var(--paper-2);color:var(--ink-2)}
+.method .d{font-size:13.5px;color:var(--ink-2);margin-top:6px}
+
+/* scope grant — the trust moment */
+.grant{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.grant .head{background:var(--paper-2);padding:12px 16px;font-size:12.5px;color:var(--muted);display:grid;grid-template-columns:1fr 120px 96px;gap:12px}
+.scope{display:grid;grid-template-columns:1fr 120px 96px;gap:12px;align-items:center;padding:14px 16px;border-top:1px solid var(--line)}
+.scope .what b{font-weight:500}.scope .what small{display:block;color:var(--ink-2);font-size:12.5px;margin-top:2px}
+.scope .lvl{font-size:13px}
+.scope .lvl.read{color:var(--green)}.scope .lvl.write{color:var(--amber)}.scope .lvl.none{color:var(--muted)}
+.toggle{justify-self:end;width:44px;height:26px;border-radius:999px;background:var(--green);position:relative;flex:none}
+.toggle::after{content:"";position:absolute;top:3px;left:21px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .12s}
+.toggle.off{background:var(--paper-2);border:1px solid var(--line)}.toggle.off::after{left:2px;background:var(--muted)}
+.toggle.locked{opacity:.55;cursor:not-allowed}
+.grantnote{display:flex;gap:10px;background:var(--amber-soft);border:1px solid var(--amber);border-radius:8px;padding:12px 14px;margin-top:16px;font-size:13.5px;color:var(--ink)}
+.grantnote b{color:var(--amber)}
+
+/* credential entry */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13.5px;font-weight:500;margin-bottom:6px}
+.field .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+.field input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--paper);color:var(--ink)}
+.field input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:transparent}
+.vault{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--ink-2);background:var(--paper-2);border-radius:8px;padding:12px 14px;margin-top:4px}
+.vault .k{color:var(--green);flex:none}
+
+/* test connection */
+.checks{display:flex;flex-direction:column;gap:2px}
+.chk{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid var(--line)}
+.chk:last-child{border:0}
+.chk .st{width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:12px;color:#fff}
+.chk .st.ok{background:var(--green)}.chk .st.run{background:var(--amber)}.chk .st.wait{background:var(--paper-2);color:var(--muted);border:1px solid var(--line)}
+.chk .tx{font-size:14px}.chk .tx small{display:block;color:var(--muted);font-size:12.5px}
+.chk .r{margin-left:auto;font-size:13px;color:var(--ink-2)}
+
+/* done */
+.done-box{text-align:center;padding:10px 0 4px}
+.done-box .big{width:56px;height:56px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;font-size:26px;margin:6px auto 16px}
+.summary{border:1px solid var(--line);border-radius:10px;text-align:left;margin:20px 0 0}
+.summary .r{display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);font-size:14px}
+.summary .r:last-child{border:0}.summary .r span:first-child{color:var(--ink-2)}
+.revoke{font-size:13px;color:var(--ink-2);margin-top:16px}
+
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:26px}
+.btn{padding:10px 18px;border-radius:8px;border:1px solid var(--line);background:var(--doc);font-weight:500}
+.btn.primary{background:var(--green);color:#fff;border-color:var(--green)}
+.btn.primary[disabled]{opacity:.45;cursor:not-allowed}
+.btn.ghost{border-color:transparent;color:var(--ink-2)}
+@media (max-width:640px){
+  .sources{grid-template-columns:1fr}.rail .s .lbl{display:none}
+  .grant .head,.scope{grid-template-columns:1fr 70px 54px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><span class="mark">Karya</span><span class="org">Meridian Traders Pvt Ltd · ap-south-1</span></div>
+  <p class="forwhom">Connecting data for <b>GSTR-2B Reconciler</b>. It asked for two sources. You'll grant only what its permission statement declares.</p>
+
+  <div class="rail" aria-label="Steps">
+    <div class="s now" data-rail="0"><span class="n">1</span><span class="lbl">Source</span></div>
+    <div class="s" data-rail="1"><span class="n">2</span><span class="lbl">How to connect</span></div>
+    <div class="s" data-rail="2"><span class="n">3</span><span class="lbl">Grant access</span></div>
+    <div class="s" data-rail="3"><span class="n">4</span><span class="lbl">Credentials</span></div>
+    <div class="s" data-rail="4"><span class="n">5</span><span class="lbl">Test</span></div>
+    <div class="s" data-rail="5"><span class="n">6</span><span class="lbl">Done</span></div>
+  </div>
+
+  <div class="card">
+    <!-- STEP 1 -->
+    <section class="step active" data-step="0">
+      <h1>Which system holds your purchase register?</h1>
+      <p class="lede">This agent reads invoices from your accounting system and the month's GSTR-2B from the GST portal. Pick where your books live.</p>
+      <div class="sources">
+        <button class="src sel" data-src><span class="ic">T</span><span><span class="nm">Tally Prime</span><span class="ds">On-premise or Tally on cloud</span></span><span class="rq">agent needs this</span></button>
+        <button class="src" data-src><span class="ic">Z</span><span><span class="nm">Zoho Books</span><span class="ds">Cloud, OAuth</span></span></button>
+        <button class="src" data-src><span class="ic">B</span><span><span class="nm">Busy</span><span class="ds">On-premise</span></span></button>
+        <button class="src" data-src><span class="ic">X</span><span><span class="nm">Excel / Tally export</span><span class="ds">Upload a file each month</span></span></button>
+      </div>
+      <p class="lede" style="margin:16px 0 0;font-size:13.5px">The GST portal is connected separately in the next agent step — it uses your own login and is never stored.</p>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="step" data-step="1">
+      <h1>How should Karya reach your Tally?</h1>
+      <p class="lede">Tally runs on your machine, so Karya connects through a small secure bridge rather than holding your Tally password.</p>
+      <div class="methods">
+        <button class="method sel" data-method><div class="h"><b>Karya Connector on your Tally machine</b><span class="tag best">recommended</span></div><div class="d">A lightweight service you install once. It opens a read-only channel to Tally over an encrypted tunnel. Nothing about Tally leaves your network except the invoices this agent reads.</div></button>
+        <button class="method" data-method><div class="h"><b>Tally on cloud (TallyPrime Server)</b><span class="tag plain">if you already have it</span></div><div class="d">Karya connects to your hosted Tally endpoint over TLS with a scoped service user.</div></button>
+        <button class="method" data-method><div class="h"><b>Monthly file upload</b><span class="tag plain">no install</span></div><div class="d">You export the purchase register and upload it each month. Simplest, but the agent can't run on its own.</div></button>
+      </div>
+    </section>
+
+    <!-- STEP 3: THE GRANT -->
+    <section class="step" data-step="2">
+      <h1>Grant exactly what the agent declared</h1>
+      <p class="lede">These are the scopes from the agent's permission statement. Read access is on; you can't turn on anything it didn't ask for. Write access to your ledger was never requested.</p>
+      <div class="grant">
+        <div class="head"><span>What it reaches</span><span>Access</span><span>Granted</span></div>
+        <div class="scope"><span class="what"><b>Purchase register</b><small>Invoices, GSTINs, tax amounts — current financial year</small></span><span class="lvl read">Read only</span><span class="toggle" role="switch" aria-checked="true" aria-label="Grant read access to purchase register"></span></div>
+        <div class="scope"><span class="what"><b>Vendor master</b><small>Names and GSTINs, to match invoices to filers</small></span><span class="lvl read">Read only</span><span class="toggle" role="switch" aria-checked="true" aria-label="Grant read access to vendor master"></span></div>
+        <div class="scope"><span class="what"><b>Ledger entries &amp; vouchers</b><small>Posting to or editing your books</small></span><span class="lvl none">Not requested</span><span class="toggle off locked" aria-checked="false" aria-disabled="true" aria-label="Write access not requested"></span></div>
+        <div class="scope"><span class="what"><b>Bank &amp; cash accounts</b><small>Balances and transactions</small></span><span class="lvl none">Not requested</span><span class="toggle off locked" aria-checked="false" aria-disabled="true" aria-label="Not requested"></span></div>
+      </div>
+      <div class="grantnote"><span aria-hidden="true">⚠</span><div><b>You stay in control.</b> Access lasts until you revoke it, and the agent can spend at most <b>₹25,000</b> a month under this grant. You can lower either in Billing at any time.</div></div>
+    </section>
+
+    <!-- STEP 4: CREDENTIALS -->
+    <section class="step" data-step="3">
+      <h1>Point Karya at your Tally machine</h1>
+      <p class="lede">Install the Karya Connector on the PC where Tally runs, then paste the pairing code it shows you. The connector holds the Tally link; Karya never sees a Tally password.</p>
+      <div class="field"><label for="pair">Pairing code from the connector</label><input id="pair" placeholder="e.g.  MERI-9F2K-TALLY-0417" value="MERI-9F2K-TALLY-0417"><div class="hint">Open the Karya Connector on your Tally PC → it shows a 4-part code valid for 10 minutes.</div></div>
+      <div class="field"><label for="cname">Name this connection</label><input id="cname" value="Head office Tally — Sep 2026"><div class="hint">So you can tell it apart if you add more branches later.</div></div>
+      <div class="vault"><span class="k" aria-hidden="true">🔒</span><div>The link is stored in Karya's key vault, encrypted per company, and injected only into this agent's runs as a short-lived credential. It's never written to logs and never shared with the agent's developer.</div></div>
+    </section>
+
+    <!-- STEP 5: TEST -->
+    <section class="step" data-step="4">
+      <h1>Testing the connection</h1>
+      <p class="lede">Karya runs a dry read — no charge, no writes — so you see it works before the agent ever runs for real.</p>
+      <div class="checks" id="checks">
+        <div class="chk"><span class="st ok" aria-hidden="true">✓</span><span class="tx">Reached the Karya Connector<small>Head office Tally PC, encrypted tunnel up</small></span><span class="r">42 ms</span></div>
+        <div class="chk"><span class="st ok" aria-hidden="true">✓</span><span class="tx">Opened Tally in read-only mode<small>TallyPrime 4.1, company "Meridian Traders"</small></span><span class="r">ok</span></div>
+        <div class="chk"><span class="st ok" aria-hidden="true">✓</span><span class="tx">Read a sample of the purchase register<small>Fetched 25 invoices, did not store them</small></span><span class="r">25 rows</span></div>
+        <div class="chk"><span class="st ok" aria-hidden="true">✓</span><span class="tx">Confirmed write access is blocked<small>Attempted a test voucher post — correctly refused</small></span><span class="r">blocked, as set</span></div>
+        <div class="chk"><span class="st run" aria-hidden="true">⋯</span><span class="tx">Checking GST portal reachability<small>Will use your login only at run time</small></span><span class="r">…</span></div>
+      </div>
+    </section>
+
+    <!-- STEP 6: DONE -->
+    <section class="step" data-step="5">
+      <div class="done-box">
+        <div class="big" aria-hidden="true">✓</div>
+        <h1>Tally is connected</h1>
+        <p class="lede" style="margin-left:auto;margin-right:auto">GSTR-2B Reconciler can now read your purchase register and vendor master, read only, up to a ₹25,000 monthly limit. It still asks you before marking any credit above ₹50,000 unclaimable.</p>
+      </div>
+      <div class="summary">
+        <div class="r"><span>Source</span><span>Tally Prime · Head office</span></div>
+        <div class="r"><span>How</span><span>Karya Connector, encrypted tunnel</span></div>
+        <div class="r"><span>Granted</span><span>Purchase register + vendor master, read only</span></div>
+        <div class="r"><span>Spend limit</span><span>₹25,000 / month</span></div>
+        <div class="r"><span>Approval gate</span><span>Any unclaimable credit above ₹50,000</span></div>
+      </div>
+      <p class="revoke">You can revoke this connection or change its limits any time under Billing → Connections. Revoking takes effect on the agent's next run.</p>
+    </section>
+
+    <div class="foot">
+      <button class="btn ghost" id="back" style="visibility:hidden">Back</button>
+      <button class="btn primary" id="next">Continue</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var step=0, LAST=5;
+  var steps=document.querySelectorAll('.step');
+  var rails=document.querySelectorAll('.rail .s');
+  var back=document.getElementById('back'), next=document.getElementById('next');
+
+  function labelFor(s){ return s===4 ? 'Looks good' : s===LAST ? 'Go to agent' : 'Continue'; }
+  function render(){
+    steps.forEach(function(el,i){el.classList.toggle('active',i===step)});
+    rails.forEach(function(el,i){el.classList.remove('now','done'); if(i<step)el.classList.add('done'); if(i===step)el.classList.add('now');});
+    back.style.visibility = step===0 ? 'hidden':'visible';
+    next.textContent = labelFor(step);
+    try{localStorage.setItem('karya.connect.step',String(step))}catch(e){}
+    window.scrollTo({top:0});
+  }
+  next.addEventListener('click',function(){ if(step<LAST){step++;render();} else {step=0;render();} });
+  back.addEventListener('click',function(){ if(step>0){step--;render();} });
+
+  // selection behaviour for pickers
+  function single(sel){document.querySelectorAll(sel).forEach(function(b){b.addEventListener('click',function(){
+    b.parentNode.querySelectorAll(sel).forEach(function(x){x.classList.remove('sel');});b.classList.add('sel');});});}
+  single('[data-src]'); single('[data-method]');
+
+  // scope toggles (only unlocked ones)
+  document.querySelectorAll('.toggle:not(.locked)').forEach(function(t){
+    t.setAttribute('tabindex','0');
+    function flip(){var on=!t.classList.contains('off');t.classList.toggle('off',on);t.setAttribute('aria-checked',String(!on));}
+    t.addEventListener('click',flip);
+    t.addEventListener('keydown',function(e){if(e.key===' '||e.key==='Enter'){e.preventDefault();flip();}});
+  });
+
+  try{var s=parseInt(localStorage.getItem('karya.connect.step')||'0',10); if(s>=0&&s<=LAST)step=s;}catch(e){}
+  render();
+})();
+</script>
+</body>
+</html>

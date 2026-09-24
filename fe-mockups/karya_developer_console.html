@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karya for Developers — publish an agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F7F4; --paper-2:#EDEFEA; --ink:#1C2430; --ink-2:#4B5563; --muted:#8A93A0;
+  --line:#D6DAD2; --green:#1D5C4A; --green-soft:#E3EFEA; --amber:#B8651B; --amber-soft:#F7EBDD;
+  --red:#A63A2B; --red-soft:#F5E3DF; --doc:#FFFFFF; --focus:#1D5C4A; --blue:#2B5B8C; --blue-soft:#E7EEF5;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#151A20;--paper-2:#1C232B;--ink:#E9ECEF;--ink-2:#C2C8D0;--muted:#8A93A0;--line:#2C353F;
+  --green:#6FBF9E;--green-soft:#1B2E28;--amber:#E0A05C;--amber-soft:#332618;--red:#E08A7B;--red-soft:#3A2420;--doc:#1C232B;--focus:#6FBF9E;--blue:#7CA6D6;--blue-soft:#1B2733;}}
+:root[data-theme="dark"]{--paper:#151A20;--paper-2:#1C232B;--ink:#E9ECEF;--ink-2:#C2C8D0;--muted:#8A93A0;--line:#2C353F;
+  --green:#6FBF9E;--green-soft:#1B2E28;--amber:#E0A05C;--amber-soft:#332618;--red:#E08A7B;--red-soft:#3A2420;--doc:#1C232B;--focus:#6FBF9E;--blue:#7CA6D6;--blue-soft:#1B2733;}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+input,textarea,select{font:inherit;color:inherit}
+.mono{font-family:"IBM Plex Mono",monospace}
+
+.shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+.rail{border-right:1px solid var(--line);padding:22px 18px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:baseline;gap:9px}
+.brand .mark{font-family:"IBM Plex Serif",serif;font-size:24px;font-weight:500;letter-spacing:-.01em}
+.brand .tag{font-size:11.5px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.pub{font-size:12.5px;color:var(--muted);margin-top:-6px}
+.pub b{color:var(--ink-2);font-weight:500}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{text-align:left;padding:8px 10px;border-radius:6px;color:var(--ink-2)}
+.nav button[aria-current="page"]{background:var(--paper-2);color:var(--ink);font-weight:500}
+.rail-foot{margin-top:auto}
+main{padding:22px 34px 70px;max-width:1160px}
+h1{font-family:"IBM Plex Serif",serif;font-weight:500;font-size:26px;letter-spacing:-.01em;margin:0 0 6px}
+h2{font-weight:600;font-size:15px;margin:0 0 4px}
+.lede{color:var(--ink-2);margin:0 0 24px;max-width:64ch}
+.screen{display:none}.screen.active{display:block}
+.btn{padding:9px 15px;border-radius:7px;border:1px solid var(--line);background:var(--doc);font-weight:500}
+.btn.primary{background:var(--green);color:#fff;border-color:var(--green)}
+.btn.primary[disabled]{opacity:.4;cursor:not-allowed}
+.btn.ghost{border-color:transparent;color:var(--ink-2)}
+.btn.small{padding:6px 11px;font-size:13.5px}
+.pill{font-size:11.5px;border-radius:999px;padding:2px 9px;font-weight:500}
+.pill.live{background:var(--green-soft);color:var(--green)}
+.pill.review{background:var(--amber-soft);color:var(--amber)}
+.pill.draft{background:var(--paper-2);color:var(--muted)}
+.pill.rejected{background:var(--red-soft);color:var(--red)}
+
+/* dashboard */
+.agentlist{border-top:1px solid var(--line)}
+.arow{display:grid;grid-template-columns:1.6fr .9fr .9fr .8fr auto;gap:16px;align-items:center;padding:15px 4px;border-bottom:1px solid var(--line);width:100%;text-align:left}
+.arow:hover{background:var(--paper-2)}
+.arow .nm{font-weight:600}.arow .sub{font-size:13px;color:var(--ink-2)}
+.arow .v{font-size:13px;color:var(--ink-2)}
+.list-head{display:grid;grid-template-columns:1.6fr .9fr .9fr .8fr auto;gap:16px;padding:0 4px 8px;font-size:12.5px;color:var(--muted)}
+.cta-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+
+/* wizard rail */
+.wrail{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:26px;background:var(--doc)}
+.wrail .s{flex:1;padding:11px 10px;font-size:12px;color:var(--muted);border-right:1px solid var(--line);display:flex;gap:7px;align-items:center}
+.wrail .s:last-child{border-right:0}
+.wrail .s .n{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:11px;flex:none}
+.wrail .s.done{color:var(--green)}.wrail .s.done .n{border-color:var(--green);background:var(--green);color:#fff}
+.wrail .s.now{color:var(--ink)}.wrail .s.now .n{border-color:var(--ink);font-weight:600}
+
+.card{background:var(--doc);border:1px solid var(--line);border-radius:12px;padding:26px 28px}
+.wstep{display:none}.wstep.active{display:block}
+
+/* manifest builder — mirrors the merchant permission statement */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13.5px;font-weight:500;margin-bottom:6px}
+.field .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:var(--paper)}
+.field textarea{resize:vertical;min-height:64px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.scopepick{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px}
+.scopepick .r{display:grid;grid-template-columns:1fr 110px 110px;gap:10px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+.scopepick .r:first-child{border-top:0;background:var(--paper-2);font-size:12px;color:var(--muted)}
+.scopepick .r .nm{font-weight:500;font-size:14px}
+.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;font-size:12.5px}
+.seg button{flex:1;padding:5px 0;color:var(--muted)}
+.seg button.on{background:var(--ink);color:var(--doc)}
+.addscope{border:1px dashed var(--line);border-radius:8px;padding:10px;width:100%;color:var(--ink-2);font-size:13.5px;text-align:center}
+
+/* live preview panel */
+.split{display:grid;grid-template-columns:1fr 320px;gap:26px;align-items:start}
+.preview{border:1px solid var(--line);border-radius:4px;background:var(--doc);padding:20px 22px;position:sticky;top:22px}
+.preview h3{font-family:"IBM Plex Serif",serif;font-weight:500;font-size:17px;margin:0 0 2px}
+.preview .sub{font-family:"IBM Plex Serif",serif;font-style:italic;color:var(--ink-2);font-size:13px;margin:0 0 16px}
+.preview dt{font-family:"IBM Plex Serif",serif;font-size:12.5px;color:var(--muted);margin:12px 0 5px;border-bottom:1px dotted var(--line);padding-bottom:3px}
+.preview dd{margin:0 0 3px;display:flex;justify-content:space-between;font-size:13px}
+.preview dd .v{color:var(--ink-2)}
+.preview .badge{display:inline-block;margin-top:14px;font-size:11.5px;background:var(--amber-soft);color:var(--amber);border-radius:6px;padding:3px 8px}
+
+/* evals */
+.upload{border:1.5px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--ink-2)}
+.upload b{color:var(--ink)}
+.evalrow{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.evalrow .ic{width:32px;height:32px;border-radius:7px;background:var(--green-soft);color:var(--green);display:grid;place-items:center;flex:none;font-size:13px}
+.evalrow .nm{font-weight:500;font-size:14px}.evalrow .sub{font-size:12.5px;color:var(--muted)}
+.evalrow .stat{margin-left:auto;font-size:13px}
+.reqbox{background:var(--blue-soft);border:1px solid var(--blue);border-radius:8px;padding:14px 16px;margin-top:16px;font-size:13.5px;display:flex;gap:10px}
+.reqbox b{color:var(--blue)}
+
+/* pricing */
+.pricecards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px}
+.pc{border:1px solid var(--line);border-radius:10px;padding:16px;text-align:left}
+.pc.sel{border-color:var(--green);background:var(--green-soft)}
+.pc .nm{font-weight:600;margin-bottom:4px}.pc .ds{font-size:12.5px;color:var(--ink-2)}
+
+/* review pipeline */
+.pipeline{border-left:2px solid var(--line);margin-left:10px}
+.pstep{position:relative;padding:0 0 26px 26px}
+.pstep::before{content:"";position:absolute;left:-31px;top:2px;width:13px;height:13px;border-radius:50%;background:var(--paper);border:2px solid var(--muted)}
+.pstep.ok::before{background:var(--green);border-color:var(--green)}
+.pstep.run::before{background:var(--amber);border-color:var(--amber)}
+.pstep.bad::before{background:var(--red);border-color:var(--red)}
+.pstep .h{font-weight:600;display:flex;align-items:center;gap:10px}
+.pstep .t{font-size:12.5px;color:var(--muted);margin-top:2px}
+.pstep .b{color:var(--ink-2);font-size:14px;margin-top:6px;max-width:56ch}
+.pstep .detail{margin-top:10px;background:var(--paper-2);border-radius:8px;padding:12px 14px;font-size:13.5px}
+.pstep .detail .r{display:flex;justify-content:space-between;padding:4px 0}
+.pstep .fix{margin-top:10px;background:var(--red-soft);border:1px solid var(--red);border-radius:8px;padding:12px 14px;font-size:13.5px}
+
+/* published */
+.verlist{border-top:1px solid var(--line)}
+.ver{display:grid;grid-template-columns:100px 1fr auto;gap:14px;align-items:center;padding:13px 4px;border-bottom:1px solid var(--line)}
+.ver .vnum{font-family:"IBM Plex Mono",monospace;font-size:13px}
+.ver .desc{font-size:13.5px;color:var(--ink-2)}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.met{border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.met .n{font-size:23px;font-family:"IBM Plex Serif",serif;font-weight:500}
+.met .l{font-size:12.5px;color:var(--ink-2);margin-top:4px}
+
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:24px}
+@media (max-width:960px){.split{grid-template-columns:1fr}.preview{position:static}.two,.pricecards,.metrics{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <div class="brand"><span class="mark">Karya</span><span class="tag">for developers</span></div>
+    <div class="pub"><b>Ledgerline Labs</b><br>Publisher since Mar 2026 · verified</div>
+    <nav class="nav" aria-label="Sections">
+      <button data-go="dash" aria-current="page">Your agents</button>
+      <button data-go="wizard">New submission</button>
+      <button data-go="pipeline">Review status</button>
+      <button data-go="published">Payouts &amp; usage</button>
+    </nav>
+    <div class="rail-foot"><button class="btn small" style="width:100%">Publisher docs ↗</button></div>
+  </aside>
+
+  <main>
+    <!-- DASHBOARD -->
+    <section class="screen active" id="dash">
+      <div class="cta-row"><div><h1>Your agents</h1><p class="lede" style="margin:0">Four listed, one in review.</p></div><button class="btn primary" data-go="wizard">Submit a new agent</button></div>
+      <div class="list-head"><span>Agent</span><span>Status</span><span>Companies using it</span><span>Disputed</span><span></span></div>
+      <div class="agentlist">
+        <button class="arow" data-go="published"><span><span class="nm">GSTR-2B Reconciler</span><br><span class="sub">v4.2 · updated 11 Sep</span></span><span class="pill live">Live</span><span class="v">312 companies</span><span class="v">0.3%</span><span class="btn small">Manage</span></button>
+        <button class="arow" data-go="pipeline"><span><span class="nm">TDS Return Preparer — v5.0</span><br><span class="sub">Adds 24Q support</span></span><span class="pill review">In review</span><span class="v">—</span><span class="v">—</span><span class="btn small">View status</span></button>
+        <button class="arow"><span><span class="nm">TDS Return Preparer</span><br><span class="sub">v4.1 · live version</span></span><span class="pill live">Live</span><span class="v">640 companies</span><span class="v">0.0%</span><span class="btn small">Manage</span></button>
+        <button class="arow"><span><span class="nm">E-Invoice Validator</span><br><span class="sub">Draft, not submitted</span></span><span class="pill draft">Draft</span><span class="v">—</span><span class="v">—</span><span class="btn small">Continue</span></button>
+      </div>
+    </section>
+
+    <!-- WIZARD -->
+    <section class="screen" id="wizard">
+      <h1>Submit an agent</h1>
+      <p class="lede">Everything here becomes the permission statement a company sees before they connect their data. Be exact — this is a legal declaration, not marketing copy.</p>
+      <div class="wrail" aria-label="Submission steps">
+        <div class="s now" data-r="0"><span class="n">1</span>Basics</div>
+        <div class="s" data-r="1"><span class="n">2</span>Scopes</div>
+        <div class="s" data-r="2"><span class="n">3</span>Cost &amp; limits</div>
+        <div class="s" data-r="3"><span class="n">4</span>Evals</div>
+        <div class="s" data-r="4"><span class="n">5</span>Pricing</div>
+        <div class="s" data-r="5"><span class="n">6</span>Review &amp; submit</div>
+      </div>
+
+      <div class="card">
+        <!-- 1 basics -->
+        <div class="wstep active" data-w="0">
+          <div class="split">
+            <div>
+              <h2>What job does it do</h2>
+              <div class="field"><label>Agent name</label><input value="E-Invoice Validator"></div>
+              <div class="field"><label>One-line job description — shown in the catalog</label><textarea>Validates e-invoices against GST schema and IRP rules before submission, catching rejections before they happen.</textarea></div>
+              <div class="two">
+                <div class="field"><label>Category</label><select><option>GST &amp; TDS</option><option>Receivables</option><option>Bank reconciliation</option></select></div>
+                <div class="field"><label>Underlying model(s) used</label><input value="Claude Sonnet 4.6, rules engine"></div>
+              </div>
+              <div class="field"><label>Support contact for merchants</label><input value="support@ledgerline.in"></div>
+            </div>
+            <aside class="preview">
+              <h3>E-Invoice Validator</h3>
+              <p class="sub">Validates e-invoices against GST schema and IRP rules before submission, catching rejections before they happen.</p>
+              <div class="badge">Preview updates as you fill the form</div>
+            </aside>
+          </div>
+        </div>
+
+        <!-- 2 scopes -->
+        <div class="wstep" data-w="1">
+          <div class="split">
+            <div>
+              <h2>Declare every scope it needs</h2>
+              <p class="lede" style="margin-bottom:16px">This is the only source of truth for what the agent can touch. A merchant can grant less than this, never more. Anything not listed here, the agent cannot request at run time — that's enforced by the sandbox, not just policy.</p>
+              <div class="scopepick">
+                <div class="r"><span>System</span><span>Access</span><span>Required</span></div>
+                <div class="r"><span class="nm">E-invoice / IRP portal</span><div class="seg"><button class="on">Read</button><button>Write</button><button>None</button></div><div class="seg"><button class="on">Yes</button><button>No</button></div></div>
+                <div class="r"><span class="nm">Purchase &amp; sales register</span><div class="seg"><button class="on">Read</button><button>Write</button><button>None</button></div><div class="seg"><button class="on">Yes</button><button>No</button></div></div>
+                <div class="r"><span class="nm">Draft invoice queue</span><div class="seg"><button>Read</button><button class="on">Write</button><button>None</button></div><div class="seg"><button>Yes</button><button class="on">No</button></div></div>
+                <div class="r"><span class="nm">Filed / signed invoices</span><div class="seg"><button>Read</button><button>Write</button><button class="on">None</button></div><div class="seg"><button>Yes</button><button class="on">No</button></div></div>
+              </div>
+              <button class="addscope">+ Add another scope</button>
+              <div class="field" style="margin-top:20px"><label>Network destinations it needs to reach</label><input value="einvoice1.gst.gov.in, einvoice2.gst.gov.in"><div class="hint">Anything not on this list is blocked at the network layer during runs.</div></div>
+              <div class="field"><label>Approval gate — when should it stop and ask a human?</label><textarea>Before submitting any invoice above ₹2,00,000, and before overwriting a draft that was manually edited.</textarea></div>
+            </div>
+            <aside class="preview">
+              <h3>E-Invoice Validator</h3>
+              <p class="sub">Permission statement, live preview</p>
+              <dt>Reads</dt><dd><span>E-invoice / IRP portal</span><span class="v">yes</span></dd><dd><span>Purchase &amp; sales register</span><span class="v">yes</span></dd>
+              <dt>Writes</dt><dd><span>Draft invoice queue</span><span class="v">yes</span></dd><dd><span>Filed invoices</span><span class="v">no</span></dd>
+              <dt>Talks to</dt><dd><span>einvoice1/2.gst.gov.in</span><span class="v">only</span></dd>
+              <dt>Asks first</dt><dd><span>Invoices &gt; ₹2,00,000</span><span class="v">always</span></dd>
+            </aside>
+          </div>
+        </div>
+
+        <!-- 3 cost & limits -->
+        <div class="wstep" data-w="2">
+          <div class="split">
+            <div>
+              <h2>What can it cost a merchant</h2>
+              <p class="lede" style="margin-bottom:16px">Karya enforces this as a hard cap per company, independent of your pricing below. Set it honestly — merchants see it before they connect anything.</p>
+              <div class="two">
+                <div class="field"><label>Typical run cost</label><input value="₹6 per invoice"></div>
+                <div class="field"><label>Suggested monthly cap for a new merchant</label><input value="₹15,000"></div>
+              </div>
+              <div class="field"><label>Compute / third-party costs included in your price?</label><select><option>Yes — merchant never sees a separate bill</option><option>No — billed separately</option></select></div>
+              <div class="field"><label>Retry behaviour on failure</label><textarea>Up to 2 automatic retries on IRP timeout, no charge for retries. A third failure stops the run and refunds that invoice.</textarea></div>
+            </div>
+            <aside class="preview">
+              <h3>E-Invoice Validator</h3>
+              <p class="sub">Cost, live preview</p>
+              <dt>Price</dt><dd><span>Per invoice</span><span class="v">₹6</span></dd>
+              <dt>Suggested cap</dt><dd><span>Default monthly limit</span><span class="v">₹15,000</span></dd>
+              <dt>Retries</dt><dd><span>Free, up to 2</span><span class="v">then refund</span></dd>
+            </aside>
+          </div>
+        </div>
+
+        <!-- 4 evals -->
+        <div class="wstep" data-w="3">
+          <h2>Prove it works</h2>
+          <p class="lede">Every listed agent is re-tested by Karya on its own held-out set, but you need to pass your own evals first — this is what the "measured on your kind of data" numbers on the listing come from.</p>
+          <div class="upload"><b>Drop your eval suite</b> — a runnable harness plus at least 500 labeled cases covering the scopes you declared.<br><button class="btn small" style="margin-top:12px">Choose files</button></div>
+          <div style="margin-top:18px">
+            <div class="evalrow"><span class="ic">✓</span><span><span class="nm">irp_validation_evalset.zip</span><br><span class="sub">1,240 invoices, 6 rejection categories</span></span><span class="stat" style="color:var(--green)">Uploaded</span></div>
+            <div class="evalrow"><span class="ic">✓</span><span><span class="nm">scope_boundary_tests.zip</span><br><span class="sub">Confirms it never touches filed invoices</span></span><span class="stat" style="color:var(--green)">Uploaded</span></div>
+          </div>
+          <div class="reqbox"><span aria-hidden="true">ℹ</span><div><b>Required before submission:</b> an accuracy eval on your own labeled data, a scope-boundary test proving the agent respects the "asks first" and "no access" lines from step 2, and a cost-envelope test showing typical spend matches step 3.</div></div>
+        </div>
+
+        <!-- 5 pricing -->
+        <div class="wstep" data-w="4">
+          <h2>How merchants pay</h2>
+          <div class="pricecards">
+            <button class="pc sel"><div class="nm">Per outcome</div><div class="ds">₹6 per invoice validated. Matches how you described cost. Most trusted by merchants.</div></button>
+            <button class="pc"><div class="nm">Subscription</div><div class="ds">Flat monthly fee regardless of volume.</div></button>
+            <button class="pc"><div class="nm">Usage-metered</div><div class="ds">Billed on compute/tool-call units directly.</div></button>
+          </div>
+          <div class="two">
+            <div class="field"><label>Price to merchant</label><input value="₹6 per invoice"></div>
+            <div class="field"><label>Karya platform fee</label><input value="12% — standard tier" disabled></div>
+          </div>
+          <div class="field"><label>Payout account</label><input value="HDFC Bank ····6031 · GSTIN 27AACCL1234F1Z5" disabled><div class="hint">Payouts settle monthly, net of platform fee and any disputes reversed that month.</div></div>
+        </div>
+
+        <!-- 6 review & submit -->
+        <div class="wstep" data-w="5">
+          <h2>Ready to submit</h2>
+          <p class="lede">This is exactly what companies will see and exactly what your sandbox will be held to. Submitting starts automated review — nothing goes live without a human check.</p>
+          <div class="split">
+            <div>
+              <div class="field"><label>What changed since your last version (for the changelog)</label><textarea>Initial submission. New agent, no prior version.</textarea></div>
+              <label style="display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--ink-2);margin-top:10px"><input type="checkbox" checked style="margin-top:3px"> I confirm the scopes in step 2 are complete — the agent will not request access beyond what's declared here, and Karya's sandbox will reject the submission if it does.</label>
+            </div>
+            <aside class="preview">
+              <h3>E-Invoice Validator</h3>
+              <p class="sub">Final permission statement</p>
+              <dt>Reads</dt><dd><span>IRP portal, registers</span><span class="v">yes</span></dd>
+              <dt>Writes</dt><dd><span>Draft queue only</span><span class="v">yes</span></dd>
+              <dt>Price</dt><dd><span>Per invoice</span><span class="v">₹6</span></dd>
+              <dt>Asks first</dt><dd><span>&gt; ₹2,00,000</span><span class="v">always</span></dd>
+            </aside>
+          </div>
+        </div>
+
+        <div class="foot">
+          <button class="btn ghost" id="wback" style="visibility:hidden">Back</button>
+          <button class="btn primary" id="wnext">Continue</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- REVIEW PIPELINE -->
+    <section class="screen" id="pipeline">
+      <h1>TDS Return Preparer — v5.0</h1>
+      <p class="lede">Submitted 14 Sep, 10:02. Nothing here is user-facing until every gate passes.</p>
+      <div class="pipeline">
+        <div class="pstep ok"><div class="h">Manifest &amp; sandbox check <span class="pill live" style="background:var(--green-soft)">passed</span></div><div class="t">14 Sep, 10:04</div><div class="b">Confirmed the agent's actual tool calls during a sandboxed run never exceed the scopes declared in the manifest.</div></div>
+        <div class="pstep ok"><div class="h">Automated evals <span class="pill live" style="background:var(--green-soft)">passed</span></div><div class="t">14 Sep, 10:19</div>
+          <div class="detail"><div class="r"><span>Accuracy on Karya's held-out set</span><span>97.9%</span></div><div class="r"><span>Scope-boundary tests</span><span>32 / 32 passed</span></div><div class="r"><span>Cost envelope vs declared</span><span>within 4%</span></div></div>
+        </div>
+        <div class="pstep run"><div class="h">Red-team &amp; prompt-injection probes <span class="pill review">running</span></div><div class="t">started 10:22, usually 2–4 hours</div><div class="b">Adversarial inputs designed to make it exceed declared scopes or leak data across companies.</div></div>
+        <div class="pstep"><div class="h" style="color:var(--muted)">Human review</div><div class="t">queued</div><div class="b" style="color:var(--muted)">A Karya reviewer checks the permission statement against actual behaviour and approves the listing copy.</div></div>
+        <div class="pstep"><div class="h" style="color:var(--muted)">Staged rollout</div><div class="t">queued</div><div class="b" style="color:var(--muted)">Ships to 5% of eligible companies for 3 days before full release. Auto-rolls back on a dispute-rate spike.</div></div>
+      </div>
+      <div class="reqbox" style="margin-top:22px"><span aria-hidden="true">↻</span><div>Your last submission (v4.3, TDS Preparer) was auto-rejected here: red-team found a prompt-injection path where a malicious vendor invoice description could trigger a filing above the declared approval threshold. Fixed in this version — see changelog.</div></div>
+    </section>
+
+    <!-- PUBLISHED / MANAGE -->
+    <section class="screen" id="published">
+      <h1>GSTR-2B Reconciler</h1>
+      <p class="lede">Live since Feb 2026. Manage pricing, scopes, and versions here — changes to scopes trigger review again; pricing and description changes don't.</p>
+      <div class="metrics">
+        <div class="met"><div class="n">312</div><div class="l">Companies using it</div></div>
+        <div class="met"><div class="n">₹18.4L</div><div class="l">Payout, last 30 days</div></div>
+        <div class="met"><div class="n">0.3%</div><div class="l">Disputed runs</div></div>
+        <div class="met"><div class="n">98.4%</div><div class="l">Latest accuracy score</div></div>
+      </div>
+      <h2 style="margin-bottom:10px">Version history</h2>
+      <div class="verlist">
+        <div class="ver"><span class="vnum">v4.2</span><span class="desc"><b>Live</b> — Improved matching on partial-amount invoices. Scopes unchanged.</span><span class="pill live">Live</span></div>
+        <div class="ver"><span class="vnum">v4.1</span><span class="desc">Added vendor master read scope for better matching. Reviewed &amp; approved 2 Aug.</span><span class="v" style="color:var(--muted)">Superseded</span></div>
+        <div class="ver"><span class="vnum">v4.0</span><span class="desc">Initial GSTR-2B matching engine.</span><span class="v" style="color:var(--muted)">Superseded</span></div>
+      </div>
+      <div class="foot" style="justify-content:flex-start;gap:10px"><button class="btn" data-go="wizard">Submit new version</button><button class="btn ghost">Pause listing</button></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  var screens=document.querySelectorAll('.screen'), navs=document.querySelectorAll('.nav button');
+  function go(id){screens.forEach(function(s){s.classList.toggle('active',s.id===id)});
+    navs.forEach(function(b){b.toggleAttribute('aria-current',false);b.removeAttribute('aria-current')});
+    var m={dash:0,wizard:1,pipeline:2,published:3}[id]; if(navs[m]) navs[m].setAttribute('aria-current','page');
+    window.scrollTo({top:0});}
+  document.addEventListener('click',function(e){var t=e.target.closest('[data-go]');if(!t)return;
+    if(t.classList.contains('btn')&&t.closest('.arow'))t=t.closest('.arow'); go(t.getAttribute('data-go'));});
+
+  // wizard step control
+  var wstep=0, WLAST=5;
+  var wsteps=document.querySelectorAll('.wstep'), wrails=document.querySelectorAll('.wrail .s');
+  var wback=document.getElementById('wback'), wnext=document.getElementById('wnext');
+  function wrender(){
+    wsteps.forEach(function(el,i){el.classList.toggle('active',i===wstep)});
+    wrails.forEach(function(el,i){el.classList.remove('now','done');if(i<wstep)el.classList.add('done');if(i===wstep)el.classList.add('now');});
+    wback.style.visibility= wstep===0?'hidden':'visible';
+    wnext.textContent = wstep===WLAST ? 'Submit for review' : 'Continue';
+  }
+  wnext.addEventListener('click',function(){ if(wstep<WLAST){wstep++;wrender();} else {go('pipeline');} });
+  wback.addEventListener('click',function(){ if(wstep>0){wstep--;wrender();} });
+  wrender();
+
+  // segmented controls (scope pickers) — single-select within each seg group
+  document.querySelectorAll('.seg').forEach(function(seg){
+    seg.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click',function(){seg.querySelectorAll('button').forEach(function(x){x.classList.remove('on')});b.classList.add('on');});
+    });
+  });
+  document.querySelectorAll('.pc').forEach(function(b){b.addEventListener('click',function(){
+    b.parentNode.querySelectorAll('.pc').forEach(function(x){x.classList.remove('sel')});b.classList.add('sel');});});
+})();
+</script>
+</body>
+</html>

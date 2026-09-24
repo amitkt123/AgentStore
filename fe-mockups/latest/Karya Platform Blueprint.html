@@ -1,0 +1,803 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Karya Platform Blueprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap">
+<style>
+:root{
+  --paper:#F6F7F4; --paper-2:#EDEFEA; --ink:#1C2430; --ink-2:#4B5563; --muted:#7D8693;
+  --line:#D6DAD2; --green:#1D5C4A; --green-soft:#E3EFEA; --amber:#B8651B; --amber-soft:#F7EBDD;
+  --red:#A63A2B; --red-soft:#F5E3DF; --doc:#FFFFFF; --focus:#1D5C4A; --shade:rgba(28,36,48,.06);
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --paper:#151A20; --paper-2:#1C232B; --ink:#E9ECEF; --ink-2:#C2C8D0; --muted:#8A93A0;
+    --line:#2C353F; --green:#6FBF9E; --green-soft:#1B2E28; --amber:#E0A05C; --amber-soft:#332618;
+    --red:#E08A7B; --red-soft:#3A2420; --doc:#1C232B; --focus:#6FBF9E; --shade:rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#151A20; --paper-2:#1C232B; --ink:#E9ECEF; --ink-2:#C2C8D0; --muted:#8A93A0;
+  --line:#2C353F; --green:#6FBF9E; --green-soft:#1B2E28; --amber:#E0A05C; --amber-soft:#332618;
+  --red:#E08A7B; --red-soft:#3A2420; --doc:#1C232B; --focus:#6FBF9E; --shade:rgba(0,0,0,.25);
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;padding-inline:20px}
+a{color:var(--green)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;padding-block:40px 80px}
+.layout{display:grid;grid-template-columns:190px minmax(0,1fr);gap:48px}
+@media (max-width:880px){.layout{grid-template-columns:minmax(0,1fr)}.toc{display:none}}
+.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 24px);align-self:start;font-size:13px}
+.toc b{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-weight:600}
+.toc a{display:block;color:var(--ink-2);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid var(--line)}
+.toc a:hover{color:var(--ink);border-left-color:var(--green)}
+
+header.top{padding-bottom:28px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.mark{font-family:var(--serif);font-weight:600;font-size:15px;color:var(--green);letter-spacing:.01em}
+.mark span{color:var(--muted);font-family:var(--sans);font-weight:400;font-size:13px;margin-left:8px}
+h1{font-family:var(--serif);font-weight:500;font-size:clamp(30px,4.4vw,44px);line-height:1.12;margin:14px 0 14px;text-wrap:balance;max-width:20ch}
+.lede{font-size:17px;color:var(--ink-2);max-width:64ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:18px;font-size:12.5px;color:var(--muted)}
+.meta code{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+
+section{padding-top:52px}
+.eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--green);font-weight:600;margin:0 0 6px}
+h2{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.2;margin:0 0 10px;text-wrap:balance}
+h3{font-size:15px;font-weight:600;margin:0 0 6px}
+.intro{color:var(--ink-2);max-width:66ch;margin:0 0 24px}
+p{margin:0 0 12px}
+
+/* sides */
+.sides{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:760px){.sides{grid-template-columns:minmax(0,1fr)}}
+.side{border-top:2px solid var(--ink);padding-top:14px}
+.side .who{font-family:var(--serif);font-size:19px;margin-bottom:4px}
+.side p{color:var(--ink-2);font-size:14px}
+.side ul{margin:8px 0 0;padding-left:18px;font-size:14px;color:var(--ink-2)}
+.side li{margin-bottom:3px}
+
+/* swimlanes */
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:6px;background:var(--doc)}
+.lanes{display:grid;grid-template-columns:120px repeat(8,minmax(118px,1fr));min-width:1080px;font-size:12.5px}
+.lanes > div{padding:10px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
+.lanes .lh{background:var(--paper-2);font-weight:600;font-size:12px;display:flex;align-items:center}
+.lanes .ph{background:var(--paper-2);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.lanes .ph span{display:block;color:var(--ink);font-size:12.5px;letter-spacing:0;text-transform:none;margin-top:2px}
+.lanes .c:empty{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--paper) 6px 7px)}
+.lanes .c b{display:block;font-weight:600;margin-bottom:2px}
+.lanes .c{color:var(--ink-2)}
+.lanes code{font-family:var(--mono);font-size:11.5px;color:var(--ink)}
+.lanes .gate{border-left:3px solid var(--amber)}
+.lanes .money{border-left:3px solid var(--green)}
+
+/* architecture */
+.arch{border:1px solid var(--line);border-radius:6px;background:var(--doc);padding:18px;display:grid;gap:10px}
+.row{display:grid;gap:10px}
+.r3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.r4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:760px){.r3,.r4{grid-template-columns:minmax(0,1fr)}}
+.box{border:1px solid var(--line);border-radius:5px;padding:10px 12px;background:var(--paper);font-size:13px}
+.box b{display:block;font-size:13.5px}
+.box small{color:var(--muted);display:block;font-size:12px;line-height:1.45}
+.box.strong{border-color:var(--green);background:var(--green-soft)}
+.box.risk{border-color:var(--amber);background:var(--amber-soft)}
+.wire{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-align:center;padding:2px 0}
+.wire::before{content:"↓  "}
+.mono-box{border:1.5px solid var(--ink);border-radius:6px;padding:14px;background:var(--doc)}
+.mono-box > b{font-size:14px}
+.mono-box .sub{font-size:12px;color:var(--muted);margin-bottom:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--paper);white-space:nowrap}
+.chip.new{border-color:var(--green);color:var(--green)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:999px;border:1px solid var(--green);margin-right:6px;vertical-align:-1px}
+
+/* run sequence */
+.seq{list-style:none;margin:0;padding:0;counter-reset:s;border-left:2px solid var(--line);margin-left:12px}
+.seq li{position:relative;padding:0 0 18px 26px;counter-increment:s}
+.seq li::before{content:counter(s);position:absolute;left:-13px;top:0;width:24px;height:24px;border-radius:999px;background:var(--doc);border:1.5px solid var(--ink);font-size:12px;font-weight:600;display:grid;place-items:center;font-family:var(--mono)}
+.seq li.g::before{border-color:var(--amber);color:var(--amber)}
+.seq li.m::before{border-color:var(--green);color:var(--green)}
+.seq b{font-weight:600}
+.seq .who{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;margin-left:6px}
+.seq p{color:var(--ink-2);margin:2px 0 0;font-size:14px;max-width:70ch}
+.seq code{font-family:var(--mono);font-size:12.5px}
+
+/* mockups */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.tab{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--doc);color:var(--ink-2);padding:7px 14px;border-radius:999px;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.frame{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper);box-shadow:0 12px 30px -18px var(--shade)}
+.chrome{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--paper-2);border-bottom:1px solid var(--line)}
+.dots{display:flex;gap:5px}.dots i{width:9px;height:9px;border-radius:999px;background:var(--line);display:block}
+.url{flex:1;font-family:var(--mono);font-size:11.5px;color:var(--muted);background:var(--doc);border:1px solid var(--line);border-radius:4px;padding:3px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.appbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--line);background:var(--doc);font-size:13px;flex-wrap:wrap}
+.appbar nav{display:flex;gap:16px;color:var(--ink-2);flex-wrap:wrap}
+.appbar nav .on{color:var(--ink);font-weight:600}
+.appbar .org{color:var(--muted);font-size:12px}
+.screen{padding:20px 18px;display:grid;gap:18px}
+.two{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px}
+.side-rail{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:18px}
+@media (max-width:820px){.two,.side-rail{grid-template-columns:minmax(0,1fr)}}
+.pill{display:inline-block;font-size:11.5px;border-radius:999px;padding:2px 9px;font-weight:500;white-space:nowrap}
+.p-green{background:var(--green-soft);color:var(--green)}
+.p-amber{background:var(--amber-soft);color:var(--amber)}
+.p-red{background:var(--red-soft);color:var(--red)}
+.p-grey{background:var(--paper-2);color:var(--ink-2)}
+.agent-h{font-family:var(--serif);font-size:24px;margin:4px 0 2px}
+.by{font-size:13px;color:var(--ink-2)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+.stat{border:1px solid var(--line);border-radius:5px;padding:10px 12px;background:var(--doc)}
+.stat .n{font-family:var(--mono);font-size:19px;font-variant-numeric:tabular-nums}
+.stat .l{font-size:12px;color:var(--ink-2)}
+.stat .s{font-size:11px;color:var(--muted)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.btn{font:inherit;font-size:13px;border-radius:5px;padding:8px 14px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.danger{background:transparent;border-color:var(--red);color:var(--red)}
+.btn[disabled]{opacity:.45;cursor:default}
+.doc{background:var(--doc);border:1px solid var(--line);border-radius:3px;padding:20px 22px;box-shadow:0 1px 0 var(--line),0 8px 22px -16px var(--shade)}
+.doc h4{font-family:var(--serif);font-weight:500;font-size:17px;margin:0 0 2px}
+.doc .dsub{font-size:12px;color:var(--muted);margin-bottom:12px}
+.doc dl{margin:0;display:grid;gap:10px}
+.doc dt{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.doc dd{margin:2px 0 0;font-size:13.5px}
+.doc dd .k{font-family:var(--mono);font-size:12.5px}
+.doc .sign{margin-top:14px;padding-top:10px;border-top:1px dashed var(--line);font-family:var(--serif);font-style:italic;font-size:12.5px;color:var(--ink-2)}
+.trace{list-style:none;margin:0;padding:0}
+.trace li{display:grid;grid-template-columns:62px minmax(0,1fr);gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.trace .t{font-family:var(--mono);font-size:11.5px;color:var(--muted);padding-top:1px}
+.trace .src{font-size:10.5px;color:var(--muted);margin-left:6px;text-transform:uppercase;letter-spacing:.06em}
+.gatecard{border:1.5px solid var(--amber);background:var(--amber-soft);border-radius:6px;padding:14px}
+.gatecard.done{border-color:var(--green);background:var(--green-soft)}
+.gatecard h5{margin:0 0 4px;font-size:14px}
+.mini{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;font-variant-numeric:tabular-nums}
+.mini th,.mini td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}
+.mini th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.mini td.num{text-align:right;font-family:var(--mono)}
+.panel{border:1px solid var(--line);border-radius:6px;background:var(--doc);padding:14px}
+.panel h6{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:4px 0}
+.kv span:last-child{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:999px;background:var(--paper-2);overflow:hidden;margin:4px 0 10px}
+.bar i{display:block;height:100%;background:var(--green)}
+.bar.a i{background:var(--amber)}
+.warnbar{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--red);background:var(--red-soft);color:var(--ink);border-radius:6px;padding:10px 12px;font-size:13px}
+.warnbar b{color:var(--red)}
+tr.viol td{background:var(--red-soft)}
+.field{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+.field select{font:inherit;font-size:13px;color:var(--ink);background:var(--doc);border:1px solid var(--line);border-radius:4px;padding:6px 8px}
+.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:10px;align-items:end}
+@media (max-width:820px){.fields{grid-template-columns:minmax(0,1fr)}}
+.stage{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+.stage .ico{width:20px;height:20px;border-radius:999px;display:grid;place-items:center;font-size:12px;font-weight:600}
+.stage .ico.ok{background:var(--green-soft);color:var(--green)}
+.stage .ico.wait{background:var(--amber-soft);color:var(--amber)}
+.stage small{display:block;color:var(--muted);font-size:12px}
+.diff{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:5px;background:var(--doc);padding:10px 12px;line-height:1.7;overflow-x:auto}
+.diff .add{color:var(--green)}
+.diff .ctx{color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin-top:10px}
+
+/* defence */
+.layers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+@media (max-width:760px){.layers{grid-template-columns:minmax(0,1fr)}}
+.layers div{background:var(--doc);padding:14px 16px;font-size:13.5px;color:var(--ink-2)}
+.layers b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+
+/* deployment */
+.region{border:1.5px dashed var(--green);border-radius:8px;padding:14px;display:grid;gap:10px;background:var(--doc)}
+.region > .rl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--green);font-weight:600}
+.vpc{border:1px solid var(--line);border-radius:6px;padding:12px;display:grid;gap:10px;background:var(--paper)}
+.vpc > .rl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.deploy-grid{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px}
+@media (max-width:880px){.deploy-grid{grid-template-columns:minmax(0,1fr)}}
+.ext{display:grid;gap:10px;align-content:start}
+table.where{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
+table.where th,table.where td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+table.where th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--paper-2)}
+table.where td:first-child{font-weight:600;white-space:nowrap}
+table.where td:nth-child(2){font-family:var(--mono);font-size:12.5px}
+table.where td:nth-child(3){color:var(--ink-2)}
+.envs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:760px){.envs{grid-template-columns:minmax(0,1fr)}}
+.env{border:1px solid var(--line);border-radius:6px;padding:14px;background:var(--doc);font-size:13.5px}
+.env h3{font-family:var(--mono);font-size:14px}
+.env ul{margin:6px 0 0;padding-left:18px;color:var(--ink-2)}
+.pipe{display:flex;flex-wrap:wrap;gap:0;align-items:stretch;margin-top:6px}
+.pipe div{flex:1 1 140px;padding:12px 14px;border:1px solid var(--line);margin:-1px 0 0 -1px;background:var(--doc);font-size:13px;color:var(--ink-2)}
+.pipe b{display:block;color:var(--ink);font-size:13.5px}
+.pipe .hold{background:var(--amber-soft);border-color:var(--amber)}
+.callout{border-left:3px solid var(--amber);background:var(--amber-soft);padding:12px 16px;border-radius:0 6px 6px 0;font-size:14px;margin-top:16px}
+.callout b{color:var(--amber)}
+.why{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 28px;margin-top:18px}
+@media (max-width:760px){.why{grid-template-columns:minmax(0,1fr)}}
+.why div{font-size:14px;color:var(--ink-2)}
+.why b{color:var(--ink);display:block}
+
+/* roadmap */
+.miles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.miles{grid-template-columns:minmax(0,1fr)}}
+.mile{border-top:3px solid var(--line);padding-top:10px;font-size:13px;color:var(--ink-2)}
+.mile.now{border-top-color:var(--green)}
+.mile .id{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.mile h3{font-size:14.5px;color:var(--ink);margin:2px 0 6px}
+.mile .exit{margin-top:8px;font-size:12.5px;color:var(--ink)}
+.q{display:grid;grid-template-columns:48px minmax(0,1fr);gap:10px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}
+.q .qid{font-family:var(--mono);color:var(--muted)}
+.q p{margin:2px 0 0;color:var(--ink-2)}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+footer code{font-family:var(--mono)}
+@media (prefers-reduced-motion:no-preference){.gatecard,.trace li{transition:background-color .25s,border-color .25s}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="mark">Karya <span>Platform blueprint · 23 Sep 2026</span></div>
+    <h1>How the Karya agent store works, end to end</h1>
+    <p class="lede">A B2B marketplace where finance teams run third-party AI agents on their own books, safely. Developers build and test agents in a sandbox, the platform checks what they actually do, and buyers get a signed permission statement, approval gates and a hard spend cap on every run.</p>
+    <div class="meta">
+      <span>Source spec: <code>2026-09-23-agent-store-developer-platform-and-sandbox-design.md</code> (revision 2, aligned with the 20 UI screens)</span>
+      <span>Plans: <code>ws0-execution-defect-fixes</code> · <code>ws13-identity-workspaces-teams</code> · <code>ws15-workspace-spending-approvers</code> · <code>ws14-notifications-and-approval-links</code> · <code>ws16-disputes</code> · frontend <code>fe1</code>–<code>fe4</code></span>
+      <span>Mockups show target UI; example data is illustrative</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <b>Contents</b>
+      <a href="#sides">Who uses it</a>
+      <a href="#journey">An agent's journey</a>
+      <a href="#architecture">System architecture</a>
+      <a href="#run">Anatomy of one run</a>
+      <a href="#screens">Screens</a>
+      <a href="#coverage">Screen coverage</a>
+      <a href="#safety">Safety layers</a>
+      <a href="#deploy">Deployment</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#decisions">Open decisions</a>
+    </nav>
+
+    <main>
+      <section id="sides" style="padding-top:28px">
+        <p class="eyebrow">Who uses it</p>
+        <h2>Three sides, one execution engine</h2>
+        <p class="intro">Every execution, whether a developer's test, an automated review, a buyer's free trial or a real paid run, goes through the same sandbox, the same Runtime API and the same trace. Only ownership, data source and billing differ.</p>
+        <div class="sides">
+          <div class="side">
+            <div class="who">Buyers</div>
+            <p>Finance teams at Indian SMBs and mid-market firms. Organised as orgs with admins and approvers.</p>
+            <ul><li>Browse agents with measured scorecards</li><li>Try on sample data before connecting anything</li><li>Grant specific scopes, bind data, set a spend cap</li><li>Approve risky writes from web or an email link</li></ul>
+          </div>
+          <div class="side">
+            <div class="who">Developers</div>
+            <p>Anyone can sign up and build. Listing publicly requires identity and business verification.</p>
+            <ul><li>Write agents in Python or TypeScript with the SDK</li><li><code>agentstore push</code> builds on platform images</li><li>Remote sandbox with behaviour reports</li><li>Earn 80% of charges, paid monthly</li></ul>
+          </div>
+          <div class="side">
+            <div class="who">Karya (platform)</div>
+            <p>Owns the runtime, mediates all data and LLM access, and signs off every listing.</p>
+            <ul><li>Builds and scans every bundle</li><li>Automated evals, red-team and cost profiling</li><li>Human review for anything that writes</li><li>Ledger, revenue split, payouts</li></ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="journey">
+        <p class="eyebrow">An agent's journey</p>
+        <h2>From a laptop to a paid run</h2>
+        <p class="intro">Read left to right. The amber stage is where a human decides; the green stage is where money moves.</p>
+        <div class="scroll" role="region" aria-label="Journey swimlanes" tabindex="0">
+          <div class="lanes">
+            <div class="ph"></div>
+            <div class="ph">Build<span>Write code</span></div>
+            <div class="ph">Package<span>Push</span></div>
+            <div class="ph">Test<span>Sandbox</span></div>
+            <div class="ph">Submit<span>Review</span></div>
+            <div class="ph">List<span>Catalog</span></div>
+            <div class="ph">Connect<span>Consent</span></div>
+            <div class="ph">Run<span>Execute</span></div>
+            <div class="ph">Settle<span>Money</span></div>
+
+            <div class="lh">Developer</div>
+            <div class="c"><b>Scaffold</b><code>agentstore init</code>, write <code>run(ctx)</code>, iterate with the local emulator <code>agentstore dev</code></div>
+            <div class="c"><b>Push bundle</b><code>agentstore push --wait</code> uploads source + <code>manifest.json</code></div>
+            <div class="c"><b>Run on fixtures</b>Profiles pick data, gate policy and LLM mode (real, mock, replay)</div>
+            <div class="c"><b>Get verified</b>PAN/GSTIN, agreement, payout details; then <code>submit</code></div>
+            <div class="c"></div>
+            <div class="c"></div>
+            <div class="c"></div>
+            <div class="c money"><b>Earnings</b>80% of each charge accrues; monthly payout above ₹1,000</div>
+
+            <div class="lh">Platform</div>
+            <div class="c"></div>
+            <div class="c"><b>Build template</b>Base image + deps, dependency and secret scans, entrypoint smoke test</div>
+            <div class="c"><b>SANDBOX run</b>Real microVM, simulated billing, behaviour report</div>
+            <div class="c gate"><b>Automated review</b>Evals, scope boundary, red-team, cost profile; human review if it writes</div>
+            <div class="c"><b>Publish listing</b>Permission statement + public scorecard</div>
+            <div class="c"><b>Pin version</b>Connection locked to the consented version</div>
+            <div class="c"><b>PRODUCTION run</b>Mediated reads/writes, metered LLM, reaper watches deadlines</div>
+            <div class="c money"><b>Ledger split</b>Buyer wallet → developer payable + platform revenue</div>
+
+            <div class="lh">Buyer</div>
+            <div class="c"></div>
+            <div class="c"></div>
+            <div class="c"></div>
+            <div class="c"></div>
+            <div class="c"><b>Evaluate</b>Reads statement, scorecard; runs a free TRIAL on sample data</div>
+            <div class="c"><b>Grant</b>Toggle scopes, upload CSVs, set spend cap</div>
+            <div class="c gate"><b>Approve gate</b>Reviews staged writes; approve or reject</div>
+            <div class="c money"><b>Statement</b>Per-run charge, downloadable outputs</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <p class="eyebrow">System architecture</p>
+        <h2>One monolith, one tiny bridge, bought isolation</h2>
+        <p class="intro">The Spring Boot monolith stays the single source of truth. A small stateless TypeScript service exists only because E2B's template-build and in-sandbox command APIs are available only through its JS/Python SDKs. Agent code never touches buyer credentials or the internet at large; it talks to <code>/runtime/v1</code>.</p>
+        <div class="arch">
+          <div class="row r3">
+            <div class="box"><b>Buyers &amp; approvers</b><small>Web console, one-tap approval links by email and Slack</small></div>
+            <div class="box"><b>Developers</b><small>Portal + <code>agentstore</code> CLI (npm and standalone binaries)</small></div>
+            <div class="box"><b>Karya admins</b><small>Review and verification consoles</small></div>
+          </div>
+          <div class="wire">HTTPS · /api/v1 · JWT (web) or developer API key (CLI)</div>
+          <div class="box"><b>Next.js web app</b><small>Buyer console · Developer portal + Sandbox · Admin console. Server-side proxy holds the JWT in an httpOnly cookie.</small></div>
+          <div class="wire">REST /api/v1</div>
+          <div class="mono-box">
+            <b>Spring Boot monolith · Java 21</b>
+            <div class="sub">Stateless, 2+ instances. Background jobs via @Scheduled + ShedLock (reaper, outbox dispatcher, notification delivery, dispute deadlines, build poller, report generator, payouts, retention purge)</div>
+            <div class="chips">
+              <span class="chip">identity</span><span class="chip">catalog</span><span class="chip">manifest v2</span><span class="chip">publishing</span><span class="chip">execution</span><span class="chip">ledger</span>
+              <span class="chip new">runtime API</span><span class="chip new">packaging</span><span class="chip new">datastore</span><span class="chip new">llm gateway</span><span class="chip new">review pipeline</span><span class="chip new">payouts</span><span class="chip new">verification</span>
+              <span class="chip new">teams &amp; sign-in</span><span class="chip new">spending limits</span><span class="chip new">events outbox</span><span class="chip new">notifications</span><span class="chip new">disputes</span>
+            </div>
+          </div>
+          <div class="wire">SQL · pre-signed URLs · internal HTTP (shared secret) · provider APIs</div>
+          <div class="row r4" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+            <div class="box"><b>Postgres</b><small>All business state; Flyway migrations</small></div>
+            <div class="box"><b>Object storage</b><small>Bundles, datasets, run outputs, build and run logs</small></div>
+            <div class="box strong"><b>sandbox-bridge</b><small>~500 lines of TypeScript over the E2B SDK: build template, create + start, status, kill</small></div>
+            <div class="box"><b>LLM providers</b><small>Anthropic + OpenAI behind the gateway; platform keys or verified-dev BYOK</small></div>
+            <div class="box"><b>Email, Slack, payments</b><small>SES (SMTP) for mail, a Slack app for approval DMs, Razorpay for wallet top-ups (M4)</small></div>
+          </div>
+          <div class="wire">Firecracker microVM per run</div>
+          <div class="box risk"><b>E2B sandbox: agent code + Karya SDK</b><small>Egress denied by default. Allowed: Karya runtime host, storage host, manifest allowlist. Per-run token, hashed at rest, dies with the run. Calls back only to <code>/runtime/v1</code>: context, resources, gates, llm/chat, usage, logs, complete.</small></div>
+          <div class="legend"><span><i></i>New modules from the developer-platform spec</span></div>
+        </div>
+      </section>
+
+      <section id="run">
+        <p class="eyebrow">Anatomy of one run</p>
+        <h2>A bank reconciliation, step by step</h2>
+        <p class="intro">What happens between a buyer clicking <b>Run</b> and a line appearing on their statement. The platform records every step itself; the agent no longer self-reports what it read.</p>
+        <ol class="seq">
+          <li><b>Reserve the spend cap</b><span class="who">Buyer · ledger</span><p>Buyer triggers the run on a connection pinned to v1.3.0. The wallet row is locked and ₹500 (the spend cap) moves from available to reserved, so concurrent runs can't overspend.</p></li>
+          <li><b>Start an isolated sandbox</b><span class="who">execution → bridge → E2B</span><p>A fresh microVM from the agent's built template, deny-all egress plus allowlist, a 15-minute deadline and a per-run token in <code>AGENTSTORE_RUN_TOKEN</code>.</p></li>
+          <li><b>Read only what was granted</b><span class="who">runtime API</span><p><code>GET /runtime/v1/resources/bank_statements/records</code> → scope check → 412 rows, recorded as <code>DATA_READ</code>. An undeclared read returns 403 <code>SCOPE_NOT_GRANTED</code>; three of those kill a production run.</p></li>
+          <li><b>Think through the gateway</b><span class="who">llm gateway</span><p><code>POST /runtime/v1/llm/chat</code> with an allowed model. Tokens are metered against <code>maxTokensPerRun</code> and pre-checked against budget. Prompts aren't stored for production runs.</p></li>
+          <li class="g"><b>Stage writes, ask for approval</b><span class="who">datastore · gates</span><p>142 journal entries land as <code>STAGED</code> in the output store. The agent opens gate <code>post_journal_entries</code> and the run moves to <em>Awaiting approval</em>. The approver gets a web notification and an email link.</p></li>
+          <li class="g"><b>Buyer decides</b><span class="who">Buyer approver</span><p>Approve → staged entries become <code>COMMITTED</code>. Reject → <code>DISCARDED</code> and the run is cancelled. No decision in 30 minutes → <code>EXPIRED</code>.</p></li>
+          <li class="m"><b>Charge, clamped to the cap</b><span class="who">ledger</span><p>142 invoices × ₹2 = ₹284. Buyer wallet −₹284, developer payable +₹227.20, platform revenue +₹56.80. A charge that would cross the cap is cut to the remaining amount and the run stops.</p></li>
+          <li class="m"><b>Complete and clean up</b><span class="who">execution</span><p>Sandbox killed, the unused ₹216 reservation released, outputs downloadable from the run console. If the agent crashes or goes silent, the reaper finishes the run as <code>FAILED</code>, <code>TIMED_OUT</code> or <code>EXPIRED</code>.</p></li>
+        </ol>
+      </section>
+
+      <section id="screens">
+        <p class="eyebrow">Screens</p>
+        <h2>What each side will see</h2>
+        <p class="intro">Target UI for the new capabilities, in the existing Karya visual language. The run console is interactive: try approving the gate.</p>
+        <div class="tabs" role="tablist" aria-label="Mockup screens">
+          <button class="tab" role="tab" id="t-listing" aria-controls="s-listing" aria-selected="true">Buyer · agent listing</button>
+          <button class="tab" role="tab" id="t-run" aria-controls="s-run" aria-selected="false">Buyer · run console</button>
+          <button class="tab" role="tab" id="t-sandbox" aria-controls="s-sandbox" aria-selected="false">Developer · sandbox</button>
+          <button class="tab" role="tab" id="t-review" aria-controls="s-review" aria-selected="false">Admin · review</button>
+        </div>
+
+        <!-- Listing -->
+        <div class="frame" role="tabpanel" id="s-listing" aria-labelledby="t-listing">
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">app.karya.example/agents/bank-reconciliation</div></div>
+          <div class="appbar"><nav><span class="on">Catalog</span><span>Runs</span><span>Billing</span></nav><span class="org">Meridian Traders Pvt Ltd</span></div>
+          <div class="screen two">
+            <div>
+              <span class="pill p-grey">Reconciliation</span>
+              <div class="agent-h">Bank Reconciliation</div>
+              <div class="by">by Ledgerline Labs · <span class="pill p-green">Verified publisher</span></div>
+              <p style="margin-top:12px;color:var(--ink-2);font-size:14px">Matches bank statement lines to open invoices for a month and proposes journal entries for your approval. Nothing is posted until you approve it.</p>
+              <div class="stats">
+                <div class="stat"><div class="n">96%</div><div class="l">Eval pass rate</div><div class="s">48 cases, re-run on v1.3.0</div></div>
+                <div class="stat"><div class="n">12 / 12</div><div class="l">Red-team probes passed</div><div class="s">Prompt injection, exfiltration bait</div></div>
+                <div class="stat"><div class="n">₹148 · ₹310</div><div class="l">Cost per run, p50 · p95</div><div class="s">Declared maximum ₹500</div></div>
+                <div class="stat"><div class="n">1,204</div><div class="l">Completed runs</div><div class="s">0.4% disputed</div></div>
+              </div>
+              <div class="btns"><button class="btn ghost" type="button">Try on sample data</button><button class="btn" type="button">Connect</button></div>
+            </div>
+            <div class="doc">
+              <h4>Permission statement</h4>
+              <div class="dsub">Version 1.3.0 · what this agent can and cannot do</div>
+              <dl>
+                <div><dt>Reads</dt><dd><span class="k">bank_statements</span> statement lines · <span class="k">invoices</span> open invoices</dd></div>
+                <div><dt>Writes, only after you approve</dt><dd><span class="k">journal_entries</span> proposed matching entries</dd></div>
+                <div><dt>Talks to</dt><dd>Nothing outside Karya</dd></div>
+                <div><dt>AI model</dt><dd>Claude Sonnet via Karya; your data is not retained by the provider</dd></div>
+                <div><dt>Data classes</dt><dd>Financial, basic PII</dd></div>
+                <div><dt>Price</dt><dd>₹2 per invoice matched · never more than ₹500 per run</dd></div>
+              </dl>
+              <div class="sign">Checked by Karya on 11 Sep 2026. Any change requires a new statement and your consent.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Run console -->
+        <div class="frame" role="tabpanel" id="s-run" aria-labelledby="t-run" hidden>
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">app.karya.example/runs/R-2291</div></div>
+          <div class="appbar"><nav><span>Catalog</span><span class="on">Runs</span><span>Billing</span></nav><span class="org">Meridian Traders · Approver</span></div>
+          <div class="screen side-rail">
+            <div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+                <strong style="font-family:var(--serif);font-size:19px;font-weight:500">Bank Reconciliation · August 2026</strong>
+                <span class="pill p-amber" id="run-status">Awaiting your approval</span>
+              </div>
+              <ul class="trace" id="trace">
+                <li><span class="t">09:41:02</span><span>Started in an isolated sandbox · v1.3.0 (pinned)<span class="src">platform</span></span></li>
+                <li><span class="t">09:41:05</span><span>Read <code>bank_statements</code> · 412 rows<span class="src">platform</span></span></li>
+                <li><span class="t">09:41:06</span><span>Read <code>invoices</code> · 389 rows<span class="src">platform</span></span></li>
+                <li><span class="t">09:41:31</span><span>Asked Claude Sonnet · 18,420 tokens<span class="src">platform</span></span></li>
+                <li><span class="t">09:41:40</span><span>Staged 142 journal entries (not posted)<span class="src">platform</span></span></li>
+              </ul>
+              <div class="gatecard" id="gate" style="margin-top:14px">
+                <h5 id="gate-title">Needs your decision: post 142 journal entries for 2026-08</h5>
+                <div style="font-size:13px;color:var(--ink-2)" id="gate-sub">Entries stay staged until you approve. Rejecting discards them and stops the run.</div>
+                <table class="mini">
+                  <thead><tr><th>Bank line</th><th>Matched invoice</th><th style="text-align:right">Amount</th></tr></thead>
+                  <tbody>
+                    <tr><td>NEFT/ACME/0814</td><td>INV-20931</td><td class="num">₹48,200.00</td></tr>
+                    <tr><td>UPI/SHREE TRD</td><td>INV-20944</td><td class="num">₹12,760.00</td></tr>
+                    <tr><td>RTGS/NOVA IND</td><td>INV-20978</td><td class="num">₹2,31,500.00</td></tr>
+                  </tbody>
+                </table>
+                <div class="btns" id="gate-btns"><button class="btn" type="button" id="approve">Approve</button><button class="btn danger" type="button" id="reject">Reject</button></div>
+              </div>
+            </div>
+            <div style="display:grid;gap:12px;align-content:start">
+              <div class="panel">
+                <h6>Spend</h6>
+                <div class="kv"><span>Charged</span><span id="charged">₹0.00</span></div>
+                <div class="bar"><i id="charged-bar" style="width:0%"></i></div>
+                <div class="kv"><span>Spend cap</span><span>₹500.00</span></div>
+                <div class="kv"><span>Held in wallet</span><span id="reserved">₹500.00</span></div>
+              </div>
+              <div class="panel">
+                <h6>Limits</h6>
+                <div class="kv"><span>Time left</span><span id="timeleft">11:20</span></div>
+                <div class="kv"><span>Approval window</span><span>30 min</span></div>
+                <div class="kv"><span>Scope violations</span><span>0</span></div>
+              </div>
+              <div class="panel">
+                <h6>Outputs</h6>
+                <div class="kv"><span>journal_entries</span><span class="pill p-amber" id="out-pill">Staged · 142</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sandbox -->
+        <div class="frame" role="tabpanel" id="s-sandbox" aria-labelledby="t-sandbox" hidden>
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">app.karya.example/developer/agents/bank-reconciliation/sandbox</div></div>
+          <div class="appbar"><nav><span>Dashboard</span><span class="on">Sandbox</span><span>Fixtures</span><span>Earnings</span></nav><span class="org">Ledgerline Labs · Unverified · 34 of 120 sandbox minutes used</span></div>
+          <div class="screen">
+            <div class="fields">
+              <label class="field" for="sb-version">Version<select id="sb-version"><option>1.4.0 · DRAFT · build succeeded</option><option>1.3.0 · LIVE</option></select></label>
+              <label class="field" for="sb-profile">Profile<select id="sb-profile"><option>august-fixtures</option><option>empty-month</option></select></label>
+              <label class="field" for="sb-llm">LLM<select id="sb-llm"><option>Replay run S-118 (≈ ₹0)</option><option>Real (dev budget)</option><option>Mock</option></select></label>
+              <button class="btn" type="button">Run in sandbox</button>
+            </div>
+            <div class="warnbar"><span aria-hidden="true">●</span><div><b>2 issues would fail automated review.</b> Your agent read a resource it didn't declare and tried to reach a host outside its allowlist.</div></div>
+            <div class="two">
+              <div class="panel">
+                <h6>Behaviour report · run S-121 · declared vs actual</h6>
+                <table class="mini">
+                  <thead><tr><th>Scope</th><th>Declared</th><th style="text-align:right">Actual</th></tr></thead>
+                  <tbody>
+                    <tr><td><code>READ bank_statements</code></td><td>Yes</td><td class="num">412 rows</td></tr>
+                    <tr><td><code>READ invoices</code></td><td>Yes</td><td class="num">389 rows</td></tr>
+                    <tr><td><code>WRITE journal_entries</code></td><td>Yes, gated</td><td class="num">142 staged</td></tr>
+                    <tr class="viol"><td><code>READ vendor_master</code></td><td><b style="color:var(--red)">No</b></td><td class="num">1 denied</td></tr>
+                  </tbody>
+                </table>
+                <table class="mini" style="margin-top:14px">
+                  <thead><tr><th>Network host</th><th>Allowed</th><th style="text-align:right">Attempts</th></tr></thead>
+                  <tbody>
+                    <tr><td>Karya runtime + storage</td><td>Automatic</td><td class="num">61</td></tr>
+                    <tr class="viol"><td>hooks.slack.com</td><td><b style="color:var(--red)">Not in allowlist</b></td><td class="num">2 blocked</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style="display:grid;gap:12px;align-content:start">
+                <div class="panel">
+                  <h6>Cost vs declared envelope</h6>
+                  <div class="kv"><span>Simulated buyer charge</span><span>₹284 of ₹500</span></div>
+                  <div class="bar"><i style="width:57%"></i></div>
+                  <div class="kv"><span>LLM cost (replayed)</span><span>₹0.00</span></div>
+                  <div class="kv"><span>Sandbox time</span><span>0:48</span></div>
+                  <div class="note">No ledger entries: sandbox billing is simulated.</div>
+                </div>
+                <div class="panel">
+                  <h6>Monthly sandbox quota</h6>
+                  <div class="kv"><span>Run minutes</span><span>34 / 120</span></div>
+                  <div class="bar a"><i style="width:28%"></i></div>
+                  <div class="kv"><span>LLM spend</span><span>₹38 / ₹200</span></div>
+                  <div class="bar a"><i style="width:19%"></i></div>
+                  <div class="kv"><span>Concurrent runs</span><span>1 / 1</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Review -->
+        <div class="frame" role="tabpanel" id="s-review" aria-labelledby="t-review" hidden>
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">app.karya.example/admin/review/RV-0412</div></div>
+          <div class="appbar"><nav><span class="on">Review queue</span><span>Verification</span><span>Vitals</span></nav><span class="org">Karya · Reviewer</span></div>
+          <div class="screen two">
+            <div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <strong style="font-family:var(--serif);font-size:19px;font-weight:500">Bank Reconciliation 1.4.0</strong>
+                <span class="pill p-amber">Tier B · writes data</span>
+              </div>
+              <div class="by" style="margin:4px 0 10px">Ledgerline Labs · Verified 02 Sep 2026</div>
+              <div class="stage"><span class="ico ok">✓</span><div><b>Static checks</b><small>Manifest v2 lint, build succeeded, no vulnerable deps, no secrets in bundle</small></div><span class="pill p-green">Pass</span></div>
+              <div class="stage"><span class="ico ok">✓</span><div><b>Evals</b><small>47 of 50 cases · 94% (minimum 80%)</small></div><span class="pill p-green">Pass</span></div>
+              <div class="stage"><span class="ico ok">✓</span><div><b>Scope boundary</b><small>No undeclared reads, hosts or ungated writes across 50 runs</small></div><span class="pill p-green">Pass</span></div>
+              <div class="stage"><span class="ico ok">✓</span><div><b>Red-team</b><small>12 of 12 probes; canary tokens never left the platform</small></div><span class="pill p-green">Pass</span></div>
+              <div class="stage"><span class="ico ok">✓</span><div><b>Cost profile</b><small>p95 ₹310 within ₹500 envelope</small></div><span class="pill p-green">Pass</span></div>
+              <div class="stage"><span class="ico wait">…</span><div><b>Human review</b><small>Required: the agent writes data</small></div><span class="pill p-amber">You</span></div>
+            </div>
+            <div>
+              <div class="panel">
+                <h6>Manifest diff vs LIVE 1.3.0</h6>
+                <div class="diff">
+                  <div class="ctx">  scopes:</div>
+                  <div class="ctx">    READ  bank_statements</div>
+                  <div class="ctx">    READ  invoices</div>
+                  <div class="add">+   READ  vendor_master      "Look up vendor GSTIN"</div>
+                  <div class="ctx">    WRITE journal_entries    requiresApproval</div>
+                  <div class="ctx">  costEnvelope: ₹2 / invoice_matched · max ₹500</div>
+                </div>
+                <div class="note">New READ scope → existing buyers must re-consent before their connections move to 1.4.0.</div>
+                <div class="btns"><button class="btn" type="button">Approve listing</button><button class="btn danger" type="button">Reject with reason</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="coverage">
+        <p class="eyebrow">Screen coverage</p>
+        <h2>Every screen has a backend home</h2>
+        <p class="intro">Spec revision 2 maps each of the 20 UI screens to the workstream that serves it. The screens themselves are built in four frontend plans: FE-1 (shell and buyer core), FE-2 (agents, files, live flow), FE-3 (developer and money), FE-4 (admin). "Planned" means an implementation plan exists today; "Spec" means the design is in the spec and its plan comes with that workstream.</p>
+        <div class="scroll" role="region" aria-label="Screen to backend coverage table" tabindex="0" style="background:var(--doc)">
+          <table class="where">
+            <thead><tr><th>Screen</th><th>What the backend provides</th><th>Workstream</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>1. Sign in or create account</td><td>Pick a side, full name, several orgs per person, Google, keep me signed in, forgot password</td><td>WS13</td><td>Planned</td></tr>
+              <tr><td>2. Workspace home</td><td>One home call: waiting approvals, running work, agents, spend vs limit, held money, activity</td><td>WS15</td><td>Planned</td></tr>
+              <tr><td>3. Store: the agent as a flow</td><td>Flow blocks in buyer language, scorecard, publisher, trial</td><td>Manifest v2 · WS8 · WS9 · WS11</td><td>Spec</td></tr>
+              <tr><td>4. Plug in data and set limits</td><td>File library, per-run cap, monthly limit per agent, named approvers, add and run now</td><td>WS2 · WS15</td><td>Planned (limits)</td></tr>
+              <tr><td>5. Live run with approval</td><td>Per-block state, gate preview and expiry, spend, time left</td><td>WS1</td><td>Spec</td></tr>
+              <tr><td>6. Approve from a phone</td><td>Single-use link bound to the gate; GET shows, POST decides</td><td>WS14</td><td>Planned</td></tr>
+              <tr><td>7. Runs history</td><td>Filter groups, reached block, stop reason, readable IDs</td><td>WS1</td><td>Spec</td></tr>
+              <tr><td>8. Files and where they go</td><td>Usage map, pending requests, storage, 30-day purge</td><td>WS2 · WS11</td><td>Spec</td></tr>
+              <tr><td>9. Billing and wallet</td><td>Held vs available, statement by agent, UPI and bank top-up, GST invoices</td><td>WS10 · WS15</td><td>Spec (money in)</td></tr>
+              <tr><td>10. Notifications</td><td>Centre, categories, channels, quiet hours, Slack</td><td>WS14</td><td>Planned</td></tr>
+              <tr><td>11. Agent track record</td><td>Review highlights, cost spread, 30/90-day stats, disputes in the open</td><td>WS8 · WS11 · WS16</td><td>Planned (disputes)</td></tr>
+              <tr><td>12. Agent versions and update consent</td><td>Timeline incl. in review, NEW/SAME/SAFER diff, agree ahead of approval</td><td>WS11</td><td>Spec</td></tr>
+              <tr><td>13. Developer studio</td><td>Declared vs actual, callsite of a violation, quick fix on a draft</td><td>WS6</td><td>Spec</td></tr>
+              <tr><td>14. Sandbox runs and quota</td><td>Result class, rerun with the same answers, builds today</td><td>WS6</td><td>Spec</td></tr>
+              <tr><td>15. Test files and profiles</td><td>Row-level errors, PII scan, evals per profile, trial toggle</td><td>WS6 · WS8 · WS9</td><td>Spec</td></tr>
+              <tr><td>16. Earnings and payouts</td><td>Fee and AI usage, dispute holds, payout history</td><td>WS10 · WS16</td><td>Planned (holds)</td></tr>
+              <tr><td>17. Developer: get verified</td><td>Five resumable steps, PAN + GSTIN, OTP, ₹1 bank check</td><td>WS7</td><td>Spec</td></tr>
+              <tr><td>18. Karya review pipeline</td><td>Six stages with findings, diff tags, impact, send back</td><td>WS8</td><td>Spec</td></tr>
+              <tr><td>19. Developer verification</td><td>Automated checks via a KYC provider seam</td><td>WS7</td><td>Spec</td></tr>
+              <tr><td>20. Agent health and rollouts</td><td>Health states, blocked log, resume, roll back, suspend</td><td>WS11</td><td>Spec</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="safety">
+        <p class="eyebrow">Safety layers</p>
+        <h2>Untrusted code, trusted outcome</h2>
+        <p class="intro">Every agent is treated as untrusted third-party code. No single layer is relied on alone.</p>
+        <div class="layers">
+          <div><b>Isolation</b>Fresh Firecracker microVM per run, never reused across orgs.</div>
+          <div><b>Egress</b>Deny-all at the VM network layer, plus a logging proxy for visibility.</div>
+          <div><b>Mediated access</b>Data, LLM and gates only via <code>/runtime/v1</code> with scope checks.</div>
+          <div><b>Short-lived tokens</b>Per-run, hashed at rest, constant-time compare, dead at run end.</div>
+          <div><b>Money limits</b>Wallet reservation, cap clamping, token budgets, developer quotas.</div>
+          <div><b>Version pinning</b>Connections run only the version the buyer consented to.</div>
+          <div><b>Pre-publication</b>Build scans, evals, red-team, scope boundary, human review for writes.</div>
+          <div><b>Post-publication</b>Vitals, auto-halting rollouts, suspension, disputes.</div>
+          <div><b>Data handling</b>Buyer data never in sandbox or review runs; retention purge; SSE-KMS.</div>
+        </div>
+      </section>
+
+      <section id="deploy">
+        <p class="eyebrow">Deployment</p>
+        <h2>Where it runs: AWS Mumbai, with managed pieces around it</h2>
+        <p class="intro">Recommendation: put everything that stores or processes buyer data in <b>AWS ap-south-1 (Mumbai)</b>. Buyers are Indian finance teams paying in INR, and their ledgers fall under the DPDP Act, so keeping data in-country makes the conversation with every buyer's auditor simpler. Run containers on <b>ECS Fargate</b>, not Kubernetes: one monolith and one small bridge don't justify cluster operations.</p>
+
+        <div class="deploy-grid">
+          <div class="region">
+            <div class="rl">AWS · ap-south-1 (Mumbai)</div>
+            <div class="row r3">
+              <div class="box"><b>Route 53 + ACM</b><small><code>app.</code> · <code>api.</code> · <code>docs.</code></small></div>
+              <div class="box"><b>AWS WAF</b><small>Rate limits per path family; bot rules</small></div>
+              <div class="box"><b>Public ALB</b><small><code>/api/v1/**</code> users · <code>/runtime/v1/**</code> agents</small></div>
+            </div>
+            <div class="vpc">
+              <div class="rl">VPC · private subnets</div>
+              <div class="row r3">
+                <div class="box strong"><b>backend · ECS Fargate</b><small>2+ tasks, 1 vCPU / 2 GB each to start; Flyway on deploy</small></div>
+                <div class="box strong"><b>sandbox-bridge · ECS Fargate</b><small>2 tasks, internal only (service discovery), shared secret</small></div>
+                <div class="box"><b>Secrets Manager + KMS</b><small>JWT key, AES key (with key id), E2B, LLM, bridge secret</small></div>
+              </div>
+              <div class="row r3">
+                <div class="box"><b>RDS Postgres 16</b><small>Multi-AZ in prod, PITR backups, encrypted</small></div>
+                <div class="box"><b>S3</b><small>Versioned, SSE-KMS, private; pre-signed URLs only</small></div>
+                <div class="box"><b>SES</b><small>Approval links, verification, payout notices</small></div>
+              </div>
+            </div>
+          </div>
+          <div class="ext">
+            <div class="box"><b>Vercel · Next.js</b><small>Functions pinned to Mumbai (bom1). Holds no data; proxies to <code>api.</code></small></div>
+            <div class="box risk"><b>E2B · sandboxes</b><small>Managed microVMs. Reach back to <code>api.…/runtime/v1</code> over HTTPS. Region: see note below.</small></div>
+            <div class="box"><b>Anthropic · OpenAI</b><small>Called only by the backend LLM gateway</small></div>
+            <div class="box"><b>Grafana Cloud</b><small>Metrics, OTel traces, alerts (or AWS-managed equivalents)</small></div>
+            <div class="box"><b>GitHub Actions</b><small>OIDC into AWS; images in ECR</small></div>
+          </div>
+        </div>
+
+        <div class="callout"><b>Check before launch:</b> sandboxes process buyer rows while an agent runs. Confirm which region E2B runs microVMs in. If it's outside India, either get buyer consent for it in the permission statement, or plan a self-hosted/BYOC E2B deployment in ap-south-1 for M3–M4. The <code>SandboxProvider</code> seam means switching doesn't touch business code.</div>
+
+        <h3 style="margin-top:32px">What goes where</h3>
+        <div class="scroll" role="region" aria-label="Component placement table" tabindex="0" style="background:var(--doc)">
+          <table class="where">
+            <thead><tr><th>Component</th><th>Runs on</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr><td>Web app</td><td>Vercel (bom1)</td><td>Zero-ops Next.js with preview deploys per PR. Move it to ECS behind CloudFront later if everything must sit in one AWS account.</td></tr>
+              <tr><td>Backend</td><td>ECS Fargate</td><td>Stateless Spring Boot image; scales horizontally; jobs made single-instance by ShedLock.</td></tr>
+              <tr><td>sandbox-bridge</td><td>ECS Fargate</td><td>Never public. Stateless, so it can be replaced by another provider behind the same API.</td></tr>
+              <tr><td>Database</td><td>RDS Postgres 16</td><td>Source of truth, including jobs and locks. Add a read replica for reporting when needed.</td></tr>
+              <tr><td>Files</td><td>S3</td><td>Bundles, datasets, outputs and logs; lifecycle rules enforce retention (30-day purge, 14-day sandbox prompts).</td></tr>
+              <tr><td>Sandboxes</td><td>E2B</td><td>Buying isolation instead of building it; one run = one microVM.</td></tr>
+              <tr><td>Local dev</td><td>docker-compose</td><td>Postgres, MinIO, bridge in <code>--fake</code> mode, backend, frontend; <code>cloudflared</code> tunnel so real E2B can reach a laptop.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="margin-top:32px">Three environments</h3>
+        <div class="envs">
+          <div class="env"><h3>local</h3><ul><li>docker-compose, fake sandbox by default</li><li>Seed: sample developer, agent, fixtures</li><li>Tunnel when testing real E2B</li></ul></div>
+          <div class="env"><h3>staging</h3><ul><li>Same shape as prod, single-AZ, smallest sizes</li><li>Own E2B project, LLM keys, bucket, DB</li><li>Deployed automatically from <code>main</code></li></ul></div>
+          <div class="env"><h3>prod</h3><ul><li>Multi-AZ RDS, 2+ tasks per service</li><li>Startup fails if dev-default secrets are present</li><li>Promoted manually from staging</li></ul></div>
+        </div>
+
+        <h3 style="margin-top:32px">Release pipeline</h3>
+        <div class="pipe">
+          <div><b>Pull request</b>Backend Testcontainers suite, Vitest, Playwright E2E, SDK conformance, OpenAPI drift check, bridge tests</div>
+          <div><b>Merge to main</b>Build backend + bridge images, push to ECR, Vercel builds web</div>
+          <div><b>Staging</b>Rolling deploy, smoke tests; nightly real-E2B egress + process-start test</div>
+          <div class="hold"><b>Manual promote</b>One click after staging is green</div>
+          <div><b>Production</b>ECS rolling deploy; migrations must be backward-compatible (expand, then contract)</div>
+        </div>
+
+        <div class="why">
+          <div><b>Why not Kubernetes?</b>Two services. Fargate gives rolling deploys, autoscaling and private networking without running a control plane. Revisit when there are more services than people.</div>
+          <div><b>Why not Fly.io or Render?</b>Fine for a demo, but Mumbai data residency, KMS, private networking to RDS and IAM-scoped S3 are first-class on AWS and awkward elsewhere.</div>
+          <div><b>What scales first?</b>E2B concurrency (a plan limit), then Postgres. The backend is stateless and the bridge holds no state.</div>
+          <div><b>Cost shape</b>Fixed: RDS, two small Fargate services, NAT, ALB. Variable: E2B seconds and LLM tokens, both metered per run and visible on dashboards. Price it in the AWS calculator once sizes are confirmed.</div>
+        </div>
+      </section>
+
+      <section id="roadmap">
+        <p class="eyebrow">Roadmap</p>
+        <h2>Five milestones</h2>
+        <p class="intro">Critical path: WS0 → WS5 (bridge) → WS1 (Runtime API) → WS2 (data) → WS6 (sandbox). Verification (WS7) can run in parallel at any time. The buyer-side workstreams run in the order WS13 → WS15 → WS14, and WS16 follows once money moves.</p>
+        <div class="miles">
+          <div class="mile now"><div class="id">M0 · planned</div><h3>Foundations</h3>Fix execution defects (WS0), local compose, secrets, bridge skeleton.<div class="exit">Exit: today's run path is correct and safe.</div></div>
+          <div class="mile"><div class="id">M1</div><h3>First third-party run</h3>Build pipeline + bridge, Runtime API, buyer datasets, Python SDK. Teams and approvers (WS13), spending limits and home (WS15), email approval links (WS14).<div class="exit">Exit: someone else's agent runs for a buyer on uploaded CSVs.</div></div>
+          <div class="mile"><div class="id">M2</div><h3>Developer sandbox</h3>Remote sandbox, profiles, behaviour report, quotas, LLM gateway, TS SDK. Notification centre, Slack, quiet hours.<div class="exit">Exit: an unverified developer iterates without help.</div></div>
+          <div class="mile"><div class="id">M3</div><h3>Open the doors</h3>Verification, automated review, BYOK, docs site, production deploy. Google sign-in.<div class="exit">Exit: verified developers list; Tier A goes live automatically.</div></div>
+          <div class="mile"><div class="id">M4</div><h3>Money &amp; scale</h3>Double-entry ledger, revenue split, payouts, wallet top-up and GST invoices, disputes, trials, staged rollout, vitals.<div class="exit">Exit: developers get paid; buyers try before connecting.</div></div>
+        </div>
+      </section>
+
+      <section id="decisions">
+        <p class="eyebrow">Open decisions</p>
+        <h2>Needed before the named milestone</h2>
+        <div class="q"><span class="qid">Q1</span><div><b>Who pays for platform LLM usage?</b><p>Settled by the UI: the developer, at cost, deducted from earnings. Buyers see only the declared unit price.</p></div></div>
+        <div class="q"><span class="qid">Q2</span><div><b>Take rate</b><p>20% default (the UI and agreement say so). Still open: 15% for partners and a developer's first ₹10 lakh of annual earnings. Needed by M4.</p></div></div>
+        <div class="q"><span class="qid">Q3</span><div><b>E2B plan, limits and region</b><p>Concurrency, template count, build minutes, and where microVMs run (data residency). Needed by M1.</p></div></div>
+        <div class="q"><span class="qid">Q4</span><div><b>Manual verification or a KYC vendor?</b><p>The admin screen shows automatic checks. The backend puts them behind a KYC provider seam: launch manual if needed, add a PAN/GSTIN/penny-drop vendor for fully automatic checks. Pick before M3.</p></div></div>
+        <div class="q"><span class="qid">Q6</span><div><b>Legal</b><p>Developer agreement, marketplace obligations, TDS/GST on payouts, DPDP processing terms, who issues buyer GST invoices. Counsel before M3 and M4.</p></div></div>
+        <div class="q"><span class="qid">Q9</span><div><b>"Ask Karya" questions in the search bar</b><p>Plain search ships first. An assistant that reads run traces is a separate, read-only design. After M2.</p></div></div>
+        <div class="q"><span class="qid">Q10</span><div><b>Can a one-tap link approve without signing in?</b><p>Yes by default: per person, single use, bound to the gate, POST-only. Each workspace can require sign-in. Confirm with the first buyers' auditors. Needed by M1.</p></div></div>
+        <div class="q"><span class="qid">Q11</span><div><b>Payment provider for wallet top-ups</b><p>Recommended: Razorpay (UPI + virtual accounts for NEFT/RTGS) behind a provider seam. Needs a merchant account and a legal check on holding prepaid balances. Needed by M4.</p></div></div>
+        <div class="q"><span class="qid">Q12</span><div><b>Slack: links or buttons?</b><p>Links only, so there is one decision path to secure. Revisit if buyers ask.</p></div></div>
+      </section>
+
+      <footer>Karya platform blueprint · derived from the developer-platform and sandbox design spec, revision 2 (WS0–WS16). Names, figures and hostnames in mockups are illustrative.</footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+  function select(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.tabIndex = i === 0 ? 0 : -1;
+    t.addEventListener('click', function () { select(t); });
+    t.addEventListener('keydown', function (e) {
+      var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!d) return;
+      var next = tabs[(i + d + tabs.length) % tabs.length];
+      select(next); next.focus();
+    });
+  });
+
+  var trace = document.getElementById('trace');
+  function add(time, html) {
+    var li = document.createElement('li');
+    li.innerHTML = '<span class="t">' + time + '</span><span>' + html + '<span class="src">platform</span></span>';
+    trace.appendChild(li);
+  }
+  function decide(approved) {
+    var gate = document.getElementById('gate');
+    var status = document.getElementById('run-status');
+    document.getElementById('gate-btns').hidden = true;
+    if (approved) {
+      gate.classList.add('done');
+      document.getElementById('gate-title').textContent = 'Approved: 142 journal entries posted for 2026-08';
+      document.getElementById('gate-sub').textContent = 'Staged entries were committed to the output store and are ready to download.';
+      add('09:44:12', 'Approved by you');
+      add('09:44:13', 'Committed 142 journal entries');
+      add('09:44:14', 'Charged ₹284.00 · 142 invoices × ₹2');
+      add('09:44:15', 'Completed · sandbox stopped · ₹216.00 released');
+      status.className = 'pill p-green'; status.textContent = 'Completed';
+      document.getElementById('charged').textContent = '₹284.00';
+      document.getElementById('charged-bar').style.width = '56.8%';
+      document.getElementById('reserved').textContent = '₹0.00';
+      document.getElementById('timeleft').textContent = '—';
+      var pill = document.getElementById('out-pill'); pill.className = 'pill p-green'; pill.textContent = 'Committed · 142';
+    } else {
+      document.getElementById('gate-title').textContent = 'Rejected: nothing was posted';
+      document.getElementById('gate-sub').textContent = 'Staged entries were discarded and the run was stopped. You were not charged.';
+      add('09:44:12', 'Rejected by you');
+      add('09:44:13', 'Discarded 142 staged entries · sandbox stopped · ₹500.00 released');
+      status.className = 'pill p-red'; status.textContent = 'Rejected';
+      document.getElementById('reserved').textContent = '₹0.00';
+      document.getElementById('timeleft').textContent = '—';
+      var p = document.getElementById('out-pill'); p.className = 'pill p-red'; p.textContent = 'Discarded';
+    }
+  }
+  document.getElementById('approve').addEventListener('click', function () { decide(true); });
+  document.getElementById('reject').addEventListener('click', function () { decide(false); });
+})();
+</script>
+
+</body></html>

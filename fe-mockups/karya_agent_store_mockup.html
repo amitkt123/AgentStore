@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karya — governed agent store for finance teams</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F7F4; --paper-2:#EDEFEA; --ink:#1C2430; --ink-2:#4B5563; --muted:#8A93A0;
+  --line:#D6DAD2; --green:#1D5C4A; --green-soft:#E3EFEA; --amber:#B8651B; --amber-soft:#F7EBDD;
+  --red:#A63A2B; --red-soft:#F5E3DF; --doc:#FFFFFF; --focus:#1D5C4A;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#151A20; --paper-2:#1C232B; --ink:#E9ECEF; --ink-2:#C2C8D0; --muted:#8A93A0;
+    --line:#2C353F; --green:#6FBF9E; --green-soft:#1B2E28; --amber:#E0A05C; --amber-soft:#332618;
+    --red:#E08A7B; --red-soft:#3A2420; --doc:#1C232B; --focus:#6FBF9E;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#151A20; --paper-2:#1C232B; --ink:#E9ECEF; --ink-2:#C2C8D0; --muted:#8A93A0;
+  --line:#2C353F; --green:#6FBF9E; --green-soft:#1B2E28; --amber:#E0A05C; --amber-soft:#332618;
+  --red:#E08A7B; --red-soft:#3A2420; --doc:#1C232B; --focus:#6FBF9E;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums}
+a{color:inherit}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.serif{font-family:"IBM Plex Serif",Georgia,serif}
+
+/* shell */
+.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.rail{border-right:1px solid var(--line);padding:22px 18px;display:flex;flex-direction:column;gap:28px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand .mark{font-family:"IBM Plex Serif",serif;font-size:26px;font-weight:500;letter-spacing:-.01em}
+.brand .org{font-size:12px;color:var(--muted)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{text-align:left;padding:8px 10px;border-radius:6px;color:var(--ink-2);display:flex;justify-content:space-between;align-items:center}
+.nav button[aria-current="page"]{background:var(--paper-2);color:var(--ink);font-weight:500}
+.nav .count{font-size:12px;color:var(--muted)}
+.rail-foot{margin-top:auto;font-size:12.5px;color:var(--muted);line-height:1.45}
+.rail-foot strong{color:var(--ink-2);font-weight:500}
+main{padding:22px 34px 60px;max-width:1240px}
+.topbar{display:flex;gap:14px;align-items:center;margin-bottom:26px}
+.search{flex:1;display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--doc);border-radius:8px;padding:9px 12px;color:var(--muted)}
+.search input{flex:1;border:0;background:none;color:var(--ink);font:inherit;outline:none}
+.search kbd{font-size:11px;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.btn{padding:9px 14px;border-radius:7px;border:1px solid var(--line);background:var(--doc);font-weight:500}
+.btn.primary{background:var(--green);color:#fff;border-color:var(--green)}
+.btn.small{padding:6px 10px;font-size:13.5px}
+h1{font-family:"IBM Plex Serif",serif;font-weight:500;font-size:28px;letter-spacing:-.01em;margin:0 0 6px}
+h2{font-weight:600;font-size:15px;margin:0 0 12px}
+.lede{color:var(--ink-2);margin:0 0 22px;max-width:62ch}
+.screen{display:none}.screen.active{display:block}
+
+/* catalog */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13.5px;color:var(--ink-2);background:var(--doc)}
+.chip.on{border-color:var(--ink);color:var(--ink)}
+.list{border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:1.6fr 1fr .8fr .9fr auto;gap:18px;align-items:center;padding:16px 4px;border-bottom:1px solid var(--line);text-align:left;width:100%}
+.row:hover{background:var(--paper-2)}
+.row .name{font-weight:600}
+.row .job{color:var(--ink-2);font-size:14px}
+.row .price{font-weight:500}
+.row .price small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
+.perm{font-size:13px;color:var(--ink-2)}
+.perm b{font-weight:500;color:var(--ink)}
+.trust{display:flex;align-items:center;gap:8px;font-size:13.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+.dot.amber{background:var(--amber)}
+.list-head{display:grid;grid-template-columns:1.6fr 1fr .8fr .9fr auto;gap:18px;padding:0 4px 8px;font-size:12.5px;color:var(--muted)}
+
+/* detail */
+.detail{display:grid;grid-template-columns:1fr 380px;gap:34px;align-items:start}
+.crumbs{font-size:13.5px;color:var(--muted);margin-bottom:10px}
+.crumbs button{color:var(--ink-2);text-decoration:underline;text-underline-offset:3px}
+.meta{display:flex;gap:18px;flex-wrap:wrap;color:var(--ink-2);font-size:14px;margin:0 0 22px}
+.section{margin:0 0 30px}
+.evals{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.eval{border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:var(--doc)}
+.eval .n{font-size:26px;font-weight:500;line-height:1.1}
+.eval .l{font-size:13px;color:var(--ink-2);margin-top:6px}
+.eval .s{font-size:12.5px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-weight:500;color:var(--muted);font-size:12.5px;padding:0 0 8px;border-bottom:1px solid var(--line)}
+td{padding:11px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td.r,th.r{text-align:right}
+.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
+
+/* the manifest document — the memorable element */
+.doc{background:var(--doc);border:1px solid var(--line);border-radius:4px;padding:26px 26px 22px;position:sticky;top:22px;box-shadow:0 1px 0 var(--line)}
+.doc h3{font-family:"IBM Plex Serif",serif;font-weight:500;font-size:19px;margin:0 0 2px}
+.doc .sub{font-family:"IBM Plex Serif",serif;font-style:italic;color:var(--ink-2);margin:0 0 20px;font-size:14px}
+.doc dl{margin:0}
+.doc dt{font-family:"IBM Plex Serif",serif;font-size:14px;color:var(--muted);margin:16px 0 6px;padding-bottom:4px;border-bottom:1px dotted var(--line)}
+.doc dd{margin:0 0 4px;display:flex;justify-content:space-between;gap:12px;font-size:14px}
+.doc dd .k{color:var(--ink)}
+.doc dd .v{color:var(--ink-2);text-align:right}
+.doc dd .v.no{color:var(--muted);text-decoration:line-through}
+.doc .cap{margin-top:20px;padding-top:14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline}
+.doc .cap .amt{font-family:"IBM Plex Serif",serif;font-size:24px;font-weight:500}
+.doc .cap .lbl{color:var(--ink-2);font-size:13.5px}
+.doc .sign{margin-top:14px;font-size:12.5px;color:var(--muted);font-family:"IBM Plex Serif",serif;font-style:italic}
+.doc .actions{display:flex;gap:8px;margin-top:18px}
+.doc .actions .btn{flex:1;text-align:center}
+
+/* run console */
+.run-head{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;margin-bottom:22px}
+.run-id{font-size:13.5px;color:var(--muted)}
+.status{display:inline-flex;align-items:center;gap:8px;padding:5px 10px;border-radius:6px;font-size:13.5px;background:var(--amber-soft);color:var(--amber);font-weight:500}
+.status.done{background:var(--green-soft);color:var(--green)}
+.console{display:grid;grid-template-columns:1fr 320px;gap:30px;align-items:start}
+.trace{border-left:2px solid var(--line);margin-left:8px;padding-left:22px}
+.step{position:relative;padding:0 0 22px}
+.step::before{content:"";position:absolute;left:-29px;top:6px;width:11px;height:11px;border-radius:50%;background:var(--paper);border:2px solid var(--muted)}
+.step.ok::before{background:var(--green);border-color:var(--green)}
+.step.gate::before{background:var(--amber);border-color:var(--amber)}
+.step .t{font-size:12.5px;color:var(--muted)}
+.step .h{font-weight:500;margin:2px 0 4px}
+.step .b{color:var(--ink-2);font-size:14px}
+.step .cost{font-size:13px;color:var(--muted);margin-top:4px}
+.gatebox{margin-top:10px;border:1px solid var(--amber);background:var(--amber-soft);border-radius:8px;padding:14px 16px}
+.gatebox p{margin:0 0 10px;font-size:14px}
+.gatebox .btn{margin-right:6px}
+.side{display:flex;flex-direction:column;gap:18px}
+.panel{border:1px solid var(--line);border-radius:8px;background:var(--doc);padding:16px 18px}
+.panel h4{margin:0 0 10px;font-size:14px;font-weight:600}
+.meter{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)}
+.meter:last-child{border:0}
+.bar{height:6px;background:var(--paper-2);border-radius:3px;margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;width:38%;background:var(--green)}
+
+/* billing */
+.bill{display:grid;grid-template-columns:1fr 360px;gap:34px;align-items:start}
+.wallet{border:1px solid var(--line);border-radius:8px;background:var(--doc);padding:20px 22px}
+.wallet .amt{font-family:"IBM Plex Serif",serif;font-size:34px;font-weight:500;line-height:1}
+.wallet .l{color:var(--ink-2);font-size:13.5px;margin-top:6px}
+.wallet .actions{margin-top:16px;display:flex;gap:8px}
+.stmt{background:var(--doc);border:1px solid var(--line);border-radius:4px;padding:24px 26px}
+.stmt h3{font-family:"IBM Plex Serif",serif;font-weight:500;font-size:19px;margin:0 0 2px}
+.stmt .sub{font-family:"IBM Plex Serif",serif;font-style:italic;color:var(--ink-2);font-size:14px;margin:0 0 18px}
+.stmt .line{display:flex;justify-content:space-between;font-size:14px;padding:7px 0;border-bottom:1px dotted var(--line)}
+.stmt .line span:last-child{font-variant-numeric:tabular-nums}
+.stmt .total{display:flex;justify-content:space-between;padding-top:14px;margin-top:6px;border-top:1px solid var(--line);font-family:"IBM Plex Serif",serif;font-size:18px;font-weight:500}
+.note{font-size:13px;color:var(--muted);margin-top:14px}
+
+.tablewrap{overflow-x:auto}
+@media (max-width:980px){
+  .shell{grid-template-columns:1fr}.rail{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);flex-direction:row;flex-wrap:wrap;align-items:center}
+  .nav{flex-direction:row}.rail-foot{display:none}main{padding:18px}
+  .detail,.console,.bill{grid-template-columns:1fr}.doc{position:static}
+  .row,.list-head{grid-template-columns:1fr 1fr;gap:8px}.row>*:nth-child(n+4){display:none}.list-head>*:nth-child(n+3){display:none}
+  .evals{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:no-preference){.screen.active{animation:in .18s ease-out}}
+@keyframes in{from{opacity:0}to{opacity:1}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <div class="brand"><span class="mark">Karya</span><span class="org">Meridian Traders Pvt Ltd</span></div>
+    <nav class="nav" aria-label="Sections">
+      <button data-go="catalog" aria-current="page">Find an agent</button>
+      <button data-go="runs">Runs <span class="count">3 running</span></button>
+      <button data-go="billing">Billing <span class="count">₹41,220</span></button>
+      <button data-go="catalog">Approvals <span class="count">1 waiting</span></button>
+    </nav>
+    <div class="rail-foot"><strong>Signed in as</strong><br>Priya, finance lead<br>Company plan · SSO on<br>Data stays in ap-south-1</div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <label class="search"><span aria-hidden="true">⌕</span><input placeholder="Search by the job you need done, e.g. reconcile GSTR-2B" aria-label="Search agents"><kbd>/</kbd></label>
+      <button class="btn">Request an agent</button>
+    </div>
+
+    <!-- CATALOG -->
+    <section class="screen active" id="catalog">
+      <h1>Agents for finance work</h1>
+      <p class="lede">Every agent here runs inside your workspace, touches only what its statement says it can, and charges only for outcomes you can check.</p>
+      <div class="filters" role="group" aria-label="Filter by job">
+        <button class="chip on">All jobs</button><button class="chip">GST & TDS</button><button class="chip">Receivables</button><button class="chip">Bank reconciliation</button><button class="chip">Vendor onboarding</button><button class="chip">Payroll</button><button class="chip">Priced per outcome</button>
+      </div>
+      <div class="list-head"><span>Agent</span><span>What it can touch</span><span>Price</span><span>Track record</span><span></span></div>
+      <div class="list">
+        <button class="row" data-go="detail">
+          <span><span class="name">GSTR-2B Reconciler</span><br><span class="job">Matches purchase invoices to GSTR-2B and flags unclaimable input credit before you file.</span></span>
+          <span class="perm">Reads <b>Tally, GST portal</b><br>Writes <b>nothing</b></span>
+          <span class="price">₹18 <small>per matched invoice</small></span>
+          <span class="trust"><span class="dot"></span>2,140 runs · 0.3% disputed</span>
+          <span class="btn small">View</span>
+        </button>
+        <button class="row" data-go="detail">
+          <span><span class="name">Collections Follow-up</span><br><span class="job">Sends reminder sequences for overdue invoices, escalates to you at 45 days.</span></span>
+          <span class="perm">Reads <b>Zoho Books</b><br>Sends <b>email, WhatsApp</b></span>
+          <span class="price">2% <small>of amount recovered</small></span>
+          <span class="trust"><span class="dot"></span>860 runs · 1.1% disputed</span>
+          <span class="btn small">View</span>
+        </button>
+        <button class="row" data-go="detail">
+          <span><span class="name">Bank Statement Matcher</span><br><span class="job">Reconciles HDFC and ICICI statements against ledger entries, proposes journal fixes.</span></span>
+          <span class="perm">Reads <b>bank feeds, Tally</b><br>Writes <b>draft journals only</b></span>
+          <span class="price">₹1,200 <small>per statement month</small></span>
+          <span class="trust"><span class="dot"></span>3,410 runs · 0.6% disputed</span>
+          <span class="btn small">View</span>
+        </button>
+        <button class="row" data-go="detail">
+          <span><span class="name">Vendor KYC Checker</span><br><span class="job">Verifies GSTIN, PAN, bank account and MCA filings for a new vendor. Returns a go/no-go file.</span></span>
+          <span class="perm">Reads <b>public registries</b><br>Writes <b>nothing</b></span>
+          <span class="price">₹95 <small>per vendor verified</small></span>
+          <span class="trust"><span class="dot amber"></span>190 runs · new listing</span>
+          <span class="btn small">View</span>
+        </button>
+        <button class="row" data-go="detail">
+          <span><span class="name">TDS Return Preparer</span><br><span class="job">Prepares 26Q from payments data and holds it for your sign-off. Never files on its own.</span></span>
+          <span class="perm">Reads <b>Tally, TRACES</b><br>Writes <b>draft return</b></span>
+          <span class="price">₹2,500 <small>per quarter</small></span>
+          <span class="trust"><span class="dot"></span>640 runs · 0.0% disputed</span>
+          <span class="btn small">View</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- DETAIL -->
+    <section class="screen" id="detail">
+      <div class="crumbs"><button data-go="catalog">Find an agent</button> / GST & TDS</div>
+      <div class="detail">
+        <div>
+          <h1>GSTR-2B Reconciler</h1>
+          <p class="meta"><span>By Ledgerline Labs, Pune</span><span>Version 4.2 · changed 11 Sep</span><span>Used by 312 companies</span></p>
+          <p class="lede">Pulls your purchase register from Tally and the month's GSTR-2B from the portal, matches invoice by invoice, and gives you a list of credits you can claim, credits you can't, and vendors who haven't filed. You review the list; nothing is filed for you.</p>
+
+          <div class="section">
+            <h2>Measured on your kind of data</h2>
+            <div class="evals">
+              <div class="eval"><div class="n">98.4%</div><div class="l">Invoices matched correctly</div><div class="s">Karya test set, 12,000 invoices, re-run 11 Sep</div></div>
+              <div class="eval"><div class="n">0.2%</div><div class="l">False "claimable" flags</div><div class="s">The error that costs you money</div></div>
+              <div class="eval"><div class="n">₹14</div><div class="l">Typical cost per invoice</div><div class="s">Cap is ₹18; you pay the lower</div></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h2>Your last runs</h2>
+            <div class="tablewrap"><table>
+              <tr><th>Month</th><th>Invoices</th><th>Flagged</th><th>Reviewed by</th><th class="r">Charged</th></tr>
+              <tr><td>Aug 2026</td><td>1,184</td><td class="warn">37 unclaimable</td><td>Priya</td><td class="r">₹16,576</td></tr>
+              <tr><td>Jul 2026</td><td>1,092</td><td class="warn">22 unclaimable</td><td>Priya</td><td class="r">₹15,288</td></tr>
+              <tr><td>Jun 2026</td><td>1,231</td><td class="bad">1 disputed, refunded</td><td>Rohan</td><td class="r">₹17,216</td></tr>
+            </table></div>
+          </div>
+
+          <div class="section">
+            <h2>What happens when it is wrong</h2>
+            <p class="lede" style="margin:0">Every flag links to the two source records it compared. If you dispute a match within 30 days, the charge for that invoice is reversed and the case goes to Ledgerline. Disputes are counted in the track record you saw in the catalog.</p>
+          </div>
+        </div>
+
+        <aside class="doc" aria-label="Permission statement">
+          <h3>Permission statement</h3>
+          <p class="sub">What this agent may do inside Meridian Traders</p>
+          <dl>
+            <dt>Reads</dt>
+            <dd><span class="k">Tally purchase register</span><span class="v">current FY</span></dd>
+            <dd><span class="k">GST portal, GSTR-2B</span><span class="v">via your login, 1 hour</span></dd>
+            <dt>Writes</dt>
+            <dd><span class="k">Tally ledger</span><span class="v no">no access</span></dd>
+            <dd><span class="k">GST portal filing</span><span class="v no">no access</span></dd>
+            <dd><span class="k">Karya report folder</span><span class="v">one file per run</span></dd>
+            <dt>Talks to</dt>
+            <dd><span class="k">gst.gov.in</span><span class="v">only</span></dd>
+            <dd><span class="k">Anything else on the internet</span><span class="v no">blocked</span></dd>
+            <dt>Asks you before</dt>
+            <dd><span class="k">Marking a credit unclaimable above ₹50,000</span><span class="v">always</span></dd>
+          </dl>
+          <div class="cap"><span class="lbl">Most it can spend this month</span><span class="amt">₹25,000</span></div>
+          <div class="sign">Checked by Karya on 11 Sep 2026. Changes require a new statement.</div>
+          <div class="actions"><button class="btn primary" data-go="runs">Run for September</button><button class="btn">Change limits</button></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- RUNS -->
+    <section class="screen" id="runs">
+      <div class="crumbs"><button data-go="catalog">Runs</button> / GSTR-2B Reconciler</div>
+      <div class="run-head">
+        <div><h1>September reconciliation</h1><div class="run-id">Run 8F2K-0917 · started 09:41 by Priya · will stop at ₹18,000 or 2 hours, whichever first</div></div>
+        <span class="status">Waiting for your decision</span>
+      </div>
+      <div class="console">
+        <div class="trace">
+          <div class="step ok"><div class="t">09:41:02</div><div class="h">Read purchase register from Tally</div><div class="b">1,207 invoices, Sep 2026.</div><div class="cost">₹0 · read only</div></div>
+          <div class="step ok"><div class="t">09:41:40</div><div class="h">Downloaded GSTR-2B from GST portal</div><div class="b">Used your login for 38 seconds. Session closed.</div><div class="cost">₹0 · read only</div></div>
+          <div class="step ok"><div class="t">09:42–09:58</div><div class="h">Matched 1,168 invoices</div><div class="b">1,131 exact matches, 37 matched with a date or amount difference under ₹10.</div><div class="cost">₹16,352 · 1,168 outcomes at ₹14</div></div>
+          <div class="step gate"><div class="t">09:58:12</div><div class="h">Needs your decision</div><div class="b">Invoice PI-2261 from Sharma Metals, ₹1,84,000 of credit, does not appear in GSTR-2B. Marking it unclaimable crosses your ₹50,000 limit.</div>
+            <div class="gatebox"><p>Both records are attached. Sharma Metals has filed late twice before. You can wait for their filing or mark it now.</p><button class="btn small primary">Mark unclaimable</button><button class="btn small">Wait for vendor</button><button class="btn small">Stop the run</button></div></div>
+          <div class="step"><div class="t">—</div><div class="h">Write report to Karya folder</div><div class="b">Not started.</div></div>
+        </div>
+        <div class="side">
+          <div class="panel"><h4>Spend on this run</h4><div class="meter"><span>Charged so far</span><span>₹16,352</span></div><div class="meter"><span>Limit for this run</span><span>₹18,000</span></div><div class="bar"><i style="width:91%"></i></div></div>
+          <div class="panel"><h4>Everything it touched</h4><div class="meter"><span>Tally, read</span><span>2 calls</span></div><div class="meter"><span>GST portal, read</span><span>1 session</span></div><div class="meter"><span>Writes</span><span>none yet</span></div><div class="meter"><span>Blocked requests</span><span class="ok">0</span></div></div>
+          <div class="panel"><h4>If something looks wrong</h4><p style="margin:0;font-size:14px;color:var(--ink-2)">Stop the run at any time. You are charged only for invoices already matched, and each one can be disputed for 30 days.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BILLING -->
+    <section class="screen" id="billing">
+      <h1>Billing</h1>
+      <p class="lede">One wallet for every agent you use. Charges post when an outcome is delivered, not when an agent starts working.</p>
+      <div class="bill">
+        <div>
+          <div class="wallet"><div class="amt">₹41,220</div><div class="l">Available · auto top-up at ₹10,000 from HDFC ····4417</div><div class="actions"><button class="btn primary">Add money</button><button class="btn">Set a monthly cap</button><button class="btn">Download GST invoice</button></div></div>
+          <div class="section" style="margin-top:28px">
+            <h2>This month, by agent</h2>
+            <div class="tablewrap"><table>
+              <tr><th>Agent</th><th>Outcomes</th><th>Disputed</th><th class="r">Charged</th></tr>
+              <tr><td>GSTR-2B Reconciler</td><td>1,168 invoices matched</td><td>0</td><td class="r">₹16,352</td></tr>
+              <tr><td>Bank Statement Matcher</td><td>2 statement months</td><td>0</td><td class="r">₹2,400</td></tr>
+              <tr><td>Collections Follow-up</td><td>₹6,10,000 recovered</td><td>1 · ₹340 reversed</td><td class="r">₹11,860</td></tr>
+              <tr><td>Vendor KYC Checker</td><td>14 vendors</td><td>0</td><td class="r">₹1,330</td></tr>
+            </table></div>
+          </div>
+        </div>
+        <aside class="stmt" aria-label="September statement">
+          <h3>Statement</h3>
+          <p class="sub">September 2026, to date</p>
+          <div class="line"><span>Outcomes delivered</span><span>₹31,942</span></div>
+          <div class="line"><span>Disputes reversed</span><span>−₹340</span></div>
+          <div class="line"><span>Karya platform fee, 12%</span><span>₹3,792</span></div>
+          <div class="line"><span>GST, 18%</span><span>₹6,391</span></div>
+          <div class="total"><span>Total</span><span>₹41,785</span></div>
+          <p class="note">Model and tool costs are inside the outcome price. You never see a separate token bill.</p>
+        </aside>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  var screens=document.querySelectorAll('.screen');
+  var navs=document.querySelectorAll('.nav button');
+  function go(id){
+    screens.forEach(function(s){s.classList.toggle('active',s.id===id)});
+    navs.forEach(function(b){ if(b.getAttribute('data-go')===id && b.textContent.indexOf('Approvals')<0){b.setAttribute('aria-current','page')} else {b.removeAttribute('aria-current')} });
+    if(id==='detail'){navs[0].setAttribute('aria-current','page')}
+    window.scrollTo({top:0});
+  }
+  document.addEventListener('click',function(e){
+    var t=e.target.closest('[data-go]'); if(!t) return;
+    if(t.classList.contains('btn') && t.closest('.row')) t=t.closest('.row');
+    go(t.getAttribute('data-go'));
+  });
+  try{ var saved=localStorage.getItem('karya.screen'); if(saved) go(saved); }catch(e){}
+  document.addEventListener('click',function(e){var t=e.target.closest('[data-go]'); if(t){try{localStorage.setItem('karya.screen',t.getAttribute('data-go'))}catch(err){}}});
+})();
+</script>
+</body>
+</html>
