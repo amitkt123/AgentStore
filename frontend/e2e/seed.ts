@@ -3,21 +3,19 @@ import { Client } from "pg";
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8080";
 const DATABASE_URL = process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/agentstore";
 
-async function signup(orgName: string, orgType: "BUYER" | "DEVELOPER", email: string, password: string, role: string) {
+async function signup(fullName: string, orgName: string, side: "BUYER" | "DEVELOPER", email: string, password: string) {
   const res = await fetch(`${BACKEND_URL}/api/v1/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ orgName, orgType, email, password, role }),
+    body: JSON.stringify({ fullName, orgName, side, email, password }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    // The backend has no global exception handler, so a duplicate email surfaces as a generic
-    // 500 (a DataIntegrityViolationException on the app_user.email unique constraint) rather than
-    // a clean 4xx — the JSON body carries no distinguishing detail beyond status/path. That 500 on
-    // this endpoint is by far the most common cause of a seed failure (re-running the script
-    // against a database it already seeded), so we surface that as the likely explanation instead
-    // of a raw stack trace, while still showing the underlying status for anything genuinely new.
-    if (res.status === 500 || (res.status >= 400 && res.status < 500 && /email|unique|duplicate|already/i.test(body))) {
+    // A duplicate email returns 409 (see AuthController#signup). That's by far the most common
+    // cause of a seed failure (re-running the script against a database it already seeded), so we
+    // surface that as the likely explanation instead of a raw stack trace, while still showing the
+    // underlying status for anything genuinely new.
+    if (res.status === 409) {
       throw new Error(
         `Signup failed for ${email} (status ${res.status}). This is most likely because the email is already ` +
           `registered — the seed script is meant to run once against a fresh database; see README.md before ` +
@@ -30,13 +28,13 @@ async function signup(orgName: string, orgType: "BUYER" | "DEVELOPER", email: st
 }
 
 async function main() {
-  const dev = await signup("E2E Dev Co", "DEVELOPER", "e2e-dev@example.com", "e2e-password", "DEVELOPER");
-  await signup("E2E Buyer Co", "BUYER", "e2e-buyer@example.com", "e2e-password", "BUYER_ADMIN");
+  const dev = await signup("E2E Developer", "E2E Dev Co", "DEVELOPER", "e2e-dev@example.com", "e2e-password");
+  await signup("E2E Buyer Admin", "E2E Buyer Co", "BUYER", "e2e-buyer@example.com", "e2e-password");
   // Signup always creates a brand-new org (see AuthController#signup) — there is no "join an existing org"
   // endpoint. To get a BUYER_APPROVER into the SAME org as the BUYER_ADMIN above, sign up into a throwaway
-  // org (so the backend does the bcrypt hashing + validation for us) and then reassign the user's org_id
-  // via SQL, cleaning up the throwaway org afterwards.
-  await signup("E2E Buyer Approver Org (temp)", "BUYER", "e2e-approver@example.com", "e2e-password", "BUYER_APPROVER");
+  // org (so the backend does the bcrypt hashing + validation for us) and then move the user's membership
+  // into the real buyer org via SQL, cleaning up the throwaway org afterwards.
+  await signup("E2E Approver", "E2E Buyer Approver Org (temp)", "BUYER", "e2e-approver@example.com", "e2e-password");
 
   const agent = (await fetch(`${BACKEND_URL}/api/v1/agents`, {
     method: "POST",
@@ -76,10 +74,15 @@ async function main() {
     [buyerOrgId],
   );
 
-  // Move the approver user into the real buyer org, then drop the throwaway org signup created for it.
+  // Memberships, not app_user.org_id, decide which workspace a person belongs to (WS13).
   const approverOrgRow = await pg.query("select id from org where name = $1", ["E2E Buyer Approver Org (temp)"]);
   const approverOrgId = approverOrgRow.rows[0].id;
-  await pg.query(`update app_user set org_id = $1 where email = $2`, [buyerOrgId, "e2e-approver@example.com"]);
+  await pg.query(
+    `update org_membership set org_id = $1, role = 'BUYER_APPROVER', title = 'Accounts manager'
+       where org_id = $2 and user_id = (select id from app_user where email = $3)`,
+    [buyerOrgId, approverOrgId, "e2e-approver@example.com"],
+  );
+  await pg.query(`update app_user set last_org_id = $1 where email = $2`, [buyerOrgId, "e2e-approver@example.com"]);
   await pg.query(`delete from org where id = $1`, [approverOrgId]);
 
   await pg.end();
