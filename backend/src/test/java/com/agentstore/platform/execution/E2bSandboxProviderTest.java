@@ -28,6 +28,8 @@ class E2bSandboxProviderTest {
                 .andExpect(header("X-API-Key", "test-api-key"))
                 .andExpect(jsonPath("$.templateID").value("bank-recon-template-v1"))
                 .andExpect(jsonPath("$.network.allowOut[0]").value("api.agentstore.example"))
+                .andExpect(jsonPath("$.network.denyOut[0]").value("0.0.0.0/0"))
+                .andExpect(jsonPath("$.network.denyOut.length()").value(1))
                 .andRespond(withSuccess(
                         "{\"sandboxID\":\"sbx-123\",\"templateID\":\"bank-recon-template-v1\"}",
                         MediaType.APPLICATION_JSON));
