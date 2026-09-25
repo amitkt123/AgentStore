@@ -24,6 +24,7 @@ agentstore:
       shim-command: [node, e2b-shim/shim.mjs]
       shim-timeout: PT60S
       http-timeout: PT30S
+      build-timeout: PT14M
 
 management:
   endpoints:

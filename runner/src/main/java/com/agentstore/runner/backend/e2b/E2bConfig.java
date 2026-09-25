@@ -24,6 +24,6 @@ public class E2bConfig {
         factory.setReadTimeout((int) e2b.httpTimeout().toMillis());
         E2bRestClient rest = new E2bRestClient(builder.requestFactory(factory), e2b.baseUrl(), e2b.apiKey());
         ShimClient shim = new ShimClient(e2b.shimCommand(), e2b.shimTimeout(), e2b.apiKey());
-        return new E2bBackend(rest, shim, props.runnerId());
+        return new E2bBackend(rest, shim, props.runnerId(), e2b.buildTimeout());
     }
 }

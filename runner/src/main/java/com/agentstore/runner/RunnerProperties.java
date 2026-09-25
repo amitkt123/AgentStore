@@ -29,13 +29,14 @@ public record RunnerProperties(@NotBlank String secret, @NotBlank String runnerI
                          @NotNull Path stateFile) {}
 
     public record E2b(String apiKey, String baseUrl, List<String> shimCommand, Duration shimTimeout,
-                      Duration httpTimeout) {
+                      Duration httpTimeout, Duration buildTimeout) {
 
         /** Redacts {@code apiKey}. */
         @Override
         public String toString() {
             return "E2b[apiKey=" + REDACTED + ", baseUrl=" + baseUrl + ", shimCommand=" + shimCommand
-                    + ", shimTimeout=" + shimTimeout + ", httpTimeout=" + httpTimeout + "]";
+                    + ", shimTimeout=" + shimTimeout + ", httpTimeout=" + httpTimeout
+                    + ", buildTimeout=" + buildTimeout + "]";
         }
     }
 }

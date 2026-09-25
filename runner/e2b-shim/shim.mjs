@@ -2,7 +2,7 @@
 // Protocol: one JSON request on stdin, one JSON response on stdout, exit 0 iff ok.
 // Never print the request or env values: they carry run secrets.
 
-import { realpathSync } from 'node:fs';
+import { appendFileSync, realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const RUN_DIR = '/workspace/.run';
@@ -69,11 +69,90 @@ async function readFile(req, { Sandbox, apiKey }) {
   return { ok: true, exists: true, data: newline < 0 ? '' : out.slice(newline + 1).trim(), size };
 }
 
+// ---- Image build (spec §4 steps 4-5). The same recipe is what WS5d's gVisor backend implements. ----
+
+export const APP_DIR = '/workspace/app';
+export const FAIL_MARK = 'AGENTSTORE_STEP_FAILED:';
+export const BASE_IMAGES = { 'python-3.12': 'python:3.12-slim', 'node-22': 'node:22-slim' };
+
+// Imports the entrypoint under a name other than __main__, so `if __name__ == "__main__":` code does not run.
+// sys.path[0] is set to the entrypoint's directory, as `python <entrypoint>` would do at run time.
+export const PY_SMOKE = "import importlib.util as u, os, sys; sys.path[0] = os.path.dirname(sys.argv[1]); "
+  + "s = u.spec_from_file_location('agentstore_smoke', sys.argv[1]); s.loader.exec_module(u.module_from_spec(s))";
+
+// Runs one recipe step; on failure prints the marker the runner maps to a failure code.
+function step(code, script) {
+  return `sh -c ${shellQuote(script)} || { echo "${FAIL_MARK}${code}"; exit 1; }`;
+}
+
+export function recipe(runtime, entrypoint) {
+  const ep = shellQuote(`${APP_DIR}/${entrypoint}`);
+  if (runtime === 'python-3.12') {
+    return [
+      step('INSTALL_FAILED', `cd ${APP_DIR} && if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi`),
+      step('DEP_VULN', `cd ${APP_DIR} && if [ -f requirements.txt ]; then python -m venv /opt/agentstore-audit`
+        + ` && /opt/agentstore-audit/bin/pip install --no-cache-dir --quiet pip-audit`
+        + ` && /opt/agentstore-audit/bin/pip-audit --progress-spinner off -r requirements.txt; rc=$?;`
+        + ` rm -rf /opt/agentstore-audit; exit $rc; fi`),
+      step('SMOKE_FAILED', `cd ${APP_DIR} && timeout 60 python -c ${shellQuote(PY_SMOKE)} ${ep}`),
+    ];
+  }
+  if (runtime === 'node-22') {
+    return [
+      step('INSTALL_FAILED', `cd ${APP_DIR} && if [ -f package.json ]; then`
+        + ` [ -f package-lock.json ] || { echo "package-lock.json is required next to package.json"; exit 1; };`
+        + ` npm ci --omit=dev; fi`),
+      step('DEP_VULN', `cd ${APP_DIR} && if [ -f package.json ]; then npm audit --omit=dev --audit-level=high; fi`),
+      step('SMOKE_FAILED', `cd ${APP_DIR} && node --check ${ep}`),
+    ];
+  }
+  throw new Error(`unknown runtime ${runtime}`);
+}
+
+function lineWriter(path) {
+  return (line) => {
+    if (path) appendFileSync(path, `${String(line).replace(/\n+$/, '')}\n`);
+  };
+}
+
+async function build(req, { Template, apiKey }) {
+  const base = BASE_IMAGES[req.runtime];
+  if (!base) return fail('BAD_REQUEST', `unknown runtime ${String(req.runtime)}`);
+  const writeLog = lineWriter(req.logPath);
+  let template = Template({ fileContextPath: req.appDir })
+    .fromImage(base)
+    .runCmd(`mkdir -p ${APP_DIR}`, { user: 'root' })
+    .copy('.', APP_DIR)
+    .runCmd(`chmod -R a+rX ${APP_DIR}`, { user: 'root' });
+  for (const cmd of recipe(req.runtime, req.entrypoint)) {
+    template = template.runCmd(cmd, { user: 'root' });
+  }
+  const failedSteps = [];
+  try {
+    const info = await Template.build(template, req.name, {
+      apiKey,
+      cpuCount: req.cpu ?? 1,
+      memoryMB: req.memoryMb ?? 1024,
+      onBuildLogs: (entry) => {
+        const line = String(entry?.message ?? entry);
+        writeLog(line);
+        const at = line.indexOf(FAIL_MARK);
+        if (at >= 0) failedSteps.push(line.slice(at + FAIL_MARK.length).trim().split(/\s/)[0]);
+      },
+    });
+    return { ok: true, imageRef: info.templateId };
+  } catch (e) {
+    return fail(failedSteps[0] ?? 'BUILD_FAILED',
+      `build failed: ${e?.name ?? 'Error'}: ${e?.message ?? ''}`.slice(0, 500));
+  }
+}
+
 export async function handle(req, deps) {
   try {
     switch (req?.op) {
       case 'start': return await start(req, deps);
       case 'readFile': return await readFile(req, deps);
+      case 'build': return await build(req, deps);
       default: return fail('BAD_REQUEST', `unknown op ${String(req?.op)}`);
     }
   } catch (e) {
@@ -91,8 +170,8 @@ async function main() {
     process.stdout.write(JSON.stringify(fail('BAD_REQUEST', 'stdin is not JSON')));
     process.exit(1);
   }
-  const { Sandbox } = await import('e2b');
-  const res = await handle(req, { Sandbox, apiKey: process.env.E2B_API_KEY });
+  const { Sandbox, Template } = await import('e2b');
+  const res = await handle(req, { Sandbox, Template, apiKey: process.env.E2B_API_KEY });
   process.stdout.write(JSON.stringify(res));
   process.exit(res.ok ? 0 : 1);
 }

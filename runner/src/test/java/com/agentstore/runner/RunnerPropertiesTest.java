@@ -15,7 +15,7 @@ class RunnerPropertiesTest {
         var props = new RunnerProperties("runner-s3cret", "runner-1", "e2b", "http://spring",
                 new RunnerProperties.Budget(2, Duration.ofMinutes(10), Duration.ofHours(10), Path.of("b.json")),
                 new RunnerProperties.E2b("e2b_key_value", "https://api", List.of("node"), Duration.ofSeconds(60),
-                        Duration.ofSeconds(30)));
+                        Duration.ofSeconds(30), Duration.ofMinutes(14)));
 
         String text = props.toString();
 

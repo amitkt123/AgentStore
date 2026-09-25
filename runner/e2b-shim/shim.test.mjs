@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, symlinkSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { handle, shellQuote, isEntryPoint, rangeReadCommand, WRAPPER, CONNECT_TIMEOUT_MS } from './shim.mjs';
+import { handle, shellQuote, isEntryPoint, rangeReadCommand, WRAPPER, CONNECT_TIMEOUT_MS,
+  recipe, BASE_IMAGES, FAIL_MARK } from './shim.mjs';
 
 const SHIM_PATH = fileURLToPath(new URL('./shim.mjs', import.meta.url));
 
@@ -132,5 +133,97 @@ describe('unknown op', () => {
     const { Sandbox } = fakeSandboxClass();
     const res = await handle({ op: 'nope' }, { Sandbox, apiKey: 'k' });
     expect(res).toMatchObject({ ok: false, error: { code: 'BAD_REQUEST' } });
+  });
+});
+
+function fakeTemplate({ logs = [], fail = null } = {}) {
+  const calls = [];
+  const builder = {
+    fromImage(image) { calls.push(['fromImage', image]); return builder; },
+    runCmd(cmd, opts) { calls.push(['runCmd', cmd, opts]); return builder; },
+    copy(src, dest) { calls.push(['copy', src, dest]); return builder; },
+  };
+  const Template = (opts) => { calls.push(['Template', opts]); return builder; };
+  Template.build = async (template, name, opts) => {
+    calls.push(['build', name, { apiKey: opts.apiKey, cpuCount: opts.cpuCount, memoryMB: opts.memoryMB }]);
+    for (const message of logs) opts.onBuildLogs({ message });
+    if (fail) throw fail;
+    return { templateId: 'tpl-123', buildId: 'b-1', name, alias: name, tags: [] };
+  };
+  return { calls, Template };
+}
+
+describe('recipe', () => {
+  it('installs, audits and smoke-tests a python app in that order, each step tagged with its failure code', () => {
+    const steps = recipe('python-3.12', 'agent/main.py');
+    expect(steps).toHaveLength(3);
+    expect(steps[0]).toContain('pip install --no-cache-dir -r requirements.txt');
+    expect(steps[0]).toContain(`${FAIL_MARK}INSTALL_FAILED`);
+    expect(steps[1]).toContain('pip-audit');
+    expect(steps[1]).toContain(`${FAIL_MARK}DEP_VULN`);
+    expect(steps[2]).toContain('/workspace/app/agent/main.py');
+    expect(steps[2]).toContain(`${FAIL_MARK}SMOKE_FAILED`);
+  });
+
+  it('uses npm ci, npm audit and node --check for node', () => {
+    const steps = recipe('node-22', 'index.mjs');
+    expect(steps[0]).toContain('npm ci --omit=dev');
+    expect(steps[1]).toContain('npm audit --omit=dev --audit-level=high');
+    expect(steps[2]).toContain('node --check');
+  });
+
+  it('rejects unknown runtimes', () => {
+    expect(() => recipe('ruby-3', 'main.rb')).toThrow(/unknown runtime/);
+  });
+});
+
+describe('build', () => {
+  const tmp = () => mkdtempSync(join(tmpdir(), 'shim-build-'));
+
+  it('builds from the app directory on the runtime base image and returns the image ref', async () => {
+    const dir = tmp();
+    const logPath = join(dir, 'build.log');
+    writeFileSync(logPath, '');
+    const { calls, Template } = fakeTemplate({ logs: ['step 1/5', 'step 2/5'] });
+    const res = await handle({ op: 'build', name: 'agentstore-b1', appDir: '/tmp/app', runtime: 'python-3.12',
+      entrypoint: 'main.py', logPath, cpu: 1, memoryMb: 1024 }, { Template, apiKey: 'k' });
+
+    expect(res).toEqual({ ok: true, imageRef: 'tpl-123' });
+    expect(calls[0]).toEqual(['Template', { fileContextPath: '/tmp/app' }]);
+    expect(calls).toContainEqual(['fromImage', BASE_IMAGES['python-3.12']]);
+    expect(calls).toContainEqual(['copy', '.', '/workspace/app']);
+    expect(calls.filter((c) => c[0] === 'runCmd').every((c) => c[2]?.user === 'root')).toBe(true);
+    expect(calls.at(-1)).toEqual(['build', 'agentstore-b1', { apiKey: 'k', cpuCount: 1, memoryMB: 1024 }]);
+    expect(readFileSync(logPath, 'utf8')).toBe('step 1/5\nstep 2/5\n');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports the failing step code from the build log marker', async () => {
+    const dir = tmp();
+    const { Template } = fakeTemplate({ logs: ['found 2 vulnerabilities', `${FAIL_MARK}DEP_VULN`],
+      fail: Object.assign(new Error('step failed'), { name: 'BuildError' }) });
+    const res = await handle({ op: 'build', name: 'n', appDir: '/a', runtime: 'python-3.12', entrypoint: 'main.py',
+      logPath: join(dir, 'l.log') }, { Template, apiKey: 'k' });
+    expect(res.ok).toBe(false);
+    expect(res.error.code).toBe('DEP_VULN');
+    expect(res.error.message).toContain('BuildError');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports BUILD_FAILED when no step marker was seen', async () => {
+    const dir = tmp();
+    const { Template } = fakeTemplate({ fail: new Error('upload failed') });
+    const res = await handle({ op: 'build', name: 'n', appDir: '/a', runtime: 'node-22', entrypoint: 'index.js',
+      logPath: join(dir, 'l.log') }, { Template, apiKey: 'k' });
+    expect(res).toMatchObject({ ok: false, error: { code: 'BUILD_FAILED' } });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('rejects an unknown runtime without building', async () => {
+    const { calls, Template } = fakeTemplate();
+    const res = await handle({ op: 'build', name: 'n', appDir: '/a', runtime: 'ruby-3', entrypoint: 'x.rb' },
+      { Template, apiKey: 'k' });
+    expect(res).toMatchObject({ ok: false, error: { code: 'BAD_REQUEST' } });
+    expect(calls).toHaveLength(0);
   });
 });

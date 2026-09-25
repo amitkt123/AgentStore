@@ -14,25 +14,43 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestClientException;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class E2bBackend implements IsolationBackend {
 
     private static final Logger log = LoggerFactory.getLogger(E2bBackend.class);
     static final String LOG_PATH = "/workspace/.run/log";
     static final String EXIT_PATH = "/workspace/.run/exit";
+    static final Duration DEFAULT_BUILD_TIMEOUT = Duration.ofMinutes(14);
+    static final int BUILD_CPU = 1;
+    static final int BUILD_MEMORY_MB = 1024;
+    private static final Set<String> STEP_CODES = Set.of(BuildFailedException.INSTALL_FAILED,
+            BuildFailedException.DEP_VULN, BuildFailedException.SMOKE_FAILED);
 
     private final E2bRestClient rest;
     private final ShimClient shim;
     private final String runnerId;
+    private final Duration buildTimeout;
 
     public E2bBackend(E2bRestClient rest, ShimClient shim, String runnerId) {
+        this(rest, shim, runnerId, DEFAULT_BUILD_TIMEOUT);
+    }
+
+    public E2bBackend(E2bRestClient rest, ShimClient shim, String runnerId, Duration buildTimeout) {
         this.rest = rest;
         this.shim = shim;
         this.runnerId = runnerId;
+        this.buildTimeout = buildTimeout;
     }
 
     @Override
@@ -63,8 +81,48 @@ public class E2bBackend implements IsolationBackend {
 
     @Override
     public String buildImage(ImageBuild build, BuildLog log) {
-        // Replaced in WS5b Task 3 by the shim-driven image build.
-        throw new BuildFailedException(BuildFailedException.BUILD_FAILED, "Image builds are not wired for this backend yet");
+        Path logFile;
+        try {
+            logFile = Files.createTempFile("e2b-build-", ".log");
+        } catch (IOException e) {
+            throw new BackendException("Could not create a build log file", e);
+        }
+        Map<String, Object> request = new HashMap<>();
+        request.put("op", "build");
+        request.put("name", templateName(build.buildId()));
+        request.put("appDir", build.appDir().toAbsolutePath().toString());
+        request.put("runtime", build.runtime().id());
+        request.put("entrypoint", build.entrypoint());
+        request.put("logPath", logFile.toString());
+        request.put("cpu", BUILD_CPU);
+        request.put("memoryMb", BUILD_MEMORY_MB);
+        try {
+            JsonNode response;
+            try (LogFileFollower ignored = new LogFileFollower(logFile, log)) {
+                response = shim.call(request, buildTimeout);
+            }
+            String imageRef = response.path("imageRef").asText("");
+            if (imageRef.isBlank()) {
+                throw new BuildFailedException(BuildFailedException.BUILD_FAILED, "The image build returned no image reference");
+            }
+            return imageRef;
+        } catch (ShimTimeoutException e) {
+            throw new BuildFailedException(BuildFailedException.TIMEOUT, "The image build took longer than " + buildTimeout);
+        } catch (ShimException e) {
+            String code = e.code() != null && STEP_CODES.contains(e.code()) ? e.code() : BuildFailedException.BUILD_FAILED;
+            throw new BuildFailedException(code, e.getMessage());
+        } finally {
+            try {
+                Files.deleteIfExists(logFile);
+            } catch (IOException ignored) {
+                // temp file; the OS cleans it up
+            }
+        }
+    }
+
+    /** E2B template names are lowercase; build ids are UUIDs. */
+    static String templateName(String buildId) {
+        return "agentstore-" + buildId.toLowerCase(Locale.ROOT);
     }
 
     @Override
