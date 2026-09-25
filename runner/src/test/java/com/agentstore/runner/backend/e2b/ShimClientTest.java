@@ -3,6 +3,9 @@ package com.agentstore.runner.backend.e2b;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 
@@ -52,5 +55,27 @@ class ShimClientTest {
     void missingExecutableIsAShimException() {
         var client = new ShimClient(List.of("/definitely/not/here"), Duration.ofSeconds(5), "k");
         assertThatThrownBy(() -> client.call(REQUEST)).isInstanceOf(ShimException.class);
+    }
+
+    @Test
+    void childEnvironmentKeepsOnlyPathHomeAndTheApiKey() {
+        Map<String, String> parent = Map.of("PATH", "/usr/bin", "HOME", "/home/r", "RUNNER_SECRET", "top-secret",
+                "E2B_API_KEY", "parent-key", "SPRING_BASE_URL", "http://x");
+        assertThat(ShimClient.childEnvironment(parent, "api-key"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("PATH", "/usr/bin", "HOME", "/home/r", "E2B_API_KEY", "api-key"));
+        assertThat(ShimClient.childEnvironment(Map.of("PATH", "/bin"), null))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("PATH", "/bin", "E2B_API_KEY", ""));
+    }
+
+    @Test
+    void theShimProcessSeesNoOtherRunnerEnvironmentVariables() {
+        var res = shim("env.sh", Duration.ofSeconds(10)).call(REQUEST);
+        assertThat(res.get("key").asText()).isEqualTo("api-key");
+        Set<String> names = new HashSet<>(Arrays.asList(res.get("names").asText().split(",")));
+        names.removeIf(String::isEmpty);
+        // The shell itself defines a few variables (PWD, SHLVL, _, OLDPWD); nothing else may appear.
+        names.removeAll(Set.of("PWD", "SHLVL", "_", "OLDPWD"));
+        assertThat(names).isSubsetOf("PATH", "HOME", "E2B_API_KEY");
+        assertThat(names).contains("PATH", "E2B_API_KEY");
     }
 }

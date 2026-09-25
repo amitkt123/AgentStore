@@ -1,5 +1,6 @@
 server:
   port: ${RUNNER_PORT:8090}
+  address: ${RUNNER_BIND:127.0.0.1}   # loopback by default; set 0.0.0.0 to expose
 
 spring:
   application:

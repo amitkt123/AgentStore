@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -20,6 +21,7 @@ public class ShimClient {
 
     private static final Logger log = LoggerFactory.getLogger(ShimClient.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final List<String> INHERITED_ENV = List.of("PATH", "HOME");
 
     private final List<String> command;
     private final Duration timeout;
@@ -36,7 +38,9 @@ public class ShimClient {
         Process process;
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
-            pb.environment().put("E2B_API_KEY", apiKey == null ? "" : apiKey);
+            Map<String, String> env = pb.environment();
+            env.clear();
+            env.putAll(childEnvironment(System.getenv(), apiKey));
             process = pb.start();
         } catch (IOException e) {
             throw new ShimException("shim " + op + " could not start: " + e.getMessage());
@@ -74,6 +78,22 @@ public class ShimClient {
             throw new ShimException("shim " + op + " failed: " + message);
         }
         return response;
+    }
+
+    /**
+     * The only variables node gets: PATH (to find node), HOME (if set) and the vendor API key.
+     * Nothing else from the runner's environment (RUNNER_SECRET and the like) reaches the child.
+     */
+    static Map<String, String> childEnvironment(Map<String, String> parent, String apiKey) {
+        Map<String, String> env = new HashMap<>();
+        for (String name : INHERITED_ENV) {
+            String value = parent.get(name);
+            if (value != null) {
+                env.put(name, value);
+            }
+        }
+        env.put("E2B_API_KEY", apiKey == null ? "" : apiKey);
+        return env;
     }
 
     private static byte[] readAll(InputStream in) {

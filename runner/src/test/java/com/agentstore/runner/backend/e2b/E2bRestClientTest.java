@@ -4,6 +4,7 @@ import com.agentstore.runner.backend.Labels;
 import com.agentstore.runner.backend.SandboxLaunch;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -31,7 +32,7 @@ class E2bRestClientTest {
 
     @Test
     void createSendsTemplateTimeoutMetadataAndDenyAllNetworkButNoEnv() {
-        server.expect(requestTo("https://e2b.test/sandboxes"))
+        server.expect(requestTo("https://e2b.test/v2/sandboxes"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("X-API-Key", "api-key"))
                 .andExpect(jsonPath("$.templateID").value("base"))
@@ -64,8 +65,10 @@ class E2bRestClientTest {
     }
 
     @Test
-    void listReturnsOnlyThisRunnersSandboxes() {
-        server.expect(requestTo("https://e2b.test/sandboxes")).andExpect(method(HttpMethod.GET))
+    void listFiltersByRunnerLabelOnTheServerAndStillChecksEachRow() {
+        server.expect(requestTo("https://e2b.test/v2/sandboxes?metadata=agentstore.runnerId%3Drunner-1"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-API-Key", "api-key"))
                 .andRespond(withSuccess("""
                         [{"sandboxID":"a","metadata":{"agentstore.runnerId":"runner-1","agentstore.requestId":"r1"}},
                          {"sandboxID":"b","metadata":{"agentstore.runnerId":"other"}},
@@ -74,5 +77,32 @@ class E2bRestClientTest {
 
         assertThat(client.list("runner-1")).singleElement()
                 .satisfies(o -> assertThat(o.requestId()).isEqualTo("r1"));
+        server.verify();
+    }
+
+    @Test
+    void listFollowsNextTokenUntilTheLastPage() {
+        HttpHeaders more = new HttpHeaders();
+        more.add("X-Next-Token", "tok/2=");
+        server.expect(requestTo("https://e2b.test/v2/sandboxes?metadata=agentstore.runnerId%3Drunner-1"))
+                .andRespond(withSuccess("""
+                        [{"sandboxID":"a","metadata":{"agentstore.runnerId":"runner-1","agentstore.requestId":"r1"}}]
+                        """, MediaType.APPLICATION_JSON).headers(more));
+        server.expect(requestTo("https://e2b.test/v2/sandboxes?metadata=agentstore.runnerId%3Drunner-1&nextToken=tok%2F2%3D"))
+                .andRespond(withSuccess("""
+                        [{"sandboxID":"b","metadata":{"agentstore.runnerId":"runner-1","agentstore.requestId":"r2"}}]
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.list("runner-1")).extracting(o -> o.sandboxId()).containsExactly("a", "b");
+        server.verify();
+    }
+
+    @Test
+    void listEncodesSpecialCharactersInTheRunnerIdLikeTheSdk() {
+        // SDK: encodeURIComponent(key)=encodeURIComponent(value), then the whole value is query-encoded again.
+        server.expect(requestTo("https://e2b.test/v2/sandboxes?metadata=agentstore.runnerId%3Drunner%2520a%2526b"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+        assertThat(client.list("runner a&b")).isEmpty();
+        server.verify();
     }
 }
