@@ -79,7 +79,7 @@ class RunVersionPinningTest extends AbstractIntegrationTest {
         UUID runId = trigger(s, RunResponse.class).getBody().id();
 
         assertThat(runRepository.findById(runId).orElseThrow().getAgentVersion().getId()).isEqualTo(s.version().getId());
-        assertThat(fakeSandboxProvider.specForRun(runId).templateId()).isEqualTo("template-v1");
+        assertThat(fakeSandboxProvider.specForRun(runId).imageRef()).isEqualTo("template-v1");
     }
 
     @Test

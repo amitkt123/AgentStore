@@ -5,6 +5,6 @@ public interface SandboxProvider {
 
     void kill(String sandboxId);
 
-    /** UNKNOWN means the provider could not be asked; callers must not treat it as exited. */
+    /** UNKNOWN means the provider could not be asked; callers must not treat it as stopped. */
     SandboxStatus status(String sandboxId);
 }

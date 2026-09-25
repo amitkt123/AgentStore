@@ -91,7 +91,11 @@ class RunControllerTest extends AbstractIntegrationTest {
         assertThat(saved.getSandboxId()).isNotBlank();
 
         var lastSpec = fakeSandboxProvider.createdSpecs().get(fakeSandboxProvider.createdSpecs().size() - 1);
-        assertThat(lastSpec.templateId()).isEqualTo("collections-template-v1");
+        assertThat(lastSpec.imageRef()).isEqualTo("collections-template-v1");
+        assertThat(lastSpec.requestId()).isEqualTo(saved.getId().toString());
+        assertThat(lastSpec.command()).containsExactly("sh", "-c", "/workspace/app/agentstore-entrypoint");
+        assertThat(lastSpec.cpu()).isEqualTo(RunController.SANDBOX_CPU);
+        assertThat(lastSpec.memoryMb()).isEqualTo(RunController.SANDBOX_MEMORY_MB);
         assertThat(lastSpec.allowOut()).contains("graph.facebook.com");
         assertThat(lastSpec.envVars()).containsEntry("AGENT_RUN_ID", saved.getId().toString());
 

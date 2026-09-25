@@ -72,10 +72,17 @@ public class RunReaper {
             return runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.TIMED_OUT, RunStepKind.TIMEOUT,
                     Map.of("summary", "Run exceeded its time limit"));
         }
-        if (snapshotStatus == RunStatus.RUNNING && run.getSandboxId() != null
-                && sandboxProvider.status(run.getSandboxId()) == SandboxStatus.EXITED) {
-            return runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.FAILED, RunStepKind.FAILED,
-                    Map.of("summary", "Agent stopped without reporting completion"));
+        if (snapshotStatus == RunStatus.RUNNING && run.getSandboxId() != null) {
+            SandboxStatus sandbox = sandboxProvider.status(run.getSandboxId());
+            if (sandbox.stopped()) {
+                Map<String, Object> detail = new java.util.HashMap<>();
+                detail.put("summary", "Agent stopped without reporting completion");
+                if (sandbox.exitCode() != null) {
+                    detail.put("exitCode", sandbox.exitCode());
+                }
+                return runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.FAILED,
+                        RunStepKind.FAILED, detail);
+            }
         }
         return false;
     }

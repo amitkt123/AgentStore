@@ -5,6 +5,8 @@ import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.identity.UserRole;
 import com.agentstore.platform.ledger.Wallet;
 import com.agentstore.platform.ledger.WalletRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -104,6 +106,50 @@ class RunReaperTest extends AbstractIntegrationTest {
         reaper.reapAt(now);
 
         assertThat(reload(run).getStatus()).isEqualTo(RunStatus.FAILED);
+    }
+
+    @Test
+    void runningRunWhoseSandboxIsGoneIsFailed() {
+        String sandboxId = sandbox();
+        Run run = run(scenario(), RunStatus.RUNNING, sandboxId, now.plusSeconds(600), null);
+        fakeSandboxProvider.kill(sandboxId);
+
+        reaper.reapAt(now);
+
+        assertThat(reload(run).getStatus()).isEqualTo(RunStatus.FAILED);
+    }
+
+    @Test
+    void failureRecordsTheAgentExitCode() {
+        String sandboxId = sandbox();
+        Run run = run(scenario(), RunStatus.RUNNING, sandboxId, now.plusSeconds(600), null);
+        fakeSandboxProvider.markExited(sandboxId, 3);
+
+        reaper.reapAt(now);
+
+        assertThat(reload(run).getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(runStepRepository.findByRunIdOrderByCreatedAtAsc(run.getId()))
+                .singleElement().satisfies(step -> {
+                    try {
+                        // jsonb round-trips through Postgres's own formatter (adds a space after ':'), so we parse
+                        // rather than match the raw text.
+                        JsonNode detail = new ObjectMapper().readTree(step.getDetail());
+                        assertThat(detail.get("exitCode").asInt()).isEqualTo(3);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+    }
+
+    @Test
+    void unknownSandboxStatusLeavesTheRunAlone() {
+        String sandboxId = sandbox();
+        Run run = run(scenario(), RunStatus.RUNNING, sandboxId, now.plusSeconds(600), null);
+        fakeSandboxProvider.markUnknown(sandboxId);
+
+        reaper.reapAt(now);
+
+        assertThat(reload(run).getStatus()).isEqualTo(RunStatus.RUNNING);
     }
 
     @Test
