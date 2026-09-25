@@ -13,11 +13,12 @@ public final class LogRedactor {
     private static final List<Rule> RULES = List.of(
             new Rule(Pattern.compile("\\b(?:AKIA|ASIA)[0-9A-Z]{16}\\b"), MASK),
             new Rule(Pattern.compile("(?i)(aws_secret_access_key\\s*[=:]\\s*)\\S+"), "$1" + MASK),
-            new Rule(Pattern.compile("\\bgh[pousr]_[A-Za-z0-9]{20,}"), MASK),
+            new Rule(Pattern.compile("\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"), MASK),
             new Rule(Pattern.compile("\\bsk-[A-Za-z0-9_-]{20,}"), MASK),
             new Rule(Pattern.compile("\\bxox[abprs]-[A-Za-z0-9-]{10,}"), MASK),
             new Rule(Pattern.compile("-----BEGIN [A-Z ]*PRIVATE KEY-----"), MASK),
-            new Rule(Pattern.compile("(?i)\\b(https?://[^\\s:/@]+):[^\\s@/]+@"), "$1:" + MASK + "@"));
+            new Rule(Pattern.compile("(?i)\\b(https?://[^\\s:/@]+):[^\\s@/]+@"), "$1:" + MASK + "@"),
+            new Rule(Pattern.compile("(?i)\\b(https?://)[^\\s@/:]+@"), "$1" + MASK + "@"));
 
     private LogRedactor() {}
 
