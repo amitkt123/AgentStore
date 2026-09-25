@@ -75,14 +75,22 @@ export const APP_DIR = '/workspace/app';
 export const FAIL_MARK = 'AGENTSTORE_STEP_FAILED:';
 export const BASE_IMAGES = { 'python-3.12': 'python:3.12-slim', 'node-22': 'node:22-slim' };
 
+// Only these codes are ever emitted by a recipe step; matched strictly (a real marker line is never followed by
+// a word character or a quote) so a step's own command text - which some build backends echo into the log before
+// running it - can never be mistaken for the step's real, post-execution failure output.
+const STEP_FAIL_CODES = ['INSTALL_FAILED', 'DEP_VULN', 'SMOKE_FAILED'];
+const FAIL_MARK_PATTERN = new RegExp(`${FAIL_MARK}(${STEP_FAIL_CODES.join('|')})(?![\\w"])`);
+
 // Imports the entrypoint under a name other than __main__, so `if __name__ == "__main__":` code does not run.
 // sys.path[0] is set to the entrypoint's directory, as `python <entrypoint>` would do at run time.
 export const PY_SMOKE = "import importlib.util as u, os, sys; sys.path[0] = os.path.dirname(sys.argv[1]); "
   + "s = u.spec_from_file_location('agentstore_smoke', sys.argv[1]); s.loader.exec_module(u.module_from_spec(s))";
 
-// Runs one recipe step; on failure prints the marker the runner maps to a failure code.
+// Runs one recipe step; on failure prints the marker the runner maps to a failure code. The code is a separate
+// printf argument, so the step's own command TEXT never contains the joined "<FAIL_MARK><CODE>" literal - only
+// the executed printf's actual stdout does. See FAIL_MARK_PATTERN above for why that also matters.
 function step(code, script) {
-  return `sh -c ${shellQuote(script)} || { echo "${FAIL_MARK}${code}"; exit 1; }`;
+  return `sh -c ${shellQuote(script)} || { printf '${FAIL_MARK}%s\\n' '${code}'; exit 1; }`;
 }
 
 export function recipe(runtime, entrypoint) {
@@ -136,8 +144,8 @@ async function build(req, { Template, apiKey }) {
       onBuildLogs: (entry) => {
         const line = String(entry?.message ?? entry);
         writeLog(line);
-        const at = line.indexOf(FAIL_MARK);
-        if (at >= 0) failedSteps.push(line.slice(at + FAIL_MARK.length).trim().split(/\s/)[0]);
+        const match = FAIL_MARK_PATTERN.exec(line);
+        if (match) failedSteps.push(match[1]);
       },
     });
     return { ok: true, imageRef: info.templateId };

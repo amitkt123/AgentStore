@@ -92,5 +92,31 @@ final class LogFileFollower implements AutoCloseable {
         while (pump()) {
             // drain what is left
         }
+        flushRemainder();
+    }
+
+    /**
+     * Forwards whatever is left once nothing more will ever be appended: a final line with no trailing newline
+     * yet, which {@link #pump()} deliberately withholds while the follower is still running.
+     */
+    private synchronized void flushRemainder() {
+        if (!Files.exists(file)) {
+            return;
+        }
+        try (SeekableByteChannel channel = Files.newByteChannel(file)) {
+            long available = channel.size() - position;
+            if (available <= 0) {
+                return;
+            }
+            ByteBuffer buffer = ByteBuffer.allocate((int) available);
+            channel.position(position);
+            while (buffer.hasRemaining() && channel.read(buffer) > 0) {
+                // fill
+            }
+            new String(buffer.array(), 0, buffer.position(), StandardCharsets.UTF_8).lines().forEach(log::append);
+            position += buffer.position();
+        } catch (IOException e) {
+            // best effort: the follower is closing anyway
+        }
     }
 }

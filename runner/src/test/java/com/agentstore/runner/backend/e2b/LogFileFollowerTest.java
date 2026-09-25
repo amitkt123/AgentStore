@@ -38,4 +38,14 @@ class LogFileFollowerTest {
         }
         assertThat(lines).isEmpty();
     }
+
+    @Test
+    void aTrailingLineWithNoNewlineIsFlushedOnClose(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("build.log");
+        List<String> lines = new CopyOnWriteArrayList<>();
+        try (LogFileFollower ignored = new LogFileFollower(file, lines::add)) {
+            Files.writeString(file, "tail", CREATE);
+        }
+        assertThat(lines).containsExactly("tail");
+    }
 }

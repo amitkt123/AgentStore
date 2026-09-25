@@ -158,11 +158,11 @@ describe('recipe', () => {
     const steps = recipe('python-3.12', 'agent/main.py');
     expect(steps).toHaveLength(3);
     expect(steps[0]).toContain('pip install --no-cache-dir -r requirements.txt');
-    expect(steps[0]).toContain(`${FAIL_MARK}INSTALL_FAILED`);
+    expect(steps[0]).toContain('INSTALL_FAILED');
     expect(steps[1]).toContain('pip-audit');
-    expect(steps[1]).toContain(`${FAIL_MARK}DEP_VULN`);
+    expect(steps[1]).toContain('DEP_VULN');
     expect(steps[2]).toContain('/workspace/app/agent/main.py');
-    expect(steps[2]).toContain(`${FAIL_MARK}SMOKE_FAILED`);
+    expect(steps[2]).toContain('SMOKE_FAILED');
   });
 
   it('uses npm ci, npm audit and node --check for node', () => {
@@ -174,6 +174,16 @@ describe('recipe', () => {
 
   it('rejects unknown runtimes', () => {
     expect(() => recipe('ruby-3', 'main.rb')).toThrow(/unknown runtime/);
+  });
+
+  it('never embeds the joined marker+code literal in a step\'s own command text', () => {
+    for (const [runtime, entrypoint] of [['python-3.12', 'agent/main.py'], ['node-22', 'index.mjs']]) {
+      for (const cmd of recipe(runtime, entrypoint)) {
+        expect(cmd).not.toContain(`${FAIL_MARK}INSTALL_FAILED`);
+        expect(cmd).not.toContain(`${FAIL_MARK}DEP_VULN`);
+        expect(cmd).not.toContain(`${FAIL_MARK}SMOKE_FAILED`);
+      }
+    }
   });
 });
 
@@ -207,6 +217,23 @@ describe('build', () => {
     expect(res.ok).toBe(false);
     expect(res.error.code).toBe('DEP_VULN');
     expect(res.error.message).toContain('BuildError');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('is not fooled by a build backend echoing a step\'s own command text into the log, and reports the real marker', async () => {
+    const dir = tmp();
+    const [installStep] = recipe('python-3.12', 'agent/main.py');
+    const { Template } = fakeTemplate({
+      logs: [
+        `Step 3/8 : RUN ${installStep}`,   // the backend echoing the command line it is about to run
+        `${FAIL_MARK}DEP_VULN`,            // the real failure, from a later step
+      ],
+      fail: Object.assign(new Error('step failed'), { name: 'BuildError' }),
+    });
+    const res = await handle({ op: 'build', name: 'n', appDir: '/a', runtime: 'python-3.12', entrypoint: 'main.py',
+      logPath: join(dir, 'l.log') }, { Template, apiKey: 'k' });
+    expect(res.ok).toBe(false);
+    expect(res.error.code).toBe('DEP_VULN');
     rmSync(dir, { recursive: true, force: true });
   });
 
