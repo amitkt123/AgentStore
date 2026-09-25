@@ -8,3 +8,6 @@ agentstore:
     budget:
       state-file: ${java.io.tmpdir}/runner-budget-test.json
       monthly-limit: PT100000H
+    build:
+      gitleaks-command: [sh, src/test/resources/gitleaks/clean.sh]
+      work-dir: ${java.io.tmpdir}/agentstore-builds-test

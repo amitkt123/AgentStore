@@ -18,6 +18,13 @@ agentstore:
       max-lifetime: PT10M
       monthly-limit: PT10H
       state-file: ${RUNNER_STATE_FILE:./runner-budget.json}
+    build:
+      gitleaks-command: [gitleaks]
+      timeout: PT15M
+      scan-timeout: PT2M
+      download-timeout: PT5M
+      log-flush-interval: PT5S
+      work-dir: ${RUNNER_BUILD_DIR:${java.io.tmpdir}/agentstore-builds}
     e2b:
       api-key: ${E2B_API_KEY:}
       base-url: https://api.e2b.app

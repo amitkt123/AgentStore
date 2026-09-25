@@ -1,6 +1,11 @@
 package com.agentstore.runner;
 
 import com.agentstore.runner.backend.IsolationBackend;
+import com.agentstore.runner.build.BuildService;
+import com.agentstore.runner.build.BundleFetcher;
+import com.agentstore.runner.build.BundleUnpacker;
+import com.agentstore.runner.build.LogUploader;
+import com.agentstore.runner.build.SecretScanner;
 import com.agentstore.runner.sandbox.BudgetGuard;
 import com.agentstore.runner.sandbox.RunnerReaper;
 import com.agentstore.runner.sandbox.SandboxService;
@@ -12,7 +17,9 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.net.http.HttpClient;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,5 +73,18 @@ public class RunnerConfig {
     RunnerReaper runnerReaper(IsolationBackend backend, SandboxService service, BudgetGuard budget,
                               SpringRunsClient spring, Clock clock) {
         return new RunnerReaper(backend, service, budget, spring, clock);
+    }
+
+    @Bean(destroyMethod = "shutdown")
+    BuildService buildService(IsolationBackend backend, RunnerProperties props, Clock clock) {
+        RunnerProperties.Build b = props.build();
+        HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
+                .followRedirects(HttpClient.Redirect.NEVER).build();
+        return new BuildService(backend,
+                new BundleFetcher(http, BundleFetcher.MAX_BUNDLE_BYTES, b.downloadTimeout()),
+                new BundleUnpacker(),
+                new SecretScanner(b.gitleaksCommand(), b.scanTimeout()),
+                new LogUploader(http, Duration.ofSeconds(30)),
+                b.workDir(), b.timeout(), b.logFlushInterval(), clock);
     }
 }

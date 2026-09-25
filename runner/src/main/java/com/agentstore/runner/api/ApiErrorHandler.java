@@ -30,6 +30,6 @@ public class ApiErrorHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> invalid(MethodArgumentNotValidException e) {
-        return ResponseEntity.badRequest().body(new ApiError("INVALID_REQUEST", "Invalid sandbox request"));
+        return ResponseEntity.badRequest().body(new ApiError("INVALID_REQUEST", "Invalid request"));
     }
 }
