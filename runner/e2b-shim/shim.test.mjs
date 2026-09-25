@@ -4,26 +4,23 @@ import { mkdtempSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { handle, shellQuote, isEntryPoint, WRAPPER, CONNECT_TIMEOUT_MS } from './shim.mjs';
+import { handle, shellQuote, isEntryPoint, rangeReadCommand, WRAPPER, CONNECT_TIMEOUT_MS } from './shim.mjs';
 
 const SHIM_PATH = fileURLToPath(new URL('./shim.mjs', import.meta.url));
 
-function fakeSandboxClass({ files = {}, failRun = false } = {}) {
+function fakeSandboxClass({ failRun = false, runStdout = '' } = {}) {
   const calls = [];
   const sandbox = {
     commands: {
       run: async (cmd, opts) => {
         calls.push({ kind: 'run', cmd, opts });
         if (failRun) throw new Error('boom from e2b');
-        return { exitCode: 0 };
+        return { exitCode: 0, stdout: runStdout, stderr: '' };
       },
     },
     files: {
       write: async (path, data) => { calls.push({ kind: 'write', path, data }); },
-      read: async (path) => {
-        if (!(path in files)) { const e = new Error('not found'); e.name = 'NotFoundError'; throw e; }
-        return new TextEncoder().encode(files[path]);
-      },
+      read: async () => { throw new Error('files.read must not be used: it downloads the whole file'); },
     },
   };
   return { calls, Sandbox: { connect: async (id, opts) => { calls.push({ kind: 'connect', id, opts }); return sandbox; } } };
@@ -65,18 +62,33 @@ describe('start', () => {
 });
 
 describe('readFile', () => {
-  it('returns base64 slice from offset capped at maxBytes, plus total size', async () => {
-    const { Sandbox } = fakeSandboxClass({ files: { '/workspace/.run/log': 'hello world' } });
+  it('reads only the requested byte range with one command', async () => {
+    const { calls, Sandbox } = fakeSandboxClass({ runStdout: `11\n${Buffer.from('wor').toString('base64')}` });
     const res = await handle({ op: 'readFile', sandboxId: 's', path: '/workspace/.run/log', offset: 6, maxBytes: 3 },
       { Sandbox, apiKey: 'k' });
     expect(res).toEqual({ ok: true, exists: true, data: Buffer.from('wor').toString('base64'), size: 11 });
+    const run = calls.find((c) => c.kind === 'run');
+    expect(run.cmd).toBe(rangeReadCommand('/workspace/.run/log', 6, 3));
+    expect(run.cmd).toContain('tail -c +7');
+    expect(run.cmd).toContain('head -c 3');
   });
 
   it('reports a missing file as exists:false', async () => {
-    const { Sandbox } = fakeSandboxClass();
+    const { Sandbox } = fakeSandboxClass({ runStdout: 'MISSING\n' });
     const res = await handle({ op: 'readFile', sandboxId: 's', path: '/workspace/.run/exit', offset: 0, maxBytes: 10 },
       { Sandbox, apiKey: 'k' });
     expect(res).toEqual({ ok: true, exists: false });
+  });
+
+  it('returns empty data when the offset is at the end of the file', async () => {
+    const { Sandbox } = fakeSandboxClass({ runStdout: '5\n' });
+    const res = await handle({ op: 'readFile', sandboxId: 's', path: '/workspace/.run/log', offset: 5, maxBytes: 10 },
+      { Sandbox, apiKey: 'k' });
+    expect(res).toEqual({ ok: true, exists: true, data: '', size: 5 });
+  });
+
+  it('quotes the path', () => {
+    expect(rangeReadCommand("/tmp/a'b", 0, 1)).toContain(`'/tmp/a'\\''b'`);
   });
 });
 
@@ -84,7 +96,7 @@ describe('connect timeout', () => {
   // Omitting timeoutMs makes the connect call reset a running sandbox's expiry to >= 300s.
   it('passes a 1s timeoutMs on every connect so it never extends the sandbox lifetime', async () => {
     expect(CONNECT_TIMEOUT_MS).toBe(1000);
-    const { calls, Sandbox } = fakeSandboxClass({ files: { '/workspace/.run/log': 'x' } });
+    const { calls, Sandbox } = fakeSandboxClass({ runStdout: '1\neA==' });
     await handle({ op: 'start', sandboxId: 'a', command: ['true'] }, { Sandbox, apiKey: 'k' });
     await handle({ op: 'readFile', sandboxId: 'b', path: '/workspace/.run/log', offset: 0, maxBytes: 1 },
       { Sandbox, apiKey: 'k' });

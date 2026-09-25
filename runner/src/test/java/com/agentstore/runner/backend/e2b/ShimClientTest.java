@@ -78,4 +78,36 @@ class ShimClientTest {
         assertThat(names).isSubsetOf("PATH", "HOME", "E2B_API_KEY");
         assertThat(names).contains("PATH", "E2B_API_KEY");
     }
+
+    @Test
+    void perCallTimeoutOverridesTheDefault() {
+        long start = System.nanoTime();
+        assertThatThrownBy(() -> shim("hang.sh", Duration.ofSeconds(30)).call(REQUEST, Duration.ofMillis(300)))
+                .isInstanceOf(ShimTimeoutException.class)
+                .hasMessageContaining("timed out");
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(5));
+    }
+
+    @Test
+    void aShimThatExitsButLeavesItsPipesOpenFailsWithinTheGracePeriod() {
+        long start = System.nanoTime();
+        assertThatThrownBy(() -> shim("holds-pipe.sh", Duration.ofSeconds(30)).call(REQUEST))
+                .isInstanceOf(ShimException.class)
+                .hasMessageContaining("stayed open");
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(15));
+    }
+
+    @Test
+    void largeOutputIsReadWithoutDeadlock() {
+        var res = shim("big-output.sh", Duration.ofSeconds(10)).call(REQUEST);
+        assertThat(res.get("data").asText()).hasSize(300_000);
+    }
+
+    @Test
+    void theShimsErrorCodeIsKept() {
+        assertThatThrownBy(() -> shim("fail-code.sh", Duration.ofSeconds(10)).call(REQUEST))
+                .isInstanceOf(ShimException.class)
+                .satisfies(e -> assertThat(((ShimException) e).code()).isEqualTo("DEP_VULN"))
+                .hasMessageContaining("audit found");
+    }
 }

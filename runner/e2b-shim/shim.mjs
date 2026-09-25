@@ -48,26 +48,25 @@ async function start(req, { Sandbox, apiKey }) {
   return { ok: true };
 }
 
-// The installed e2b SDK (2.x) throws `FileNotFoundError` (a subclass of the now-deprecated
-// `NotFoundError`) for a missing file; its `.name` is `'FileNotFoundError'`, not `'NotFoundError'`.
-// We check both names so this also matches the unit tests' fake, which throws with
-// `.name = 'NotFoundError'`, and any older SDK that still throws the base class directly.
-function isMissingFileError(e) {
-  return e?.name === 'FileNotFoundError' || e?.name === 'NotFoundError' || /not found/i.test(e?.message ?? '');
+// Reads [offset, offset + maxBytes) of a file inside the sandbox with one shell command, so a log poll never
+// downloads the whole file. Output: "<size>\n<base64 slice>", or "MISSING".
+export function rangeReadCommand(path, offset, maxBytes) {
+  const p = shellQuote(path);
+  const start = Math.max(0, Math.floor(offset)) + 1;
+  const count = Math.max(0, Math.floor(maxBytes));
+  return `if [ -f ${p} ]; then stat -c %s ${p} && tail -c +${start} ${p} | head -c ${count} | base64 -w0; else echo MISSING; fi`;
 }
 
 async function readFile(req, { Sandbox, apiKey }) {
   const sbx = await connect(Sandbox, req.sandboxId, apiKey);
-  let bytes;
-  try {
-    bytes = await sbx.files.read(req.path, { format: 'bytes' });
-  } catch (e) {
-    if (isMissingFileError(e)) return { ok: true, exists: false };
-    throw e;
-  }
-  const offset = Math.max(0, req.offset ?? 0);
-  const slice = Buffer.from(bytes).subarray(offset, offset + (req.maxBytes ?? 262144));
-  return { ok: true, exists: true, data: slice.toString('base64'), size: bytes.length };
+  const res = await sbx.commands.run(rangeReadCommand(req.path, req.offset ?? 0, req.maxBytes ?? 262144), { user: 'root' });
+  const out = String(res?.stdout ?? '');
+  const newline = out.indexOf('\n');
+  const first = (newline < 0 ? out : out.slice(0, newline)).trim();
+  if (first === 'MISSING') return { ok: true, exists: false };
+  const size = Number(first);
+  if (!Number.isFinite(size)) throw new Error('unexpected readFile output');
+  return { ok: true, exists: true, data: newline < 0 ? '' : out.slice(newline + 1).trim(), size };
 }
 
 export async function handle(req, deps) {
