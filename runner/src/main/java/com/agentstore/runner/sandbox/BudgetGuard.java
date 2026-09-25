@@ -8,7 +8,7 @@ import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.Set;
 
-/** Protects the E2B credit (spec §5): concurrency cap + monthly sandbox-time ceiling. */
+/** Protects sandbox-provider spend (spec §5): concurrency cap + monthly sandbox-time ceiling. */
 public class BudgetGuard {
 
     private final int maxConcurrent;
