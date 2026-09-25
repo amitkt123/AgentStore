@@ -4,8 +4,11 @@ import com.agentstore.runner.backend.FakeBackend;
 import com.agentstore.runner.backend.Labels;
 import com.agentstore.runner.backend.OwnedSandbox;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,7 +24,18 @@ class SandboxServiceTest {
     static final Instant NOW = Instant.parse("2026-09-25T10:00:00Z");
     final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     final FakeBackend backend = new FakeBackend("runner-a");
-    SandboxService service = new SandboxService(backend, new BudgetGuard(2), "runner-a", Duration.ofMinutes(10), clock);
+
+    @TempDir
+    Path tmp;
+    Path budgetFile;
+    SandboxService service;
+
+    @BeforeEach
+    void setUp() {
+        budgetFile = tmp.resolve("budget.json");
+        service = new SandboxService(backend, new BudgetGuard(2, Duration.ofHours(10), budgetFile, clock), "runner-a",
+                Duration.ofMinutes(10), clock);
+    }
 
     @AfterEach
     void cleanup() {
@@ -45,7 +59,7 @@ class SandboxServiceTest {
     @Test
     void requestIdIsFoundFromBackendLabelsAfterARunnerRestart() {
         String first = service.create(cmd("run-2", 60));
-        SandboxService restarted = new SandboxService(backend, new BudgetGuard(2), "runner-a",
+        SandboxService restarted = new SandboxService(backend, new BudgetGuard(2, Duration.ofHours(10), budgetFile, clock), "runner-a",
                 Duration.ofMinutes(10), clock);
 
         assertThat(restarted.create(cmd("run-2", 60))).isEqualTo(first);
