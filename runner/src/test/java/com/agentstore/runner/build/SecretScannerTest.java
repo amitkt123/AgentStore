@@ -49,6 +49,52 @@ class SecretScannerTest {
     }
 
     @Test
+    void anExitOneWithNoUsableReportIsBuildFailedNotSecretFound(@TempDir Path app) {
+        // gitleaks' own fatal errors also exit 1 (the same code as "leaks found"), but leave no report. That must
+        // not be mistaken for a secret finding.
+        assertThatThrownBy(() -> fake("noreport.sh").scan(app, l -> { }))
+                .satisfies(e -> assertCode(e, BuildFailedException.BUILD_FAILED));
+    }
+
+    @Test
+    void deletesTheBundlesOwnGitleaksConfigBeforeScanningAndLogsIt(@TempDir Path app) throws Exception {
+        Files.writeString(app.resolve(".gitleaks.toml"), "[allowlist]\n");
+        Files.writeString(app.resolve(".gitleaksignore"), "some-rule:some-file.py\n");
+        List<String> log = new ArrayList<>();
+
+        fake("clean.sh").scan(app, log::add);
+
+        assertThat(app.resolve(".gitleaks.toml")).doesNotExist();
+        assertThat(app.resolve(".gitleaksignore")).doesNotExist();
+        assertThat(log).anySatisfy(line -> assertThat(line)
+                .contains(".gitleaks.toml")
+                .contains(".gitleaksignore"));
+    }
+
+    @Test
+    void aTimedOutScannerKillsTheWholeProcessTreeAndFailsPromptly(@TempDir Path app, @TempDir Path work) throws Exception {
+        // A single "sh -c sleep N" has no child on this shell (sh execs straight into sleep), so it can't tell a
+        // plain destroyForcibly() of the shell apart from a tree kill. A backgrounded grandchild can: killing only
+        // the shell leaves it running as an orphan, so it still creates the marker ~2s later unless the whole tree
+        // is killed.
+        Path marker = work.resolve("child-survived.txt");
+        String script = "(sleep 2 && touch '" + marker + "') & wait";
+        SecretScanner scanner = new SecretScanner(List.of("sh", "-c", script), Duration.ofMillis(200));
+        long start = System.nanoTime();
+
+        assertThatThrownBy(() -> scanner.scan(app, l -> { }))
+                .satisfies(e -> assertCode(e, BuildFailedException.BUILD_FAILED));
+
+        long elapsedMs = Duration.ofNanos(System.nanoTime() - start).toMillis();
+        assertThat(elapsedMs).as("scan() must return promptly after killing the timed-out process, not wait for it")
+                .isLessThan(2000);
+
+        Thread.sleep(2500); // give an orphaned backgrounded child every chance to finish and write the marker
+        assertThat(marker).as("the backgrounded grandchild must be killed with the shell, not orphaned to finish")
+                .doesNotExist();
+    }
+
+    @Test
     void aMissingScannerIsBuildFailed(@TempDir Path app) {
         var scanner = new SecretScanner(List.of("/definitely/not/gitleaks"), Duration.ofSeconds(5));
         assertThatThrownBy(() -> scanner.scan(app, l -> { }))

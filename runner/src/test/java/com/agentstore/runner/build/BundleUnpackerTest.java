@@ -88,6 +88,25 @@ class BundleUnpackerTest {
     }
 
     @Test
+    void rejectsAMalformedNonUtf8EntryName() throws Exception {
+        // 0xFF/0xFE are never valid UTF-8 leading bytes, and the general-purpose flag has no EFS/UTF-8 bit set,
+        // so java.util.zip's strict decode of the entry name throws IllegalArgumentException("malformed input").
+        byte[] rawName = {0x41, (byte) 0xFF, (byte) 0xFE, 0x42};
+        Path zip = write(TestZips.zipWithRawName(rawName, "x".getBytes()));
+        Path app = target();
+        assertInvalid(() -> new BundleUnpacker().unpack(zip, app), "unreadable entry name");
+    }
+
+    @Test
+    void rejectsAnEntryNameContainingNul() throws Exception {
+        // The NUL byte is valid UTF-8, so the zip round-trips fine; it's java.nio.file.Path (root.resolve) that
+        // refuses it, throwing InvalidPathException, an IllegalArgumentException subtype.
+        Path zip = write(TestZips.zip(Map.of("bad\u0000name", "x")));
+        Path app = target();
+        assertInvalid(() -> new BundleUnpacker().unpack(zip, app), "unreadable entry name");
+    }
+
+    @Test
     void rejectsSomethingThatIsNotAZip() throws Exception {
         Path zip = Files.write(work.resolve("bundle.zip"), "definitely not a zip".getBytes());
         Path app = target();

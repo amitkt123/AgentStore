@@ -68,6 +68,11 @@ public class BundleUnpacker {
             throw invalid("Duplicate path in bundle: " + root.relativize(Path.of(e.getFile())));
         } catch (ZipException e) {
             throw invalid("Bundle is not a valid zip: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            // Covers java.util.zip's strict-UTF-8 decode failure on a malformed entry name (getNextEntry()),
+            // and java.nio.file.InvalidPathException (an IllegalArgumentException subtype) from an entry name
+            // containing a NUL byte, which the filesystem refuses to resolve into a Path.
+            throw invalid("Bundle has an unreadable entry name");
         } catch (IOException e) {
             throw invalid("Bundle could not be unpacked: " + e.getClass().getSimpleName());
         }
