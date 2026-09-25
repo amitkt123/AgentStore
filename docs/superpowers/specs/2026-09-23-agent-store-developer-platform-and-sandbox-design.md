@@ -100,7 +100,7 @@ Packaging/build pipeline, Agent Runtime API + SDKs, data plane (datasets, scope-
                                                    │ Postgres             │ S3-compatible        │ HTTP (internal, shared secret)
                                                    ▼                      ▼ object storage       ▼
                                              ┌──────────┐          ┌──────────────┐     ┌──────────────────────────────┐
-                                             │ Postgres │          │ S3 / MinIO   │     │ sandbox-bridge (TypeScript)  │
+                                             │ Postgres │          │ S3-compatible│     │ sandbox-bridge (TypeScript)  │
                                              └──────────┘          │ bundles,     │     │ wraps E2B JS SDK:            │
                                                                    │ datasets,    │     │  - build template            │
                                                                    │ outputs, logs│     │  - create sandbox + network  │
@@ -143,7 +143,7 @@ Bridge API (internal only, authenticated by a shared secret / mTLS, never expose
 |---|---|---|
 | App server | Spring Boot monolith (existing) | Stateless; 2+ instances behind a load balancer in prod. |
 | DB | Postgres (existing) | Flyway migrations continue from `V12`. The WS0 plan uses `V12`–`V16`, so later workstreams take the next free numbers from `V17` in the order they merge. **The `Vnn` labels in this document are placeholders**, not reserved numbers. |
-| Object storage | S3 (prod), MinIO (local via docker-compose) | Bundles, datasets, run outputs, build logs, run logs. Access via pre-signed URLs only. |
+| Object storage | Any S3-compatible store through the S3 API; SeaweedFS self-hosted in dev and M1 (MinIO dropped 2026-09-25, see WS5 spec C5) | Bundles, datasets, run outputs, build logs, run logs. Access via pre-signed URLs only. |
 | Background jobs | Spring `@Scheduled` + **ShedLock** (Postgres-backed lock) | Reaper, build poller, outbox processors, payouts. No Kafka/Redis needed yet. |
 | Sandbox provider | `sandbox-runner` with a pluggable `IsolationBackend`: E2B for testing, self-hosted gVisor long-term | See `2026-09-25-ws5-sandbox-runner-build-pipeline-cli-design.md`. Spring keeps the `SandboxProvider` seam. |
 | LLM providers | Anthropic + OpenAI via backend LLM gateway | Platform keys in secret manager. |
@@ -1059,7 +1059,7 @@ Built from `version_metrics_daily` summed across the agent's versions. Stats are
 
 | Area | Work |
 |---|---|
-| Local dev | `docker-compose.yml`: Postgres, MinIO, sandbox-bridge (with `--fake` mode), backend, frontend. `cloudflared` tunnel script so real E2B sandboxes can reach a local backend. Seed script extended with a sample developer, agent bundle, fixtures. |
+| Local dev | `docker-compose.yml`: Postgres, SeaweedFS, sandbox-bridge (with `--fake` mode), backend, frontend. `cloudflared` tunnel script so real E2B sandboxes can reach a local backend. Seed script extended with a sample developer, agent bundle, fixtures. |
 | Environments | `local`, `staging`, `prod`. Separate E2B projects/API keys, LLM keys, buckets, DBs per environment. |
 | Deployment | Containerize backend and bridge (Dockerfiles); deploy on one managed container platform (e.g. AWS ECS Fargate, or Fly.io/Render for speed); managed Postgres (RDS) with PITR backups; S3 with versioning + SSE-KMS; CDN in front of frontend (Vercel or CloudFront). |
 | CI/CD | GitHub Actions: backend tests (Testcontainers), frontend tests + Playwright E2E, SDK conformance, OpenAPI drift check, bridge tests; nightly real-E2B smoke test (egress + process start); image build + deploy on main with manual prod promotion. |
