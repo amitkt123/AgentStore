@@ -4,8 +4,11 @@ import com.agentstore.runner.backend.AgentRuntime;
 import com.agentstore.runner.backend.BuildFailedException;
 import com.agentstore.runner.backend.ImageBuild;
 import com.agentstore.runner.backend.IsolationBackend;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -28,6 +31,8 @@ import java.util.stream.Stream;
  * pre-signed URL every few seconds and once more before the final status is published.
  */
 public class BuildService {
+
+    private static final Logger log = LoggerFactory.getLogger(BuildService.class);
 
     static final Duration RETENTION = Duration.ofHours(24);
 
@@ -136,14 +141,18 @@ public class BuildService {
         String code = null;
         String reason = null;
         try {
-            dir = Files.createTempDirectory(Files.createDirectories(workDir), "build-");
-            imageRef = build(entry, dir);
-        } catch (BuildFailedException e) {
-            code = e.code();
-            reason = e.getMessage();
-        } catch (IOException | RuntimeException e) {
-            code = BuildFailedException.BUILD_FAILED;
-            reason = "Build failed: " + e.getMessage();
+            try {
+                dir = Files.createTempDirectory(Files.createDirectories(workDir), "build-");
+                imageRef = build(entry, dir);
+            } catch (BuildFailedException e) {
+                code = e.code();
+                reason = LogRedactor.redact(String.valueOf(e.getMessage()));
+            } catch (Throwable e) {
+                // Anything else (BackendException, an unexpected RuntimeException, even an Error from a
+                // misbehaving backend) must still end the build, never leave it stuck in BUILDING.
+                code = BuildFailedException.BUILD_FAILED;
+                reason = LogRedactor.redact("Build failed: " + describe(e));
+            }
         } finally {
             watchdog.cancel(false);
             flusher.cancel(false);
@@ -153,14 +162,33 @@ public class BuildService {
             code = BuildFailedException.TIMEOUT;
             reason = "The build took longer than " + timeout;
         }
-        entry.log.append(imageRef != null ? "Build succeeded: " + imageRef : "Build failed: " + code + ": " + reason);
-        flush(entry);
-        deleteRecursively(dir);
-        entry.imageRef = imageRef;
-        entry.failureCode = code;
-        entry.failureReason = reason;
-        entry.finishedAt = clock.instant();
-        entry.status = imageRef != null ? Status.SUCCEEDED : Status.FAILED;   // last, so pollers see a complete result
+        String finalImageRef = imageRef;
+        String finalCode = code;
+        String finalReason = reason;
+        try {
+            entry.log.append(finalImageRef != null ? "Build succeeded: " + finalImageRef
+                    : "Build failed: " + finalCode + ": " + finalReason);
+            flush(entry);
+        } catch (RuntimeException e) {
+            log.warn("Could not publish the final build log for {}: {}", entry.cmd.buildId(), describe(e));
+        }
+        try {
+            deleteRecursively(dir);
+        } catch (RuntimeException e) {
+            log.warn("Could not remove the build directory for {}: {}", entry.cmd.buildId(), describe(e));
+        } finally {
+            // Always published, however the two blocks above went: a poller must never see a build stuck
+            // in BUILDING because a log flush or a directory cleanup misbehaved.
+            entry.imageRef = finalImageRef;
+            entry.failureCode = finalCode;
+            entry.failureReason = finalReason;
+            entry.finishedAt = clock.instant();
+            entry.status = finalImageRef != null ? Status.SUCCEEDED : Status.FAILED;
+        }
+    }
+
+    private static String describe(Throwable e) {
+        return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
     }
 
     private String build(Entry entry, Path dir) throws IOException {
@@ -211,8 +239,8 @@ public class BuildService {
                     // best effort
                 }
             });
-        } catch (IOException ignored) {
-            // best effort
+        } catch (IOException | UncheckedIOException ignored) {
+            // best effort: Files.walk's stream can throw UncheckedIOException lazily during iteration
         }
     }
 }

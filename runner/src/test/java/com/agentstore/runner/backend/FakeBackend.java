@@ -32,8 +32,14 @@ public class FakeBackend implements IsolationBackend {
     public final AtomicInteger createCalls = new AtomicInteger();
     private volatile RuntimeException failNextCreate;
 
-    /** Test hook: an app dir containing this file fails the build with the failure code written in it. */
+    /**
+     * Test hook: an app dir containing this file fails the build with the failure code written in it — or, when
+     * the content starts with one of the two prefixes below, with a raw exception instead of a BuildFailedException
+     * (to exercise the "backend threw something unexpected" path).
+     */
     public static final String FAIL_MARKER = ".fake-build-fail";
+    public static final String RUNTIME_PREFIX = "RUNTIME:";
+    public static final String BACKEND_PREFIX = "BACKEND:";
     /** Test hook: an app dir containing this file has its content appended to the build log. */
     public static final String LOG_MARKER = ".fake-build-log";
 
@@ -96,8 +102,14 @@ public class FakeBackend implements IsolationBackend {
             }
             Path marker = build.appDir().resolve(FAIL_MARKER);
             if (Files.exists(marker)) {
-                String code = Files.readString(marker, StandardCharsets.UTF_8).trim();
-                throw new BuildFailedException(code, "fake " + code);
+                String content = Files.readString(marker, StandardCharsets.UTF_8).trim();
+                if (content.startsWith(RUNTIME_PREFIX)) {
+                    throw new RuntimeException(content.substring(RUNTIME_PREFIX.length()));
+                }
+                if (content.startsWith(BACKEND_PREFIX)) {
+                    throw new BackendException(content.substring(BACKEND_PREFIX.length()));
+                }
+                throw new BuildFailedException(content, "fake " + content);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

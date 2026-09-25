@@ -117,6 +117,11 @@ class BuildServiceTest {
         BuildView view = awaitFinished("b4");
         assertThat(view.failureCode()).isEqualTo(BuildFailedException.INVALID_BUNDLE);
         assertThat(view.failureReason()).contains("Entrypoint main.py");
+        // The unpack itself succeeded (only the entrypoint check failed after), leaving a partial app dir —
+        // the build directory must still be removed on a FAILED outcome, not only on success.
+        try (var entries = Files.list(work)) {
+            assertThat(entries.toList()).isEmpty();
+        }
     }
 
     @Test
@@ -155,6 +160,7 @@ class BuildServiceTest {
         submit("b8", app());
         BuildView view = awaitFinished("b8");
         assertThat(view.failureCode()).isEqualTo(BuildFailedException.TIMEOUT);
+        assertThat(server.lastLog()).contains("Build failed: " + BuildFailedException.TIMEOUT);
     }
 
     @Test
@@ -178,5 +184,49 @@ class BuildServiceTest {
         try (var entries = Files.list(work)) {
             assertThat(entries.toList()).isEmpty();
         }
+    }
+
+    @Test
+    void aBackendFailureMessageContainingACredentialIsRedactedInFailureReason() throws Exception {
+        submit("b11", app(FakeBackend.FAIL_MARKER,
+                FakeBackend.RUNTIME_PREFIX + "shim build failed: https://bot:hunter2@pypi.example.com/repo.git"));
+        BuildView view = awaitFinished("b11");
+        assertThat(view.status()).isEqualTo(Status.FAILED);
+        assertThat(view.failureCode()).isEqualTo(BuildFailedException.BUILD_FAILED);
+        assertThat(view.failureReason()).doesNotContain("hunter2").contains("[REDACTED]");
+    }
+
+    @Test
+    void anUnexpectedRuntimeExceptionFromTheBackendEndsAsBuildFailed() throws Exception {
+        submit("b12", app(FakeBackend.FAIL_MARKER, FakeBackend.RUNTIME_PREFIX + "boom"));
+        BuildView view = awaitFinished("b12");
+        assertThat(view.status()).isEqualTo(Status.FAILED);
+        assertThat(view.failureCode()).isEqualTo(BuildFailedException.BUILD_FAILED);
+    }
+
+    @Test
+    void aBackendExceptionFromTheBackendEndsAsBuildFailed() throws Exception {
+        submit("b13", app(FakeBackend.FAIL_MARKER, FakeBackend.BACKEND_PREFIX + "backend unavailable"));
+        BuildView view = awaitFinished("b13");
+        assertThat(view.status()).isEqualTo(Status.FAILED);
+        assertThat(view.failureCode()).isEqualTo(BuildFailedException.BUILD_FAILED);
+    }
+
+    @Test
+    void aSecondBuildSubmittedWhileTheFirstIsBuildingStaysQueued() throws Exception {
+        backend.buildDelay = Duration.ofSeconds(5);
+        BuildView first = submit("b14", app());
+        long until = System.currentTimeMillis() + 5_000;
+        while (first.status() == Status.QUEUED && System.currentTimeMillis() < until) {
+            Thread.sleep(20);
+            first = service.get("b14");
+        }
+        assertThat(first.status()).isEqualTo(Status.BUILDING);
+
+        BuildView second = submit("b15", app());
+        assertThat(second.status()).isEqualTo(Status.QUEUED);
+
+        awaitFinished("b14");
+        awaitFinished("b15");
     }
 }
