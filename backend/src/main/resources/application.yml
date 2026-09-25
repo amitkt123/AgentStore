@@ -44,6 +44,12 @@ agentstore:
     gate-timeout: PT30M
     reaper-interval: PT30S
     agent-command: ${AGENTSTORE_RUNS_AGENT_COMMAND:/workspace/app/agentstore-entrypoint}
+  runner:
+    base-url: ${RUNNER_BASE_URL:http://localhost:8090}
+    secret: ${RUNNER_SECRET:}
+    connect-timeout: PT5S
+    # Worst-case create is E2B REST (30s) + shim (60s); Spring must outlast the runner's 60s shim timeout.
+    read-timeout: PT120S
 
 management:
   endpoints:

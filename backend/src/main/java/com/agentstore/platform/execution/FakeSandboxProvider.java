@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Component
 @Profile("!runner")
@@ -20,9 +21,14 @@ public class FakeSandboxProvider implements SandboxProvider {
     private final Map<String, Integer> exited = new ConcurrentHashMap<>();
     private final Set<String> unknown = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean failNextCreate = new AtomicBoolean(false);
+    private final AtomicReference<String> capacityCode = new AtomicReference<>();
 
     @Override
     public SandboxHandle create(SandboxSpec spec) {
+        String code = capacityCode.getAndSet(null);
+        if (code != null) {
+            throw new SandboxCapacityException(code);
+        }
         if (failNextCreate.getAndSet(false)) {
             throw new IllegalStateException("Simulated sandbox provider failure");
         }
@@ -32,6 +38,10 @@ public class FakeSandboxProvider implements SandboxProvider {
 
     public void failNextCreate() {
         failNextCreate.set(true);
+    }
+
+    public void failNextCreateWithCapacity(String code) {
+        capacityCode.set(code);
     }
 
     @Override

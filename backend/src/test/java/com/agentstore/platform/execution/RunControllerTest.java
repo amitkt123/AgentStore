@@ -5,11 +5,16 @@ import com.agentstore.platform.catalog.*;
 import com.agentstore.platform.identity.*;
 import com.agentstore.platform.ledger.Wallet;
 import com.agentstore.platform.ledger.WalletRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
+import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.DefaultResponseErrorHandler;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -17,6 +22,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +53,8 @@ class RunControllerTest extends AbstractIntegrationTest {
     SecretRepository secretRepository;
     @Autowired
     ExecutionFixtures fixtures;
+    @Autowired
+    RunStepRepository runStepRepository;
 
     String url(String path) {
         return "http://localhost:" + port + path;
@@ -131,6 +139,46 @@ class RunControllerTest extends AbstractIntegrationTest {
         assertThat(runs).singleElement().satisfies(r -> {
             assertThat(r.getStatus()).isEqualTo(RunStatus.FAILED);
             assertThat(r.getCompletedAt()).isNotNull();
+        });
+    }
+
+    @Test
+    void noSandboxCapacityFailsTheRunWith503AndReleasesTheReservation() {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+        fakeSandboxProvider.failNextCreateWithCapacity("CAPACITY_EXHAUSTED");
+
+        // Not TestRestTemplate: its Apache HttpClient5-backed factory transparently retries this specific POST
+        // about a second later (observed via debug instrumentation during TDD) once the server answers with a
+        // 5xx status faster than the client finishes writing the small request body over the loopback socket.
+        // The retry succeeds (capacityCode is already consumed) and TestRestTemplate silently returns that
+        // second, unrelated 200 response, hiding the 503 this test is asserting on. A plain RestTemplate over
+        // the JDK's SimpleClientHttpRequestFactory does not exhibit this and reliably returns the first response.
+        var plain = new RestTemplate();
+        plain.setRequestFactory(new SimpleClientHttpRequestFactory());
+        plain.setErrorHandler(new DefaultResponseErrorHandler() {
+            @Override
+            public boolean hasError(ClientHttpResponse response) { return false; }
+        });
+
+        var response = plain.postForEntity(url("/api/v1/runs"),
+                new HttpEntity<>(new TriggerRunRequest(s.connection().getId()), buyerAdmin(s.buyer().getId())),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        var run = runRepository.findByConnectionBuyerOrgIdOrderByStartedAtDesc(s.buyer().getId()).get(0);
+        assertThat(run.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(run.getReservedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        var steps = runStepRepository.findByRunIdOrderByCreatedAtAsc(run.getId());
+        assertThat(steps).anySatisfy(step -> {
+            assertThat(step.getKind()).isEqualTo(RunStepKind.FAILED);
+            // jsonb round-trips through Postgres with reformatted spacing, so parse rather than substring-match.
+            Map<String, Object> detail;
+            try {
+                detail = new ObjectMapper().readValue(step.getDetail(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            assertThat(detail).containsEntry("code", "CAPACITY_EXHAUSTED");
         });
     }
 

@@ -134,6 +134,10 @@ public class RunController {
             handle = sandboxProvider.create(new SandboxSpec(run.getId().toString(), version.getImageRef(),
                     List.of("sh", "-c", agentCommand), envVars, allowOut, SANDBOX_CPU, SANDBOX_MEMORY_MB,
                     SANDBOX_TIMEOUT_SECONDS));
+        } catch (SandboxCapacityException e) {
+            runLifecycleService.terminate(run.getId(), RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
+                    Map.of("summary", "No sandbox capacity right now; try again shortly", "code", e.code()));
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.code(), e);
         } catch (RuntimeException e) {
             runLifecycleService.terminate(run.getId(), RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
                     Map.of("summary", "Sandbox could not be started"));
