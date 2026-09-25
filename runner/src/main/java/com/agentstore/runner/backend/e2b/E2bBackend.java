@@ -1,6 +1,9 @@
 package com.agentstore.runner.backend.e2b;
 
 import com.agentstore.runner.backend.BackendException;
+import com.agentstore.runner.backend.BuildFailedException;
+import com.agentstore.runner.backend.BuildLog;
+import com.agentstore.runner.backend.ImageBuild;
 import com.agentstore.runner.backend.IsolationBackend;
 import com.agentstore.runner.backend.LogChunk;
 import com.agentstore.runner.backend.OwnedSandbox;
@@ -56,6 +59,12 @@ public class E2bBackend implements IsolationBackend {
             }
             throw new BackendException("Agent start failed in sandbox " + sandboxId + ": " + e.getMessage());
         }
+    }
+
+    @Override
+    public String buildImage(ImageBuild build, BuildLog log) {
+        // Replaced in WS5b Task 3 by the shim-driven image build.
+        throw new BuildFailedException(BuildFailedException.BUILD_FAILED, "Image builds are not wired for this backend yet");
     }
 
     @Override
