@@ -2,6 +2,9 @@ package com.agentstore.platform.execution;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
+@ExtendWith(OutputCaptureExtension.class)
 class RunnerSandboxProviderTest {
 
     MockRestServiceServer server;
@@ -72,6 +76,22 @@ class RunnerSandboxProviderTest {
     void unreachableRunnerIsUnknown() {
         server.expect(requestTo("http://runner.test/sandboxes/sbx-1")).andRespond(withServerError());
         assertThat(provider.status("sbx-1")).isEqualTo(SandboxStatus.UNKNOWN);
+    }
+
+    @Test
+    void nonNumericExitCodeIsUnknown() {
+        server.expect(requestTo("http://runner.test/sandboxes/sbx-1"))
+                .andRespond(withSuccess("{\"state\":\"EXITED\",\"exitCode\":\"three\"}", MediaType.APPLICATION_JSON));
+        assertThat(provider.status("sbx-1")).isEqualTo(SandboxStatus.UNKNOWN);
+    }
+
+    @Test
+    void unknownStatusIsLoggedAsWarnWithoutTheResponseBody(CapturedOutput output) {
+        server.expect(requestTo("http://runner.test/sandboxes/sbx-1"))
+                .andRespond(withServerError().body("leaked-body-token"));
+        assertThat(provider.status("sbx-1")).isEqualTo(SandboxStatus.UNKNOWN);
+        assertThat(output.getOut()).contains("WARN").contains("sbx-1").contains("UNKNOWN")
+                .doesNotContain("leaked-body-token");
     }
 
     @Test

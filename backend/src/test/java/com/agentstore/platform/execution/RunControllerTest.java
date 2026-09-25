@@ -144,15 +144,28 @@ class RunControllerTest extends AbstractIntegrationTest {
 
     @Test
     void noSandboxCapacityFailsTheRunWith503AndReleasesTheReservation() {
-        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
-        fakeSandboxProvider.failNextCreateWithCapacity("CAPACITY_EXHAUSTED");
+        Map<String, Object> detail = triggerRunRefusedByRunner("CAPACITY_EXHAUSTED");
+        assertThat(detail).containsEntry("code", "CAPACITY_EXHAUSTED")
+                .containsEntry("summary", "No sandbox capacity right now; try again shortly");
+    }
 
-        // Not TestRestTemplate: its Apache HttpClient5-backed factory transparently retries this specific POST
-        // about a second later (observed via debug instrumentation during TDD) once the server answers with a
-        // 5xx status faster than the client finishes writing the small request body over the loopback socket.
-        // The retry succeeds (capacityCode is already consumed) and TestRestTemplate silently returns that
-        // second, unrelated 200 response, hiding the 503 this test is asserting on. A plain RestTemplate over
-        // the JDK's SimpleClientHttpRequestFactory does not exhibit this and reliably returns the first response.
+    @Test
+    void exhaustedMonthlyBudgetFailsTheRunWith503AndSaysSo() {
+        Map<String, Object> detail = triggerRunRefusedByRunner("BUDGET_EXHAUSTED");
+        assertThat(detail).containsEntry("code", "BUDGET_EXHAUSTED")
+                .containsEntry("summary", "Monthly sandbox budget reached");
+    }
+
+    /** Triggers a run whose sandbox create is refused with {@code code}; returns the FAILED step's detail. */
+    private Map<String, Object> triggerRunRefusedByRunner(String code) {
+        var s = fixtures.liveTierA(new BigDecimal("200.00"), new BigDecimal("1000.00"));
+        fakeSandboxProvider.failNextCreateWithCapacity(code);
+
+        // Not TestRestTemplate: its Apache HttpClient5 client uses DefaultHttpRequestRetryStrategy, which retries
+        // any 429/503 response once after 1s regardless of the HTTP method (POST included). The retry succeeds
+        // (the capacity failure is already consumed) and TestRestTemplate returns that second, unrelated 200,
+        // hiding the 503 this test asserts on. A plain RestTemplate over the JDK's SimpleClientHttpRequestFactory
+        // does not retry.
         var plain = new RestTemplate();
         plain.setRequestFactory(new SimpleClientHttpRequestFactory());
         plain.setErrorHandler(new DefaultResponseErrorHandler() {
@@ -168,18 +181,16 @@ class RunControllerTest extends AbstractIntegrationTest {
         var run = runRepository.findByConnectionBuyerOrgIdOrderByStartedAtDesc(s.buyer().getId()).get(0);
         assertThat(run.getStatus()).isEqualTo(RunStatus.FAILED);
         assertThat(run.getReservedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
-        var steps = runStepRepository.findByRunIdOrderByCreatedAtAsc(run.getId());
-        assertThat(steps).anySatisfy(step -> {
-            assertThat(step.getKind()).isEqualTo(RunStepKind.FAILED);
-            // jsonb round-trips through Postgres with reformatted spacing, so parse rather than substring-match.
-            Map<String, Object> detail;
-            try {
-                detail = new ObjectMapper().readValue(step.getDetail(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            assertThat(detail).containsEntry("code", "CAPACITY_EXHAUSTED");
-        });
+        var failed = runStepRepository.findByRunIdOrderByCreatedAtAsc(run.getId()).stream()
+                .filter(step -> step.getKind() == RunStepKind.FAILED).toList();
+        assertThat(failed).hasSize(1);
+        // jsonb round-trips through Postgres with reformatted spacing, so parse rather than substring-match.
+        try {
+            return new ObjectMapper().readValue(failed.get(0).getDetail(),
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test

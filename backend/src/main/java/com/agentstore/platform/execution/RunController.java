@@ -23,7 +23,8 @@ import java.util.*;
 @RequestMapping("/api/v1/runs")
 public class RunController {
 
-    static final int SANDBOX_TIMEOUT_SECONDS = 900;
+    /** Matches the sandbox runner's default max-lifetime (PT10M), so a run hits its own TIMED_OUT first. */
+    static final int SANDBOX_TIMEOUT_SECONDS = 600;
     static final int SANDBOX_CPU = 1;
     static final int SANDBOX_MEMORY_MB = 1024;
 
@@ -136,7 +137,7 @@ public class RunController {
                     SANDBOX_TIMEOUT_SECONDS));
         } catch (SandboxCapacityException e) {
             runLifecycleService.terminate(run.getId(), RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
-                    Map.of("summary", "No sandbox capacity right now; try again shortly", "code", e.code()));
+                    Map.of("summary", capacitySummary(e.code()), "code", e.code()));
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.code(), e);
         } catch (RuntimeException e) {
             runLifecycleService.terminate(run.getId(), RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
@@ -145,6 +146,12 @@ public class RunController {
         }
         runLifecycleService.markStarted(run.getId(), handle.sandboxId());
         return RunResponse.from(runRepository.findById(run.getId()).orElseThrow());
+    }
+
+    static String capacitySummary(String code) {
+        return "BUDGET_EXHAUSTED".equals(code)
+                ? "Monthly sandbox budget reached"
+                : "No sandbox capacity right now; try again shortly";
     }
 
     @PostMapping("/{runId}/approve")

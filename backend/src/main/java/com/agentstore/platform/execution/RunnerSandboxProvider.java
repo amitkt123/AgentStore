@@ -1,5 +1,7 @@
 package com.agentstore.platform.execution;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -20,6 +22,8 @@ import java.util.Map;
 @Profile("runner")
 public class RunnerSandboxProvider implements SandboxProvider {
 
+    private static final Logger log = LoggerFactory.getLogger(RunnerSandboxProvider.class);
+
     private final RestClient restClient;
 
     @Autowired
@@ -27,7 +31,8 @@ public class RunnerSandboxProvider implements SandboxProvider {
                                  @Value("${agentstore.runner.base-url}") String baseUrl,
                                  @Value("${agentstore.runner.secret}") String secret,
                                  @Value("${agentstore.runner.connect-timeout:PT5S}") Duration connectTimeout,
-                                 // Worst-case create is E2B REST (30s) + shim (60s); Spring must outlast that.
+                                 // Worst-case create is the vendor backend's REST call (30s) + the runner's
+                                 // agent start (60s); Spring must outlast that.
                                  @Value("${agentstore.runner.read-timeout:PT120S}") Duration readTimeout) {
         // Unbounded calls would hang the reaper and every lifecycle call waiting on the run row lock.
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -79,7 +84,10 @@ public class RunnerSandboxProvider implements SandboxProvider {
             SandboxStatus.State state = SandboxStatus.State.valueOf(String.valueOf(body.get("state")));
             Object code = body.get("exitCode");
             return new SandboxStatus(state, code == null ? null : ((Number) code).intValue());
-        } catch (RestClientException | IllegalArgumentException | NullPointerException e) {
+        } catch (RestClientException | IllegalArgumentException | NullPointerException | ClassCastException e) {
+            // Exception type only: the message of a RestClientException can carry the response body.
+            log.warn("Sandbox {} status unavailable from the sandbox runner ({}); reporting UNKNOWN",
+                    sandboxId, e.getClass().getSimpleName());
             return SandboxStatus.UNKNOWN;
         }
     }

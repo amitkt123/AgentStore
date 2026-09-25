@@ -48,7 +48,8 @@ agentstore:
     base-url: ${RUNNER_BASE_URL:http://localhost:8090}
     secret: ${RUNNER_SECRET:}
     connect-timeout: PT5S
-    # Worst-case create is E2B REST (30s) + shim (60s); Spring must outlast the runner's 60s shim timeout.
+    # Worst-case create is the vendor backend's REST call (30s) + the runner's agent start (60s);
+    # Spring must outlast both.
     read-timeout: PT120S
 
 management:
