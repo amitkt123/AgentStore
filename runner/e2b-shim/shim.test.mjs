@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { handle, shellQuote, WRAPPER } from './shim.mjs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, symlinkSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { handle, shellQuote, isEntryPoint, WRAPPER, CONNECT_TIMEOUT_MS } from './shim.mjs';
+
+const SHIM_PATH = fileURLToPath(new URL('./shim.mjs', import.meta.url));
 
 function fakeSandboxClass({ files = {}, failRun = false } = {}) {
   const calls = [];
@@ -35,7 +42,7 @@ describe('start', () => {
       { Sandbox, apiKey: 'k' });
 
     expect(res).toEqual({ ok: true });
-    expect(calls[0]).toMatchObject({ kind: 'connect', id: 'sbx-1', opts: { apiKey: 'k' } });
+    expect(calls[0]).toEqual({ kind: 'connect', id: 'sbx-1', opts: { apiKey: 'k', timeoutMs: 1000 } });
     const write = calls.find((c) => c.kind === 'write');
     expect(write.path).toBe('/workspace/.run/agentstore-run');
     expect(write.data).toBe(WRAPPER);
@@ -70,6 +77,41 @@ describe('readFile', () => {
     const res = await handle({ op: 'readFile', sandboxId: 's', path: '/workspace/.run/exit', offset: 0, maxBytes: 10 },
       { Sandbox, apiKey: 'k' });
     expect(res).toEqual({ ok: true, exists: false });
+  });
+});
+
+describe('connect timeout', () => {
+  // Omitting timeoutMs makes the connect call reset a running sandbox's expiry to >= 300s.
+  it('passes a 1s timeoutMs on every connect so it never extends the sandbox lifetime', async () => {
+    expect(CONNECT_TIMEOUT_MS).toBe(1000);
+    const { calls, Sandbox } = fakeSandboxClass({ files: { '/workspace/.run/log': 'x' } });
+    await handle({ op: 'start', sandboxId: 'a', command: ['true'] }, { Sandbox, apiKey: 'k' });
+    await handle({ op: 'readFile', sandboxId: 'b', path: '/workspace/.run/log', offset: 0, maxBytes: 1 },
+      { Sandbox, apiKey: 'k' });
+    const connects = calls.filter((c) => c.kind === 'connect');
+    expect(connects).toHaveLength(2);
+    for (const c of connects) expect(c.opts).toEqual({ apiKey: 'k', timeoutMs: 1000 });
+  });
+});
+
+describe('entry point guard', () => {
+  it('matches the module URL for the real path and rejects others', () => {
+    expect(isEntryPoint(SHIM_PATH, pathToFileURL(SHIM_PATH).href)).toBe(true);
+    expect(isEntryPoint(undefined, pathToFileURL(SHIM_PATH).href)).toBe(false);
+    expect(isEntryPoint('/no/such/file.mjs', pathToFileURL(SHIM_PATH).href)).toBe(false);
+  });
+
+  it('runs main when started through a symlink in a directory whose name has a space', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shim entry '));
+    try {
+      const link = join(dir, 'shim.mjs');
+      symlinkSync(SHIM_PATH, link);
+      const res = spawnSync(process.execPath, [link], { input: 'not json', encoding: 'utf8' });
+      expect(JSON.parse(res.stdout)).toMatchObject({ ok: false, error: { code: 'BAD_REQUEST' } });
+      expect(res.status).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

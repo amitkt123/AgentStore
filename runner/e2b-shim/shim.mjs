@@ -2,6 +2,9 @@
 // Protocol: one JSON request on stdin, one JSON response on stdout, exit 0 iff ok.
 // Never print the request or env values: they carry run secrets.
 
+import { realpathSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+
 export const RUN_DIR = '/workspace/.run';
 export const WRAPPER_PATH = `${RUN_DIR}/agentstore-run`;
 export const WRAPPER = `#!/bin/sh
@@ -15,12 +18,23 @@ export function shellQuote(s) {
   return `'${String(s).replace(/'/g, `'\\''`)}'`;
 }
 
+// Every Sandbox.connect must pass a timeout. SDK 2.51.0 always POSTs /v2/sandboxes/{id}/connect,
+// and an omitted timeout means the server default of 300s. The SDK and the API document that for a
+// running sandbox the timeout "will update only if the new timeout is longer than the existing one".
+// So a tiny value (1s, the smallest whole second the SDK sends) never shortens or extends the
+// lifetime the runner set at create time. Without it, every shim call would push expiry out to >=300s.
+export const CONNECT_TIMEOUT_MS = 1000;
+
+function connect(Sandbox, sandboxId, apiKey) {
+  return Sandbox.connect(sandboxId, { apiKey, timeoutMs: CONNECT_TIMEOUT_MS });
+}
+
 function fail(code, message) {
   return { ok: false, error: { code, message } };
 }
 
 async function start(req, { Sandbox, apiKey }) {
-  const sbx = await Sandbox.connect(req.sandboxId, { apiKey });
+  const sbx = await connect(Sandbox, req.sandboxId, apiKey);
   await sbx.commands.run(`mkdir -p ${RUN_DIR} && chmod 777 ${RUN_DIR} && touch ${RUN_DIR}/log && chmod 666 ${RUN_DIR}/log`,
     { user: 'root' });
   await sbx.files.write(WRAPPER_PATH, WRAPPER);
@@ -43,7 +57,7 @@ function isMissingFileError(e) {
 }
 
 async function readFile(req, { Sandbox, apiKey }) {
-  const sbx = await Sandbox.connect(req.sandboxId, { apiKey });
+  const sbx = await connect(Sandbox, req.sandboxId, apiKey);
   let bytes;
   try {
     bytes = await sbx.files.read(req.path, { format: 'bytes' });
@@ -84,6 +98,17 @@ async function main() {
   process.exit(res.ok ? 0 : 1);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// True when this file is the script node was started with. It resolves symlinks and
+// percent-encodes the path the same way node builds import.meta.url for the main module.
+export function isEntryPoint(argv1 = process.argv[1], moduleUrl = import.meta.url) {
+  if (!argv1) return false;
+  try {
+    return pathToFileURL(realpathSync(argv1)).href === moduleUrl;
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   main();
 }
