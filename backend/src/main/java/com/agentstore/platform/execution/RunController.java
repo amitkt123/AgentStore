@@ -23,7 +23,10 @@ import java.util.*;
 @RequestMapping("/api/v1/runs")
 public class RunController {
 
-    static final int SANDBOX_TIMEOUT_SECONDS = 900;
+    /** Matches the sandbox runner's default max-lifetime (PT10M), so a run hits its own TIMED_OUT first. */
+    static final int SANDBOX_TIMEOUT_SECONDS = 600;
+    static final int SANDBOX_CPU = 1;
+    static final int SANDBOX_MEMORY_MB = 1024;
 
     private final ConnectionRepository connectionRepository;
     private final RunRepository runRepository;
@@ -35,12 +38,15 @@ public class RunController {
     private final String callbackBaseUrl;
     private final WalletReservationService walletReservationService;
     private final RunLifecycleService runLifecycleService;
+    // WS5a stand-in; WS5b replaces it with the manifest entrypoint.
+    private final String agentCommand;
 
     public RunController(ConnectionRepository connectionRepository, RunRepository runRepository,
                          SecretRepository secretRepository, SecretService secretService,
                          ManifestParser manifestParser, SandboxProvider sandboxProvider, RunTokenService runTokenService,
                          @Value("${agentstore.callback.base-url}") String callbackBaseUrl,
-                         WalletReservationService walletReservationService, RunLifecycleService runLifecycleService) {
+                         WalletReservationService walletReservationService, RunLifecycleService runLifecycleService,
+                         @Value("${agentstore.runs.agent-command:/workspace/app/agentstore-entrypoint}") String agentCommand) {
         this.connectionRepository = connectionRepository;
         this.runRepository = runRepository;
         this.secretRepository = secretRepository;
@@ -51,6 +57,7 @@ public class RunController {
         this.callbackBaseUrl = callbackBaseUrl;
         this.walletReservationService = walletReservationService;
         this.runLifecycleService = runLifecycleService;
+        this.agentCommand = agentCommand;
     }
 
     @PostMapping
@@ -125,8 +132,13 @@ public class RunController {
 
         SandboxHandle handle;
         try {
-            handle = sandboxProvider.create(new SandboxSpec(version.getImageRef(), SANDBOX_TIMEOUT_SECONDS, envVars,
-                    allowOut));
+            handle = sandboxProvider.create(new SandboxSpec(run.getId().toString(), version.getImageRef(),
+                    List.of("sh", "-c", agentCommand), envVars, allowOut, SANDBOX_CPU, SANDBOX_MEMORY_MB,
+                    SANDBOX_TIMEOUT_SECONDS));
+        } catch (SandboxCapacityException e) {
+            runLifecycleService.terminate(run.getId(), RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
+                    Map.of("summary", capacitySummary(e.code()), "code", e.code()));
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.code(), e);
         } catch (RuntimeException e) {
             runLifecycleService.terminate(run.getId(), RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
                     Map.of("summary", "Sandbox could not be started"));
@@ -134,6 +146,12 @@ public class RunController {
         }
         runLifecycleService.markStarted(run.getId(), handle.sandboxId());
         return RunResponse.from(runRepository.findById(run.getId()).orElseThrow());
+    }
+
+    static String capacitySummary(String code) {
+        return "BUDGET_EXHAUSTED".equals(code)
+                ? "Monthly sandbox budget reached"
+                : "No sandbox capacity right now; try again shortly";
     }
 
     @PostMapping("/{runId}/approve")

@@ -1,0 +1,10 @@
+agentstore:
+  runner:
+    secret: test-runner-secret
+    runner-id: runner-test
+    backend: fake
+    spring-base-url: http://localhost:1
+    jobs-enabled: false
+    budget:
+      state-file: ${java.io.tmpdir}/runner-budget-test.json
+      monthly-limit: PT100000H

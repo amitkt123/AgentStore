@@ -1,0 +1,32 @@
+server:
+  port: ${RUNNER_PORT:8090}
+  address: ${RUNNER_BIND:127.0.0.1}   # loopback by default; set 0.0.0.0 to expose
+
+spring:
+  application:
+    name: sandbox-runner
+
+agentstore:
+  runner:
+    secret: ${RUNNER_SECRET:}          # required; startup fails when blank
+    runner-id: ${RUNNER_ID:runner-1}
+    backend: ${RUNNER_BACKEND:e2b}
+    spring-base-url: ${SPRING_BASE_URL:http://localhost:8080}
+    jobs-enabled: true
+    budget:
+      max-concurrent: 2
+      max-lifetime: PT10M
+      monthly-limit: PT10H
+      state-file: ${RUNNER_STATE_FILE:./runner-budget.json}
+    e2b:
+      api-key: ${E2B_API_KEY:}
+      base-url: https://api.e2b.app
+      shim-command: [node, e2b-shim/shim.mjs]
+      shim-timeout: PT60S
+      http-timeout: PT30S
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

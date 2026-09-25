@@ -100,8 +100,8 @@ class EndToEndTierATest extends AbstractIntegrationTest {
         assertThat(run.status()).isEqualTo(RunStatus.RUNNING);
 
         // 3. The (fake) sandboxed agent reports usage and completion over the callback protocol.
-        // In this test we call the callback endpoints directly rather than running a real E2B
-        // sandbox, standing in for what a real agent process would do — no real agent business
+        // In this test we call the callback endpoints directly rather than running a real
+        // sandbox-runner sandbox, standing in for what a real agent process would do — no real agent business
         // logic is written or tested here, only the protocol the execution module exposes to it.
         String runDetailUrl = url("/api/v1/runs/" + run.id());
         var runDetailBeforeCompletion = rest.exchange(runDetailUrl, HttpMethod.GET,

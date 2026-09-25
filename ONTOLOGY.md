@@ -1,0 +1,305 @@
+<!--
+ontology-tracked-files: backend/src/main/java/com/agentstore/platform/catalog/Agent.java,backend/src/main/java/com/agentstore/platform/catalog/AgentVersion.java,backend/src/main/java/com/agentstore/platform/catalog/CatalogController.java,backend/src/main/java/com/agentstore/platform/catalog/CatalogListingController.java,backend/src/main/java/com/agentstore/platform/catalog/CreateAgentRequest.java,backend/src/main/java/com/agentstore/platform/catalog/CreateAgentVersionRequest.java,backend/src/main/java/com/agentstore/platform/catalog/MyAgentsController.java,backend/src/main/java/com/agentstore/platform/catalog/Tier.java,backend/src/main/java/com/agentstore/platform/catalog/VersionStatus.java,backend/src/main/java/com/agentstore/platform/execution/AgentCallbackController.java,backend/src/main/java/com/agentstore/platform/execution/AgentEventRequest.java,backend/src/main/java/com/agentstore/platform/execution/Connection.java,backend/src/main/java/com/agentstore/platform/execution/ConnectionController.java,backend/src/main/java/com/agentstore/platform/execution/ConnectionStatus.java,backend/src/main/java/com/agentstore/platform/execution/CreateConnectionRequest.java,backend/src/main/java/com/agentstore/platform/execution/FakeSandboxProvider.java,backend/src/main/java/com/agentstore/platform/execution/GateStatusResponse.java,backend/src/main/java/com/agentstore/platform/execution/InternalRunsController.java,backend/src/main/java/com/agentstore/platform/execution/Run.java,backend/src/main/java/com/agentstore/platform/execution/RunController.java,backend/src/main/java/com/agentstore/platform/execution/RunDetailController.java,backend/src/main/java/com/agentstore/platform/execution/RunLifecycleService.java,backend/src/main/java/com/agentstore/platform/execution/RunReaper.java,backend/src/main/java/com/agentstore/platform/execution/RunStatus.java,backend/src/main/java/com/agentstore/platform/execution/RunStep.java,backend/src/main/java/com/agentstore/platform/execution/RunStepKind.java,backend/src/main/java/com/agentstore/platform/execution/RunnerSandboxProvider.java,backend/src/main/java/com/agentstore/platform/execution/SandboxCapacityException.java,backend/src/main/java/com/agentstore/platform/execution/SandboxProvider.java,backend/src/main/java/com/agentstore/platform/execution/SandboxSpec.java,backend/src/main/java/com/agentstore/platform/execution/SandboxStatus.java,backend/src/main/java/com/agentstore/platform/execution/Secret.java,backend/src/main/java/com/agentstore/platform/execution/TriggerRunRequest.java,backend/src/main/java/com/agentstore/platform/identity/AuthController.java,backend/src/main/java/com/agentstore/platform/identity/AuthResponse.java,backend/src/main/java/com/agentstore/platform/identity/GoogleSignInService.java,backend/src/main/java/com/agentstore/platform/identity/IdentityService.java,backend/src/main/java/com/agentstore/platform/identity/Invitation.java,backend/src/main/java/com/agentstore/platform/identity/InvitationController.java,backend/src/main/java/com/agentstore/platform/identity/InvitationService.java,backend/src/main/java/com/agentstore/platform/identity/JwtService.java,backend/src/main/java/com/agentstore/platform/identity/LoginRequest.java,backend/src/main/java/com/agentstore/platform/identity/MeController.java,backend/src/main/java/com/agentstore/platform/identity/MembersController.java,backend/src/main/java/com/agentstore/platform/identity/Org.java,backend/src/main/java/com/agentstore/platform/identity/OrgMembership.java,backend/src/main/java/com/agentstore/platform/identity/OrgRoles.java,backend/src/main/java/com/agentstore/platform/identity/OrgType.java,backend/src/main/java/com/agentstore/platform/identity/RefreshTokenService.java,backend/src/main/java/com/agentstore/platform/identity/SignInProblem.java,backend/src/main/java/com/agentstore/platform/identity/SignupRequest.java,backend/src/main/java/com/agentstore/platform/identity/SignupSide.java,backend/src/main/java/com/agentstore/platform/identity/User.java,backend/src/main/java/com/agentstore/platform/identity/UserRole.java,backend/src/main/java/com/agentstore/platform/ledger/LedgerEntry.java,backend/src/main/java/com/agentstore/platform/ledger/LedgerEntryType.java,backend/src/main/java/com/agentstore/platform/ledger/LedgerService.java,backend/src/main/java/com/agentstore/platform/ledger/StatementController.java,backend/src/main/java/com/agentstore/platform/ledger/UsageEvent.java,backend/src/main/java/com/agentstore/platform/ledger/Wallet.java,backend/src/main/java/com/agentstore/platform/ledger/WalletController.java,backend/src/main/java/com/agentstore/platform/ledger/WalletReservationService.java,backend/src/main/java/com/agentstore/platform/manifest/ApprovalGateDecl.java,backend/src/main/java/com/agentstore/platform/manifest/CostEnvelope.java,backend/src/main/java/com/agentstore/platform/manifest/Manifest.java,backend/src/main/java/com/agentstore/platform/manifest/ManifestParser.java,backend/src/main/java/com/agentstore/platform/manifest/ManifestValidator.java,backend/src/main/java/com/agentstore/platform/manifest/PricingUnit.java,backend/src/main/java/com/agentstore/platform/manifest/Scope.java,backend/src/main/java/com/agentstore/platform/manifest/ScopeType.java,backend/src/main/java/com/agentstore/platform/publishing/PublishingService.java,backend/src/main/java/com/agentstore/platform/publishing/ReviewController.java,backend/src/main/java/com/agentstore/platform/publishing/ReviewItem.java,backend/src/main/java/com/agentstore/platform/publishing/ReviewStatus.java,backend/src/main/java/com/agentstore/platform/publishing/SubmissionController.java,backend/src/main/resources/manifest/manifest-schema.json,frontend/src/lib/types.ts,runner/src/main/java/com/agentstore/runner/api/ApiErrorHandler.java,runner/src/main/java/com/agentstore/runner/api/CreateSandboxRequest.java,runner/src/main/java/com/agentstore/runner/api/RunnerSecretFilter.java,runner/src/main/java/com/agentstore/runner/api/SandboxController.java,runner/src/main/java/com/agentstore/runner/backend/IsolationBackend.java,runner/src/main/java/com/agentstore/runner/backend/OwnedSandbox.java,runner/src/main/java/com/agentstore/runner/backend/SandboxState.java,runner/src/main/java/com/agentstore/runner/backend/e2b/E2bBackend.java,runner/src/main/java/com/agentstore/runner/sandbox/BudgetGuard.java,runner/src/main/java/com/agentstore/runner/sandbox/BudgetLedger.java,runner/src/main/java/com/agentstore/runner/sandbox/RunnerReaper.java,runner/src/main/java/com/agentstore/runner/sandbox/SandboxService.java,runner/src/main/java/com/agentstore/runner/sandbox/SpringRunsClient.java,runner/src/main/resources/application.yml
+ontology-source-hash: 8736dfe40b8d0573f1e6e1af6ec796a456d43eb1a6fb1a1b5662026cdf4e9606
+ontology-generated-at: 2026-09-25T15:47:45Z
+-->
+
+# AgentStore System Domain Ontology
+_Generated from commit `e295ec6` (2026-09-25, branch `feat/ws5a-sandbox-runner`). Regenerate when core schemas or APIs change._
+
+## 1. Meta & Scope
+- **Domain:** A B2B marketplace for autonomous agents. A `DEVELOPER` org publishes containerised agents with a declarative `Manifest`. A `BUYER` org connects to an agent, grants it scopes and a spend cap, and triggers metered `Run`s. Each run executes in an isolated remote sandbox and is billed against the buyer's prepaid `Wallet`. The approval-gate and spend-cap vocabulary, and the frontend's "I run finance" sign-up side (`backend/src/main/java/com/agentstore/platform/identity/SignupSide.java`), suggest finance buyers, but no code limits it to finance.
+- **Core Objective:** Handle the whole agent lifecycle: publish (lint, tier, review), connect (consent, scopes, secrets), execute (sandbox launch, agent callbacks, human approval gates, reaping), and bill (usage, ledger, wallet reservation). An agent working in this repo mostly edits these flows. The Spring backend (`backend/`) owns domain state. The sandbox runner (`runner/`) is a separate service that owns vendor credentials and sandbox spend.
+
+## 2. Core Classes (Concepts)
+
+### Identity & tenancy
+* **`Org`** (`backend/src/main/java/com/agentstore/platform/identity/Org.java`): A tenant workspace. `type`: `[BUYER | DEVELOPER]` (`OrgType`, `backend/src/main/java/com/agentstore/platform/identity/OrgType.java`).
+* **`User`** (`backend/src/main/java/com/agentstore/platform/identity/User.java`): A person, keyed by a unique email. `passwordHash` is null for Google-only users. `lastOrgId` is the org a login lands in. `signupOrgId` is the org they created at signup and is never updated afterwards.
+* **`OrgMembership`** (`backend/src/main/java/com/agentstore/platform/identity/OrgMembership.java`): The (`User`, `Org`) pair, with a `role` and an optional `title`. A user can belong to several orgs.
+* **`UserRole`** (`backend/src/main/java/com/agentstore/platform/identity/UserRole.java`): `[BUYER_ADMIN | BUYER_APPROVER | DEVELOPER | ADMIN]`. `ADMIN` is the platform-wide reviewer role, not an org admin.
+* **`Invitation`** (`backend/src/main/java/com/agentstore/platform/identity/Invitation.java`): A single-use, hashed-token invite that brings an email into an `Org` with a given `role`.
+* **`JwtService.Claims`** (`backend/src/main/java/com/agentstore/platform/identity/JwtService.java`): The authenticated principal `(userId, orgId, role)`. Every controller reads it for tenancy checks.
+
+### Catalog & publishing
+* **`Agent`** (`backend/src/main/java/com/agentstore/platform/catalog/Agent.java`): A listed product owned by a `developerOrg`, with `name`, `category` and `description`.
+* **`AgentVersion`** (`backend/src/main/java/com/agentstore/platform/catalog/AgentVersion.java`): An immutable release of an `Agent`: `versionNumber`, raw `manifestJson`, container `imageRef`, `changelog`. `status`: `[DRAFT | IN_REVIEW | LIVE | REJECTED]` (`backend/src/main/java/com/agentstore/platform/catalog/VersionStatus.java`). `tier`: `[TIER_A | TIER_B]` (`backend/src/main/java/com/agentstore/platform/catalog/Tier.java`), null until submitted.
+* **`Manifest`** (`backend/src/main/java/com/agentstore/platform/manifest/Manifest.java`): The parsed declaration of what an agent may do: `scopes: List<Scope>`, `networkAllowlist`, `costEnvelope: CostEnvelope`, `approvalGates: List<ApprovalGateDecl>`, `dataClasses`. It is not persisted on its own; it is re-parsed from `AgentVersion.manifestJson` whenever needed.
+  * **`Scope`** (`backend/src/main/java/com/agentstore/platform/manifest/Scope.java`): `(type, resource, description)`. `type`: `[READ | WRITE]` (`backend/src/main/java/com/agentstore/platform/manifest/ScopeType.java`).
+  * **`CostEnvelope`** (`backend/src/main/java/com/agentstore/platform/manifest/CostEnvelope.java`): `currency`, `maxPerRun`, `unitPrice`, `unitLabel`, and `pricingUnit`: `[METERED | OUTCOME | SUBSCRIPTION]` (`backend/src/main/java/com/agentstore/platform/manifest/PricingUnit.java`).
+  * **`ApprovalGateDecl`** (`backend/src/main/java/com/agentstore/platform/manifest/ApprovalGateDecl.java`): `(trigger, description)`.
+* **`ReviewItem`** (`backend/src/main/java/com/agentstore/platform/publishing/ReviewItem.java`): A manual review ticket for a `TIER_B` `AgentVersion`. `status`: `[PENDING | APPROVED | REJECTED]` (`backend/src/main/java/com/agentstore/platform/publishing/ReviewStatus.java`).
+
+### Execution
+* **`Connection`** (`backend/src/main/java/com/agentstore/platform/execution/Connection.java`): A buyer's consented installation of an `Agent`: `buyerOrg`, `agent`, pinned `agentVersion`, `grantedScopes` (resource strings), `spendCap`. `status`: `[ACTIVE | REVOKED]` (`backend/src/main/java/com/agentstore/platform/execution/ConnectionStatus.java`).
+* **`Secret`** (`backend/src/main/java/com/agentstore/platform/execution/Secret.java`): A named credential attached to a `Connection`, stored AES-GCM encrypted (`encryptedValue` + `nonce`).
+* **`Run`** (`backend/src/main/java/com/agentstore/platform/execution/Run.java`): One execution of a `Connection`'s pinned `AgentVersion`. Fields: `costCap`, `totalCharged`, `reservedAmount`, `sandboxId`, `callbackTokenHash`, `deadlineAt`, `lastHeartbeatAt`, `awaitingSince`. `status`: `[PENDING | RUNNING | AWAITING_APPROVAL | COMPLETED | FAILED | CANCELLED | TIMED_OUT | EXPIRED]` (`backend/src/main/java/com/agentstore/platform/execution/RunStatus.java`). The terminal statuses are `[COMPLETED | FAILED | CANCELLED | TIMED_OUT | EXPIRED]`.
+* **`RunStep`** (`backend/src/main/java/com/agentstore/platform/execution/RunStep.java`): An append-only event on a `Run` with a JSON `detail`. `kind`: `[READ | WRITE | GATE | COST | COMPLETE | FAILED | TIMEOUT | COST_CAP_REACHED]` (`backend/src/main/java/com/agentstore/platform/execution/RunStepKind.java`).
+* **`SandboxProvider`** (`backend/src/main/java/com/agentstore/platform/execution/SandboxProvider.java`): The backend's vendor-neutral sandbox seam (`create`/`kill`/`status`). Implementations: `RunnerSandboxProvider` (`backend/src/main/java/com/agentstore/platform/execution/RunnerSandboxProvider.java`, profile `runner`) and `FakeSandboxProvider` (`backend/src/main/java/com/agentstore/platform/execution/FakeSandboxProvider.java`, profile `!runner`).
+  * **`SandboxSpec`** (`backend/src/main/java/com/agentstore/platform/execution/SandboxSpec.java`): The create request. `requestId` is the run id.
+  * **`SandboxStatus`** (`backend/src/main/java/com/agentstore/platform/execution/SandboxStatus.java`): `state`: `[RUNNING | EXITED | GONE | UNKNOWN]`, plus `exitCode`.
+
+### Billing
+* **`Wallet`** (`backend/src/main/java/com/agentstore/platform/ledger/Wallet.java`): Prepaid funds per org (unique `orgId`): `balance`, `reserved`, `cap`.
+* **`UsageEvent`** (`backend/src/main/java/com/agentstore/platform/ledger/UsageEvent.java`): A metered consumption record (`quantity × unitCost = amount`) for a run and org, with a `processed` flag.
+* **`LedgerEntry`** (`backend/src/main/java/com/agentstore/platform/ledger/LedgerEntry.java`): The financial posting made from a `UsageEvent`. `type`: `[CHARGE | REVERSAL | FEE]` (`backend/src/main/java/com/agentstore/platform/ledger/LedgerEntryType.java`).
+
+### Sandbox runner (separate service)
+* **`IsolationBackend`** (`runner/src/main/java/com/agentstore/runner/backend/IsolationBackend.java`): The runner's only vendor seam (`create`, `status`, `readLogs`, `kill`, `listOwned`). Current implementation: `E2bBackend` (`runner/src/main/java/com/agentstore/runner/backend/e2b/E2bBackend.java`).
+* **`SandboxState`** (`runner/src/main/java/com/agentstore/runner/backend/SandboxState.java`): `phase`: `[RUNNING | EXITED | GONE | UNKNOWN]`, plus `exitCode`.
+* **`OwnedSandbox`** (`runner/src/main/java/com/agentstore/runner/backend/OwnedSandbox.java`): A live sandbox carrying this runner's labels. `requestId` (the run id) and `deadlineEpochSeconds` are read from those labels.
+* **`BudgetGuard`** (`runner/src/main/java/com/agentstore/runner/sandbox/BudgetGuard.java`): Enforces the runner's concurrency cap and monthly sandbox-time ceiling, persisted through `BudgetLedger` (`runner/src/main/java/com/agentstore/runner/sandbox/BudgetLedger.java`).
+
+## 3. Properties & Semantic Relationships
+
+**Tenancy**
+- `User` -> **belongs to (many)** -> `Org` via `OrgMembership` (`backend/src/main/java/com/agentstore/platform/identity/OrgMembership.java`)
+- `OrgMembership` -> **carries** -> `UserRole`. `OrgType` determines which roles can be assigned (`backend/src/main/java/com/agentstore/platform/identity/OrgRoles.java`).
+- `Invitation` -> **on accept, creates** -> `OrgMembership` (and a `User` if the email has no account) (`backend/src/main/java/com/agentstore/platform/identity/InvitationService.java`)
+- `JwtService.Claims` -> **scopes every request to** -> one `Org` (`orgId`) and one `UserRole`. `switch-org` issues a new token for a different membership (`backend/src/main/java/com/agentstore/platform/identity/AuthController.java`).
+
+**Publishing**
+- `Org[DEVELOPER]` -> **owns** -> `Agent` -> **has many** -> `AgentVersion`
+- `AgentVersion` -> **embeds (as JSON)** -> `Manifest` -> **declares** -> `Scope`, `CostEnvelope`, `ApprovalGateDecl`
+- `AgentVersion` status transitions (`backend/src/main/java/com/agentstore/platform/publishing/PublishingService.java`):
+  - `DRAFT` -> `submit` -> `LIVE` (`TIER_A`: no `WRITE` scope)
+  - `DRAFT` -> `submit` -> `IN_REVIEW` (`TIER_B`: at least one `WRITE` scope), which also creates a `ReviewItem[PENDING]`
+  - `IN_REVIEW` -> `ReviewItem` approve -> `LIVE` (sets `approvedAt`)
+  - `IN_REVIEW` -> `ReviewItem` reject -> `REJECTED`
+- `ReviewItem` -> **gates** -> `AgentVersion`. The reviewer is recorded as `reviewerUserId` (a raw UUID, not a relation).
+
+**Execution**
+- `Org[BUYER]` -> **creates** -> `Connection` -> **to** -> `Agent`, **pinned to** -> the latest `LIVE` `AgentVersion` at creation time (`backend/src/main/java/com/agentstore/platform/execution/ConnectionController.java`)
+- `Connection` -> **holds** -> `Secret` (0..n, unique by `name`)
+- `Connection` -> **spawns** -> `Run`. `Run.agentVersion` = `Connection.agentVersion` and `Run.costCap` = `Connection.spendCap` (`backend/src/main/java/com/agentstore/platform/execution/RunController.java`).
+- `Run` -> **executes in** -> a sandbox (`Run.sandboxId`) through `SandboxProvider` -> `RunnerSandboxProvider` -> the runner's `SandboxController` -> `SandboxService` -> `IsolationBackend`
+- `Secret` -> **is injected as** -> the env var `AGENT_SECRET_<name>`, alongside `AGENT_RUN_ID`, `AGENT_CALLBACK_URL` and `AGENT_CALLBACK_TOKEN` (`backend/src/main/java/com/agentstore/platform/execution/RunController.java`)
+- The agent in the sandbox -> **reports** -> `RunStep`s through the callback API (`backend/src/main/java/com/agentstore/platform/execution/AgentCallbackController.java`)
+- `Run` status transitions (all under a row lock in `backend/src/main/java/com/agentstore/platform/execution/RunLifecycleService.java`):
+  - created as `PENDING` -> `markStarted` -> `RUNNING`
+  - `RUNNING` -> agent `GATE` event -> `AWAITING_APPROVAL`
+  - `AWAITING_APPROVAL` -> buyer approve -> `RUNNING`
+  - `AWAITING_APPROVAL` -> buyer reject -> `CANCELLED`
+  - any non-terminal status -> agent `COMPLETE` -> `COMPLETED`
+  - any non-terminal status -> agent `FAILED` -> `FAILED`
+  - any non-terminal status -> spend exceeds `costCap` -> `FAILED` (+ `COST_CAP_REACHED` step)
+  - launch or sandbox-create failure -> `FAILED`
+  - `RunReaper` (`backend/src/main/java/com/agentstore/platform/execution/RunReaper.java`):
+    - `AWAITING_APPROVAL` past the gate timeout or the deadline -> `EXPIRED`
+    - other active run past `deadlineAt` -> `TIMED_OUT`
+    - `RUNNING` whose sandbox has stopped -> `FAILED`
+
+**Billing**
+- `Run` trigger -> **reserves** -> `Connection.spendCap` on `Wallet.reserved` (`backend/src/main/java/com/agentstore/platform/ledger/WalletReservationService.java`)
+- A `COST` `RunStep` -> **creates** -> `UsageEvent` -> **is charged into** -> `LedgerEntry[CHARGE]` -> **debits** -> `Wallet.balance` (`backend/src/main/java/com/agentstore/platform/ledger/LedgerService.java`)
+- A charge -> **releases** -> the matching part of `Run.reservedAmount`. When a run finishes, whatever is still reserved is released.
+- `UsageEvent` and `LedgerEntry` -> **reference** -> `Run` and `Org` by raw `runId`/`orgId` UUIDs, not JPA relations.
+
+**Runner**
+- `SandboxService` -> **labels each sandbox with** -> `REQUEST_ID` (run id), `RUNNER_ID` and `DEADLINE` (`runner/src/main/java/com/agentstore/runner/sandbox/SandboxService.java`)
+- `RunnerReaper` -> **reconciles against** -> the backend's `/internal/runs/active-ids` through `SpringRunsClient` (`runner/src/main/java/com/agentstore/runner/sandbox/RunnerReaper.java`, `runner/src/main/java/com/agentstore/runner/sandbox/SpringRunsClient.java`, `backend/src/main/java/com/agentstore/platform/execution/InternalRunsController.java`)
+
+## 4. Operational Axioms & Logical Constraints
+
+**Identity**
+- **Rule OrgRoleAssignability:** A `BUYER` org can assign only `[BUYER_ADMIN | BUYER_APPROVER]`. A `DEVELOPER` org can assign only `[DEVELOPER]`. `ADMIN` can never be assigned through org role management. (`backend/src/main/java/com/agentstore/platform/identity/OrgRoles.java`)
+- **Rule MemberManagers:** Only `BUYER_ADMIN` or `DEVELOPER` can manage members. The check reads the role from the database, not from the JWT, so a demoted member loses access immediately. (`backend/src/main/java/com/agentstore/platform/identity/MembersController.java`)
+- **Rule LastAdmin:** A demotion or removal that would leave an org with zero holders of its admin role (`BUYER_ADMIN` for `BUYER`, `DEVELOPER` for `DEVELOPER`) fails with 409. The org row is locked first. (`backend/src/main/java/com/agentstore/platform/identity/MembersController.java`)
+- **Rule UniqueEmail:** Signing up with an email that already exists (case-insensitive) fails with 409. (`backend/src/main/java/com/agentstore/platform/identity/IdentityService.java`)
+- **Rule AdminPromotion:** A password signup never grants `ADMIN` directly. `ADMIN` is granted only for `DEVELOPER`-side orgs, only to emails in `agentstore.identity.admin-emails`, and only after inbox control has been proven. (`backend/src/main/java/com/agentstore/platform/identity/IdentityService.java`)
+- **Rule InvitationUsable:** An invitation can be used only when `acceptedAt == null && revokedAt == null && expiresAt > now`. The TTL is 7 days. (`backend/src/main/java/com/agentstore/platform/identity/Invitation.java`, `backend/src/main/java/com/agentstore/platform/identity/InvitationService.java`)
+- **Rule InvitationIdentity:** A signed-in caller must be the invited email's account (otherwise 403). An anonymous caller whose email already has an account gets 409. A brand-new user must supply `fullName` and `password` (otherwise 400). (`backend/src/main/java/com/agentstore/platform/identity/InvitationService.java`)
+- **Rule RefreshReuse:** Presenting a refresh token that was already revoked revokes its entire token family and returns 401. (`backend/src/main/java/com/agentstore/platform/identity/RefreshTokenService.java`)
+- **Rule GoogleLinking:** A Google sign-in to an existing unverified account fails with `ACCOUNT_EXISTS_UNVERIFIED`. A Google sign-in to an account already linked to another Google subject fails with `ACCOUNT_LINKED_TO_OTHER_GOOGLE`. A new user without `side` and `orgName` gets `SIGNUP_DETAILS_REQUIRED`. (`backend/src/main/java/com/agentstore/platform/identity/GoogleSignInService.java`)
+
+**Publishing**
+- **Rule ManifestSchema:** `manifestJson` must pass the JSON Schema in `backend/src/main/resources/manifest/manifest-schema.json`. It is checked both when a version is created and when it is submitted. (`backend/src/main/java/com/agentstore/platform/manifest/ManifestValidator.java`)
+- **Rule SubmitOnlyDraft:** Only a `DRAFT` version owned by the caller's org can be submitted. (`backend/src/main/java/com/agentstore/platform/publishing/PublishingService.java`)
+- **Rule TierAssignment:** `tier = TIER_B` if any `Scope.type == WRITE`, otherwise `TIER_A`. `TIER_A` goes straight to `LIVE`. `TIER_B` requires review. (`backend/src/main/java/com/agentstore/platform/publishing/PublishingService.java`)
+- **Rule ReviewOnce:** Only a `PENDING` `ReviewItem` can be decided. (`backend/src/main/java/com/agentstore/platform/publishing/PublishingService.java`)
+- **Rule VersionVisibility:** A non-`LIVE` version is visible only to its owning `DEVELOPER` org or to `ADMIN`. (`backend/src/main/java/com/agentstore/platform/catalog/CatalogController.java`)
+- **Rule CatalogIsLive:** The public catalog lists only `LIVE` versions. (`backend/src/main/java/com/agentstore/platform/catalog/CatalogListingController.java`)
+
+**Connections & runs**
+- **Rule ScopeSubset:** Every `grantedScopes` entry must be a `Scope.resource` declared by the agent's latest `LIVE` manifest. `spendCap` must be positive. (`backend/src/main/java/com/agentstore/platform/execution/ConnectionController.java`, `backend/src/main/java/com/agentstore/platform/execution/CreateConnectionRequest.java`)
+- **Rule TriggerPreconditions:** A run can be triggered only when:
+  - the `Connection` belongs to the caller's org
+  - its status is `ACTIVE`
+  - it is pinned to an `AgentVersion`
+  - that version is still `LIVE`
+  - the `Wallet` can reserve `spendCap`, i.e. `balance - reserved >= spendCap`, otherwise 402
+
+  (`backend/src/main/java/com/agentstore/platform/execution/RunController.java`, `backend/src/main/java/com/agentstore/platform/ledger/WalletReservationService.java`)
+- **Rule SingleTerminalPath:** `RunLifecycleService.finish` is the only way a run becomes terminal. It releases any remaining reservation, sets `completedAt`, and kills the sandbox (best effort). (`backend/src/main/java/com/agentstore/platform/execution/RunLifecycleService.java`)
+- **Rule TerminalIsFinal:** A terminal run rejects agent events with 409. `terminate` on a terminal run is a no-op that returns false. (`backend/src/main/java/com/agentstore/platform/execution/RunLifecycleService.java`)
+- **Rule AgentReportableKinds:** Agents may report only `[READ | WRITE | GATE | COST | COMPLETE | FAILED]`. `[TIMEOUT | COST_CAP_REACHED]` are platform-only, and reporting them returns 400. (`backend/src/main/java/com/agentstore/platform/execution/RunLifecycleService.java`)
+- **Rule CostCap:** A `COST` charge is `quantity × manifest.costEnvelope.unitPrice` rounded HALF_UP to 2 decimal places, clamped to `costCap - totalCharged`. If the requested amount exceeds what remains, the run becomes `FAILED` with a `COST_CAP_REACHED` step. `quantity` must be a positive number (otherwise 400). (`backend/src/main/java/com/agentstore/platform/execution/RunLifecycleService.java`)
+- **Rule GateDecision:** Only `BUYER_APPROVER` in the owning org can approve or reject, and only while the run is `AWAITING_APPROVAL` (otherwise 409). (`backend/src/main/java/com/agentstore/platform/execution/RunController.java`, `backend/src/main/java/com/agentstore/platform/execution/RunLifecycleService.java`)
+- **Rule GateStatusMapping:** The agent-facing gate decision is `[PENDING | APPROVED | REJECTED]`:
+  - `AWAITING_APPROVAL` -> `PENDING`
+  - `RUNNING` or `COMPLETED` -> `APPROVED`
+  - every other status -> `REJECTED`
+
+  (`backend/src/main/java/com/agentstore/platform/execution/GateStatusResponse.java`)
+- **Rule CallbackAuth:** Agent callbacks must send `Authorization: Bearer <token>` that matches `Run.callbackTokenHash`, otherwise 401. (`backend/src/main/java/com/agentstore/platform/execution/AgentCallbackController.java`)
+- **Rule StaleReaperSafe:** The reaper terminates a run only if the locked status still equals the status in its snapshot, so it never overwrites a concurrent approval or callback. (`backend/src/main/java/com/agentstore/platform/execution/RunReaper.java`)
+- **Rule UnknownIsNotStopped:** `SandboxStatus.UNKNOWN` (runner unreachable) must never be treated as stopped. Only `EXITED` or `GONE` count as stopped. (`backend/src/main/java/com/agentstore/platform/execution/SandboxStatus.java`)
+- **Rule SandboxLimits:** Backend requests `cpu=1`, `memoryMb=1024` and `timeoutSeconds=600`. The runner clamps the timeout to `max-lifetime` (default `PT10M`). (`backend/src/main/java/com/agentstore/platform/execution/RunController.java`, `runner/src/main/java/com/agentstore/runner/sandbox/SandboxService.java`, `runner/src/main/resources/application.yml`)
+- **Rule EgressAllowlist:** Sandbox outbound traffic is limited to the callback host plus `Manifest.networkAllowlist`. (`backend/src/main/java/com/agentstore/platform/execution/RunController.java`)
+
+**Billing**
+- **Rule IdempotentCharge:** `chargeUsageEvent` returns the existing `LedgerEntry` if the `UsageEvent` has already been charged. (`backend/src/main/java/com/agentstore/platform/ledger/LedgerService.java`)
+- **Rule NonNegativeReservation:** Reserve and release amounts must be ≥ 0. `reserved` never goes below 0. (`backend/src/main/java/com/agentstore/platform/ledger/WalletReservationService.java`)
+- **Rule OrgScopedFinance:** A wallet or statement can be read only by `BUYER_ADMIN` of the same org or by `ADMIN`. (`backend/src/main/java/com/agentstore/platform/ledger/WalletController.java`, `backend/src/main/java/com/agentstore/platform/ledger/StatementController.java`)
+
+**Runner**
+- **Rule IdempotentCreate:** Sandbox creation is keyed by `requestId` (the run id). A repeat request returns the existing sandbox id, found in the in-memory map or through `listOwned`. (`runner/src/main/java/com/agentstore/runner/sandbox/SandboxService.java`)
+- **Rule RunnerBudget:** Creation is refused with 429 when owned sandboxes ≥ `max-concurrent` (`CAPACITY_EXHAUSTED`) or when this month's sandbox time ≥ `monthly-limit` (`BUDGET_EXHAUSTED`). The month is counted in UTC. (`runner/src/main/java/com/agentstore/runner/sandbox/BudgetGuard.java`, `runner/src/main/java/com/agentstore/runner/api/ApiErrorHandler.java`)
+- **Rule OrphanKill:** The runner kills any owned sandbox whose `requestId` is not in the backend's active run ids (`[PENDING | RUNNING | AWAITING_APPROVAL]`), and any sandbox past its `DEADLINE` label. It lists sandboxes before it asks the backend. (`runner/src/main/java/com/agentstore/runner/sandbox/RunnerReaper.java`)
+- **Rule RunnerSecret:** Runner endpoints other than `/actuator/health` require `X-Runner-Secret`. The backend's `/internal/runs/active-ids` requires the same secret and rejects when it is unset. (`runner/src/main/java/com/agentstore/runner/api/RunnerSecretFilter.java`, `backend/src/main/java/com/agentstore/platform/execution/InternalRunsController.java`)
+
+## 5. Tool, API, & Function Mappings
+Every backend endpoint except `/api/v1/catalog`, `/api/v1/auth/*`, `/api/v1/invitations/{token}*` and `/internal/*` needs a JWT. Role gates are shown as `@PreAuthorize` values.
+
+### Auth & identity
+- **`AuthController.signup`**: `POST /api/v1/auth/signup` (`backend/src/main/java/com/agentstore/platform/identity/AuthController.java`)
+  - Accepts: `SignupRequest` (`backend/src/main/java/com/agentstore/platform/identity/SignupRequest.java`), all required: `fullName`, `orgName`, `email`, `password`, and `side: [BUYER | DEVELOPER]`
+  - Returns: `AuthResponse(token, refreshToken=null)` (`backend/src/main/java/com/agentstore/platform/identity/AuthResponse.java`)
+  - Errors: 409 duplicate email
+- **`AuthController.login`**: `POST /api/v1/auth/login`
+  - Accepts: `LoginRequest` (`backend/src/main/java/com/agentstore/platform/identity/LoginRequest.java`): `email` and `password` are required. `remember`, `side` and `orgName` are optional; `side` and `orgName` are used only when the user has no membership.
+  - Returns: `AuthResponse` (`refreshToken` only if `remember`)
+  - Errors: 401 bad credentials; 422 `NO_WORKSPACE` (`SignInProblem`, `backend/src/main/java/com/agentstore/platform/identity/SignInProblem.java`)
+- **`AuthController.google`**: `POST /api/v1/auth/google`
+  - Accepts: `idToken` (required), `side`, `orgName`, `remember`
+  - Returns: `AuthResponse`
+  - Errors: 503 if Google is not configured; 401 invalid token; 409 or 422 `SignInProblem` codes (see Rule GoogleLinking)
+- **`AuthController.switchOrg`**: `POST /api/v1/auth/switch-org`
+  - Accepts: `orgId`
+  - Returns: `AuthResponse`
+  - Errors: 403 not a member
+- **`AuthController.refresh`**: `POST /api/v1/auth/refresh`
+  - Accepts: `refreshToken`
+  - Returns: a new `AuthResponse` (the refresh token is rotated)
+  - Errors: 401 expired, unknown or reused token
+- **`AuthController.logout`**: `POST /api/v1/auth/logout`. Revokes the token family and returns 204.
+- **`AuthController.verifyEmail`**: `POST /api/v1/auth/email/verify`
+  - Errors: 400 invalid or expired link
+- **`AuthController.resendVerification`**: `POST /api/v1/auth/email/resend`
+- **`AuthController.forgotPassword`**: `POST /api/v1/auth/password/forgot`
+- **`AuthController.resetPassword`**: `POST /api/v1/auth/password/reset`
+  - Errors: 400 invalid or expired link
+  - Password length is 8–200.
+  - Token TTLs: verify 24h, reset 1h.
+- **`MeController.me`**: `GET /api/v1/me` (`backend/src/main/java/com/agentstore/platform/identity/MeController.java`)
+  - Returns: `MeResponse` (user, `emailVerified`, current `orgId`, memberships)
+- **`MeController.addOrg`**: `POST /api/v1/me/orgs`
+  - Accepts: `side` and `orgName` (both required)
+  - Returns: `AuthResponse` for the new org, with the side's admin role
+- **`MembersController`**: `/api/v1/orgs/{orgId}/…` (`backend/src/main/java/com/agentstore/platform/identity/MembersController.java`)
+  - `GET members` (same org)
+  - `PATCH members/{userId}`: accepts `role` and `title`
+  - `DELETE members/{userId}`
+  - `POST invitations`: accepts `email` (required), `role` (required), `title`
+  - `GET invitations`
+  - `DELETE invitations/{id}`
+  - Errors: 403 wrong org or not a manager; 400 role not assignable; 409 last admin or already a member; 404 member not found
+- **`InvitationController`**: `GET /api/v1/invitations/{token}` (preview) and `POST …/accept` (`backend/src/main/java/com/agentstore/platform/identity/InvitationController.java`)
+  - Accepts: optional `fullName` and `password`
+  - Returns: `AuthResponse`
+  - Errors: see Rule InvitationIdentity; 404 or 410 for invalid or unusable tokens
+
+### Catalog & publishing
+- **`CatalogController.create`**: `POST /api/v1/agents` [`DEVELOPER`] (`backend/src/main/java/com/agentstore/platform/catalog/CatalogController.java`)
+  - Accepts: `CreateAgentRequest` (`backend/src/main/java/com/agentstore/platform/catalog/CreateAgentRequest.java`): `name` and `category` are required; `description` is optional
+  - Returns: `AgentResponse`
+- **`CatalogController.createVersion`**: `POST /api/v1/agents/{agentId}/versions` [`DEVELOPER`]
+  - Accepts: `CreateAgentVersionRequest` (`backend/src/main/java/com/agentstore/platform/catalog/CreateAgentVersionRequest.java`): `versionNumber`, `manifestJson` and `imageRef` are required; `changelog` is optional
+  - Returns: `AgentVersionResponse` (status `DRAFT`)
+  - Errors: 404 agent; 403 not owner; 400 manifest schema errors
+- **`CatalogController.detail`**: `GET /api/v1/agents/{agentId}/versions/{versionId}`
+  - Returns: `AgentVersionDetailResponse` (with the parsed `Manifest`)
+  - Errors: 404 version not found or not under this agent; 403 not visible
+- **`CatalogListingController.list`**: `GET /api/v1/catalog` (`backend/src/main/java/com/agentstore/platform/catalog/CatalogListingController.java`)
+  - Returns: `CatalogListingResponse[]` (`LIVE` versions only)
+- **`MyAgentsController.mine`**: `GET /api/v1/agents/mine` [`DEVELOPER`] (`backend/src/main/java/com/agentstore/platform/catalog/MyAgentsController.java`)
+  - Returns: `MyAgentsResponse[]`
+- **`SubmissionController.submit`**: `POST /api/v1/agents/{agentId}/versions/{versionId}/submit` [`DEVELOPER`] (`backend/src/main/java/com/agentstore/platform/publishing/SubmissionController.java`)
+  - Returns: `AgentVersionResponse` (`LIVE` or `IN_REVIEW`)
+  - Errors: 404 not found; 403 not owner; 409 not `DRAFT` or lint failed
+- **`ReviewController`**: `/api/v1/review` [`ADMIN`] (`backend/src/main/java/com/agentstore/platform/publishing/ReviewController.java`)
+  - `GET queue`: returns `ReviewItemResponse[]` (only `PENDING` items)
+  - `GET {id}`: returns `ReviewItemDetailResponse`
+  - `POST {id}/approve` and `POST {id}/reject`: accept `notes` (optional)
+  - Errors: 404 item. Deciding an item that is not `PENDING` throws `IllegalStateException`, which is not mapped to an HTTP status here (see Inconsistencies).
+
+### Connections & runs
+- **`ConnectionController.create`**: `POST /api/v1/connections` [`BUYER_ADMIN`] (`backend/src/main/java/com/agentstore/platform/execution/ConnectionController.java`)
+  - Accepts: `CreateConnectionRequest`: `agentId`, `grantedScopes` (non-empty) and `spendCap` (> 0), all required
+  - Returns: `ConnectionResponse`
+  - Errors: 404 agent; 409 no `LIVE` version; 400 undeclared scope
+- **`ConnectionController.storeSecret`**: `POST /api/v1/connections/{id}/secrets` [`BUYER_ADMIN`]
+  - Accepts: `name` and `value`. Stores by upsert on `name`.
+  - Errors: 404; 403 not owner
+- **`ConnectionController.mine`**: `GET /api/v1/connections/mine` [`BUYER_ADMIN`, `BUYER_APPROVER`]
+  - Returns: `ConnectionSummaryResponse[]`
+- **`RunController.trigger`**: `POST /api/v1/runs` [`BUYER_ADMIN`, `BUYER_APPROVER`] (`backend/src/main/java/com/agentstore/platform/execution/RunController.java`)
+  - Accepts: `TriggerRunRequest(connectionId)` (required) (`backend/src/main/java/com/agentstore/platform/execution/TriggerRunRequest.java`)
+  - Returns: `RunResponse(id, status)`
+  - Errors: 404; 403; 409 (inactive, unpinned or non-`LIVE`); 402 insufficient funds; 503 `CAPACITY_EXHAUSTED` or `BUDGET_EXHAUSTED` (`SandboxCapacityException`, `backend/src/main/java/com/agentstore/platform/execution/SandboxCapacityException.java`); 502 sandbox start failure; 500 launch prep failure. The run is marked `FAILED` in the last three cases.
+- **`RunController.approve`**: `POST /api/v1/runs/{runId}/approve` [`BUYER_APPROVER`]
+- **`RunController.reject`**: `POST /api/v1/runs/{runId}/reject` [`BUYER_APPROVER`]
+  - Returns: `RunResponse`
+  - Errors: 404; 403; 409 not awaiting approval
+- **`RunDetailController.get`**: `GET /api/v1/runs/{runId}` (`backend/src/main/java/com/agentstore/platform/execution/RunDetailController.java`)
+  - Returns: `RunDetailResponse` (with `RunStep`s in time order)
+  - Errors: 403 unless owning org or `ADMIN`
+- **`RunDetailController.mine`**: `GET /api/v1/runs/mine?status=` [`BUYER_ADMIN`, `BUYER_APPROVER`]
+  - Returns: `RunSummaryResponse[]`
+
+### Agent-facing callbacks (called from inside the sandbox)
+- **`AgentCallbackController.ingest`**: `POST /internal/agent-callback/runs/{runId}/events` (`backend/src/main/java/com/agentstore/platform/execution/AgentCallbackController.java`)
+  - Accepts: `AgentEventRequest` (`backend/src/main/java/com/agentstore/platform/execution/AgentEventRequest.java`): `kind: RunStepKind` (required), `detail: Map` (optional). `COST` requires `detail.quantity` > 0.
+  - Returns: 200 with no body
+  - Errors: 401 bad token; 400 platform-only kind or bad quantity; 409 run is terminal; 404 run
+- **`AgentCallbackController.gateStatus`**: `GET /internal/agent-callback/runs/{runId}/gate-status`
+  - Returns: `GateStatusResponse(decision: [PENDING | APPROVED | REJECTED])`
+  - Errors: 401; 404
+
+### Billing
+- **`WalletController.wallet`**: `GET /api/v1/orgs/{orgId}/wallet` [`BUYER_ADMIN`, `ADMIN`] (`backend/src/main/java/com/agentstore/platform/ledger/WalletController.java`)
+  - Returns: `WalletResponse(balance, cap, reserved)`
+  - Errors: 403 other org; 404 no wallet
+- **`StatementController.statement`**: `GET /api/v1/orgs/{orgId}/statement` [`BUYER_ADMIN`, `ADMIN`] (`backend/src/main/java/com/agentstore/platform/ledger/StatementController.java`)
+  - Returns: `StatementLineResponse[]` (newest first)
+
+### Service-to-service
+- **`InternalRunsController.activeIds`**: `GET /internal/runs/active-ids` (header `X-Runner-Secret`)
+  - Returns: `{runIds: [...]}`
+  - Errors: 401
+- **Runner `SandboxController`**: `/sandboxes` (`runner/src/main/java/com/agentstore/runner/api/SandboxController.java`)
+  - `POST`: accepts `CreateSandboxRequest` (`runner/src/main/java/com/agentstore/runner/api/CreateSandboxRequest.java`): `requestId`, `imageRef` and `command` (non-empty) are required; `cpu` ≥ 1; `memoryMb` ≥ 128; `timeoutSeconds` ≥ 1; `env` and `allowOut` are optional. Returns 201 `{sandboxId}`.
+  - `GET /{id}`: returns `{state, exitCode}`
+  - `GET /{id}/logs?offset=`: returns a log chunk of up to 256 KiB plus `finished`
+  - `DELETE /{id}`: returns 204
+  - Errors: 429 `CAPACITY_EXHAUSTED` or `BUDGET_EXHAUSTED`; 502 `BACKEND_ERROR`; 400 `INVALID_REQUEST`
+
+## Inconsistencies & Unclear Areas
+- **Two sandbox-state types:** The backend has `SandboxStatus.State` (with `stopped()`, `backend/src/main/java/com/agentstore/platform/execution/SandboxStatus.java`). The runner has `SandboxState.Phase` (with `isTerminal()`, `runner/src/main/java/com/agentstore/runner/backend/SandboxState.java`). Both use the values `[RUNNING | EXITED | GONE | UNKNOWN]` and are connected only by string name over HTTP.
+- **"Spend limit" appears under three names:**
+  - `Connection.spendCap` is the buyer's per-run cap.
+  - `Run.costCap` is copied from `spendCap`.
+  - `CostEnvelope.maxPerRun` is the developer's declared cap, but nothing in backend code reads it, so no check keeps `spendCap` within it.
+- **"Scope" appears in two shapes:** `Manifest.scopes` holds `Scope` records `(type, resource, description)`. `Connection.grantedScopes` holds plain `resource` strings, so a granted scope doesn't record whether it is `READ` or `WRITE`.
+- **Manifest wire vs parsed shape:** The raw JSON uses `network.allowlist` and may include `modelRequirements` (`backend/src/main/resources/manifest/manifest-schema.json`, `frontend/src/lib/types.ts` `ManifestDraft`). The parsed `Manifest` flattens the allowlist to `networkAllowlist` and drops `modelRequirements` (`backend/src/main/java/com/agentstore/platform/manifest/ManifestParser.java`).
+- **Declared but not enforced:** Backend logic never reads these values:
+  - `Manifest.approvalGates` and `dataClasses`. They are only returned in responses. Gates are driven entirely by agent-reported `GATE` events.
+  - `Wallet.cap`. It is only echoed in `WalletResponse`.
+  - `LedgerEntryType.REVERSAL` and `FEE`. They are never created.
+- **`PricingUnit` is ignored:** Every `COST` event is charged as `quantity × unitPrice`, whatever the `PricingUnit` is. What `OUTCOME` or `SUBSCRIPTION` should mean at run time is unclear.
+- **Two reapers:** `RunReaper` (backend, `backend/src/main/java/com/agentstore/platform/execution/RunReaper.java`) terminates `Run`s. `RunnerReaper` (runner) kills sandboxes. Both enforce a roughly 10-minute lifetime independently. The backend's `SANDBOX_TIMEOUT_SECONDS=600` is kept in step with the runner's `max-lifetime` only by a comment.
+- **`requestId` is the run id:** In `SandboxSpec` and the runner, `requestId` is the `Run.id` string. The runner never uses the term "run".
+- **`SubmissionController` ignores `{agentId}`:** The path variable is not checked against the version's agent, unlike `CatalogController.detail`.
+- **`ReviewController` doesn't map decision errors:** It does not map the `IllegalStateException` or `IllegalArgumentException` from `PublishingService.approve` and `reject` to HTTP statuses, so the resulting status for an already-decided or missing item is unclear. No global handler was found in the files read.
+- **Frontend `AuthResponse` is incomplete:** `frontend/src/lib/types.ts` declares only `token`. The backend `AuthResponse` also returns `refreshToken`.
+- **Raw UUIDs instead of relations:** `LedgerEntry.runId`/`orgId`, `UsageEvent.runId`/`orgId`, `Wallet.orgId`, `ReviewItem.reviewerUserId` and `User.lastOrgId`/`signupOrgId` are raw UUIDs, not JPA relations.

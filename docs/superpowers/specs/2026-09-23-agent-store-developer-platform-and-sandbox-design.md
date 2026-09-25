@@ -30,7 +30,7 @@ Sizes use **S** (≤ 3 days), **M** (1–2 weeks), **L** (2–4 weeks) for one e
 | D3 | **Open developer signup, verified to list.** Anyone can sign up, build and use the sandbox (within quotas). Listing publicly requires identity/business verification. | New verification workflow (WS7) and developer quotas (WS6). |
 | D4 | **SDK-first packaging on platform-controlled base images.** Developers ship code + dependency manifest, not containers. **Custom Docker images later, only for verified/partner developers.** | Platform owns the runtime; all data/LLM access goes through platform APIs. |
 | D5 | **SDKs in Python and TypeScript from day one.** | Two thin SDKs generated from one OpenAPI contract + a shared conformance suite (WS4). |
-| D6 | **Java/Spring Boot backend stays** as the single source of truth. SDKs are thin HTTP clients. | One small TypeScript service is added (`sandbox-bridge`, §3) only because E2B's command/template APIs exist only in its JS/Python SDKs. |
+| D6 | **Java/Spring Boot backend stays** as the single source of truth. SDKs are thin HTTP clients. | **Superseded 2026-09-25 (see `2026-09-25-ws5-sandbox-runner-build-pipeline-cli-design.md`):** a Java `sandbox-runner` with a pluggable `IsolationBackend` replaces the TypeScript `sandbox-bridge`. E2B is used only for testing (through a small Node shim), and self-hosted gVisor is the long-term backend. |
 | D7 | **LLM access = option C.** Platform-provided LLM by default (metered through an LLM gateway). Bring-your-own-key (BYOK) allowed **only for verified developers**. | LLM gateway in the backend (WS3). BYOK has two flavours — see WS3. |
 | D8 | **Developer sandbox = the production engine in a test mode**, not a separate system. | One execution path; sandbox, automated review and buyer trials all reuse it. |
 | D9 | **The UI shows an agent as a flow of blocks** (Reads → Thinks → Drafts → Asks you → Writes → Charges), on the listing, the live run, the developer studio and the sandbox. | The manifest has to describe each block in buyer language, and every run step has to name the block it belongs to (WS1, manifest v2 additions). |
@@ -78,6 +78,8 @@ Packaging/build pipeline, Agent Runtime API + SDKs, data plane (datasets, scope-
 
 ## 3. Target architecture
 
+> **Superseded in part (2026-09-25):** the `sandbox-bridge` and E2B boxes below are replaced by the Java `sandbox-runner` and its pluggable `IsolationBackend` (E2B for testing, gVisor self-hosted). See `2026-09-25-ws5-sandbox-runner-build-pipeline-cli-design.md` §2–§3. The rest of the diagram stands.
+
 ```
                          ┌──────────────────────────── Web (Next.js) ────────────────────────────┐
                          │ Buyer console · Developer portal (+ Sandbox) · Admin/review console   │
@@ -119,6 +121,8 @@ Packaging/build pipeline, Agent Runtime API + SDKs, data plane (datasets, scope-
 
 ### 3.1 Why `sandbox-bridge` exists (and why it stays tiny)
 
+> **Superseded (2026-09-25):** replaced by the runner API in `2026-09-25-ws5-sandbox-runner-build-pipeline-cli-design.md` §3. Kept for history.
+
 E2B's template build (`Template.build`, `fromImage`, `fromDockerfile`) and in-sandbox process execution (`sandbox.commands.run`) are only available through its JS/Python SDKs. Rather than reimplement E2B's internal protocol in Java, a ~500-line TypeScript service wraps the SDK and exposes a narrow internal HTTP API to Java. It holds **no business state** — Java remains the source of truth; the bridge is a stateless adapter and can be horizontally scaled or replaced (e.g. by a Modal or self-hosted Firecracker bridge) behind the same interface.
 
 Bridge API (internal only, authenticated by a shared secret / mTLS, never exposed publicly):
@@ -141,7 +145,7 @@ Bridge API (internal only, authenticated by a shared secret / mTLS, never expose
 | DB | Postgres (existing) | Flyway migrations continue from `V12`. The WS0 plan uses `V12`–`V16`, so later workstreams take the next free numbers from `V17` in the order they merge. **The `Vnn` labels in this document are placeholders**, not reserved numbers. |
 | Object storage | S3 (prod), MinIO (local via docker-compose) | Bundles, datasets, run outputs, build logs, run logs. Access via pre-signed URLs only. |
 | Background jobs | Spring `@Scheduled` + **ShedLock** (Postgres-backed lock) | Reaper, build poller, outbox processors, payouts. No Kafka/Redis needed yet. |
-| Sandbox provider | E2B via `sandbox-bridge` | Keep the `SandboxProvider` seam to swap later. |
+| Sandbox provider | `sandbox-runner` with a pluggable `IsolationBackend`: E2B for testing, self-hosted gVisor long-term | See `2026-09-25-ws5-sandbox-runner-build-pipeline-cli-design.md`. Spring keeps the `SandboxProvider` seam. |
 | LLM providers | Anthropic + OpenAI via backend LLM gateway | Platform keys in secret manager. |
 | Secrets | Env vars locally; AWS Secrets Manager / KMS in prod | AES key for tenant secrets moves out of `application.yml` defaults. |
 | Public ingress | One domain, two path families: `/api/v1/**` (users), `/runtime/v1/**` (agents) | Separate rate limits. Runtime host must be reachable from E2B (use a tunnel such as `cloudflared` for local dev). |
@@ -611,6 +615,8 @@ export async function run(ctx: AgentContext) {
 ---
 
 ### WS5 — Packaging, build pipeline, sandbox-bridge, CLI · **L** · depends on WS0; parallel with WS1–WS4
+
+> **Refined 2026-09-25:** `2026-09-25-ws5-sandbox-runner-build-pipeline-cli-design.md` replaces the bridge with the runner, renames `provider_template_id` to `image_ref` and adds `backend`, and splits WS5 into WS5a/b/c plus WS5d (gVisor). That document wins where the two differ.
 
 **Goal:** developer runs `agentstore push`; the platform builds an E2B template it owns and attaches it to a version. Replaces the free-text "E2B template ID" field.
 
@@ -1275,10 +1281,10 @@ CREATE TABLE dispute_message (id UUID PRIMARY KEY, dispute_id UUID NOT NULL REFE
 
 ## 6. Security model
 
-**Trust boundaries:** (1) browser ↔ backend (JWT), (2) CLI ↔ backend (developer API key), (3) agent sandbox ↔ backend (per-run token, `/runtime/v1` only), (4) backend ↔ bridge (internal network + shared secret/mTLS), (5) bridge ↔ E2B, (6) backend ↔ LLM providers, (7) backend ↔ object storage (pre-signed URLs, short TTL).
+**Trust boundaries:** (1) browser ↔ backend (JWT), (2) CLI ↔ backend (developer API key), (3) agent sandbox ↔ backend (per-run token, `/runtime/v1` only), (4) backend ↔ sandbox-runner (internal network + shared secret), (5) runner ↔ isolation backend (E2B for testing, gVisor self-hosted), (6) backend ↔ LLM providers, (7) backend ↔ object storage (pre-signed URLs, short TTL).
 
 **Defence layers for untrusted agent code**
-1. **Isolation:** Firecracker microVM per run (E2B); fresh sandbox per run, never reused across orgs.
+1. **Isolation:** a gVisor sandbox (self-hosted) or a Firecracker microVM (E2B, testing) per run; a fresh sandbox per run, never reused across orgs.
 2. **Egress:** deny-all + allowlist (runtime API host, storage host, manifest hosts) at VM network layer; in-sandbox logging proxy for visibility.
 3. **Mediated access:** agents have no buyer credentials by default — data, LLM and gates are reached only via `/runtime/v1` with scope checks. Secrets are injected only for `byok_direct` and explicit connection secrets, which only Tier B reviewed agents can declare.
 4. **Least privilege tokens:** per-run token, hashed at rest, dies with the run.
@@ -1295,8 +1301,8 @@ CREATE TABLE dispute_message (id UUID PRIMARY KEY, dispute_id UUID NOT NULL REFE
 ## 7. Sequencing & milestones
 
 ```
-M0  Foundations            WS0 fixes · WS12 local dev/compose/secrets · bridge skeleton
-M1  First third-party run  WS5 build pipeline + bridge (build, create+run, kill) · WS1 Runtime API
+M0  Foundations            WS0 fixes · WS12 local dev/compose/secrets · runner skeleton (WS5a)
+M1  First third-party run  WS5a/b/c runner + build pipeline + CLI · WS1 Runtime API
                            · WS2 datasets/bindings/outputs (buyer side) · WS4 Python SDK + base image
                            → exit: an agent written by someone else, pushed via CLI, runs for a buyer
                              on uploaded CSVs with enforced scopes and egress.
@@ -1315,7 +1321,7 @@ M4  Money & scale          WS10 double-entry + revenue split + payouts · WS9 tr
 - **M3** adds WS13 Google sign-in and SSO.
 - **M4** adds WS10 wallet top-up and tax invoices (before real money), and WS16 disputes (before public track records show dispute rates).
 
-Critical path: **WS0 → WS5 (bridge) → WS1 → WS2 → WS6**. WS4 can start as soon as the WS1 OpenAPI draft exists. WS7 is independent and can run in parallel at any time. Every workstream gets its own implementation plan under `docs/superpowers/plans/`.
+Critical path: **WS0 → WS5 (runner) → WS1 → WS2 → WS6**. WS5d (self-hosted gVisor backend) must land before production hosting moves off E2B. WS4 can start as soon as the WS1 OpenAPI draft exists. WS7 is independent and can run in parallel at any time. Every workstream gets its own implementation plan under `docs/superpowers/plans/`.
 
 ---
 
@@ -1325,7 +1331,7 @@ Critical path: **WS0 → WS5 (bridge) → WS1 → WS2 → WS6**. WS4 can start a
 |---|---|---|---|
 | Q1 | Who bears **platform LLM cost** in production and trials — buyer (separate line item), or developer (deducted from earnings)? | **Settled by the UI:** the developer bears it, at cost, deducted from earnings (Earnings screen: "AI usage through Karya"). Buyers see only the declared unit price. | ~~WS3, WS10~~ Settled |
 | Q2 | Platform take rate. | 20% default (the UI and agreement text both say "Karya keeps 20%"). The 15% partner / first-₹10-lakh tier is still open commercially; `platform_fee_percent` per developer already supports it. | WS10 |
-| Q3 | Which E2B plan/limits (concurrency, template count, build minutes) and whether to keep a second provider (Modal/Daytona) warm behind `SandboxProvider`. | Stay single-provider for M1–M3; revisit at M4 with real volume. | M1 |
+| Q3 | Which E2B plan/limits (concurrency, template count, build minutes) and whether to keep a second provider (Modal/Daytona) warm behind `SandboxProvider`. | **Closed 2026-09-25:** one backend at a time. E2B only while the free credit lasts, for testing; self-hosted gVisor long-term (WS5d). See `2026-09-25-ws5-sandbox-runner-build-pipeline-cli-design.md`. | ~~M1~~ Closed |
 | Q4 | Manual verification vs KYC vendor (e.g. an Indian KYC API for PAN/GSTIN). | The admin screen shows automated checks (PAN active, GSTIN cancelled, bank holder name differs). WS7 now puts checks behind a `KycProvider`: launch with `ManualKycProvider` if needed (checks show "check by hand"), and add a vendor with penny-drop support once volume justifies it. Pick the vendor before M3 if the screen should launch fully automated. | WS7 |
 | Q5 | Should buyers be able to supply their **own** LLM key (enterprise data-residency requirement)? | Not now; design the gateway so the key source is per-run (already true via `key_source`). | Post-M4 |
 | Q6 | Legal: developer agreement, marketplace-operator obligations, TDS/GST on payouts, DPDP for buyer data processed by third-party agents. | Counsel before M3 (listing) and M4 (payouts). Product tracks agreement versions only. | M3/M4 |
@@ -1341,7 +1347,7 @@ Critical path: **WS0 → WS5 (bridge) → WS1 → WS2 → WS6**. WS4 can start a
 ## 9. Glossary
 
 - **Bundle** — the uploaded source archive for one agent version.
-- **Template** — the E2B snapshot built from a base image + bundle; `agent_version.image_ref` points to it.
+- **Image** — the runnable artifact built from a base image + bundle by the active isolation backend (an E2B template or an OCI image); `agent_version.image_ref` points to it.
 - **Run mode** — PRODUCTION / SANDBOX / REVIEW / TRIAL (§4.1).
 - **Runtime API** — `/runtime/v1`, the only interface agent code uses (§4.2).
 - **Resource** — a typed dataset slot declared in the manifest; scopes grant READ/WRITE on resources.
@@ -1349,7 +1355,7 @@ Critical path: **WS0 → WS5 (bridge) → WS1 → WS2 → WS6**. WS4 can start a
 - **Staged write** — output held until an approval gate covering it is approved.
 - **Behaviour report** — per-run declared-vs-actual analysis (scopes, network, cost, gates).
 - **Sandbox profile** — saved configuration for sandbox runs (data, inputs, gate policy, LLM mode).
-- **sandbox-bridge** — stateless TypeScript adapter over the E2B SDK.
+- **sandbox-runner** — internal Java service that builds images and runs sandboxes through a pluggable `IsolationBackend` (replaces the earlier `sandbox-bridge`).
 
 ---
 

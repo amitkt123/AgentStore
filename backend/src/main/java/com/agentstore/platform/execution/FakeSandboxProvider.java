@@ -4,23 +4,31 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Component
-@Profile("!e2b")
+@Profile("!runner")
 public class FakeSandboxProvider implements SandboxProvider {
 
     private final List<SandboxSpec> created = new CopyOnWriteArrayList<>();
     private final Set<String> killed = ConcurrentHashMap.newKeySet();
-    private final Set<String> exited = ConcurrentHashMap.newKeySet();
+    private final Map<String, Integer> exited = new ConcurrentHashMap<>();
+    private final Set<String> unknown = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean failNextCreate = new AtomicBoolean(false);
+    private final AtomicReference<String> capacityCode = new AtomicReference<>();
 
     @Override
     public SandboxHandle create(SandboxSpec spec) {
+        String code = capacityCode.getAndSet(null);
+        if (code != null) {
+            throw new SandboxCapacityException(code);
+        }
         if (failNextCreate.getAndSet(false)) {
             throw new IllegalStateException("Simulated sandbox provider failure");
         }
@@ -30,6 +38,10 @@ public class FakeSandboxProvider implements SandboxProvider {
 
     public void failNextCreate() {
         failNextCreate.set(true);
+    }
+
+    public void failNextCreateWithCapacity(String code) {
+        capacityCode.set(code);
     }
 
     @Override
@@ -47,11 +59,26 @@ public class FakeSandboxProvider implements SandboxProvider {
 
     @Override
     public SandboxStatus status(String sandboxId) {
-        return killed.contains(sandboxId) || exited.contains(sandboxId) ? SandboxStatus.EXITED : SandboxStatus.RUNNING;
+        if (unknown.contains(sandboxId)) {
+            return SandboxStatus.UNKNOWN;
+        }
+        if (killed.contains(sandboxId)) {
+            return SandboxStatus.GONE;
+        }
+        Integer code = exited.get(sandboxId);
+        return code == null ? SandboxStatus.RUNNING : SandboxStatus.exited(code);
     }
 
     public void markExited(String sandboxId) {
-        exited.add(sandboxId);
+        markExited(sandboxId, 0);
+    }
+
+    public void markExited(String sandboxId, int exitCode) {
+        exited.put(sandboxId, exitCode);
+    }
+
+    public void markUnknown(String sandboxId) {
+        unknown.add(sandboxId);
     }
 
     /** The spec used for the given run's sandbox (latest if created more than once). Tests read the raw token from it. */
