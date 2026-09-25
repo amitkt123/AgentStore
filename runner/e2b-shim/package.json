@@ -1,0 +1,17 @@
+{
+  "name": "agentstore-e2b-shim",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "e2b": "^2.51.0"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.2"
+  }
+}
