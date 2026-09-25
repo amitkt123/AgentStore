@@ -4,6 +4,7 @@ import com.agentstore.runner.backend.FakeBackend;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.InOrder;
 
 import java.nio.file.Path;
 import java.time.Clock;
@@ -17,6 +18,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
 
 class RunnerReaperTest {
 
@@ -78,5 +80,59 @@ class RunnerReaperTest {
 
         assertThat(reaper(service, budget).reconcileWithSpring()).isZero();
         assertThat(backend.listOwned()).hasSize(1);
+    }
+
+    @Test
+    void reconcileListsSandboxesBeforeAskingSpring() {
+        BudgetGuard budget = new BudgetGuard(5, Duration.ofHours(10), tmp.resolve("b.json"), clock);
+        SandboxService service = new SandboxService(backend, budget, "runner-a", Duration.ofMinutes(10), clock);
+        String orphan = service.create(cmd("run-done", 600));
+        AtomicReference<String> racer = new AtomicReference<>();
+        // Spring answers without run-new, then run-new becomes active and gets its sandbox right away.
+        // Listing after this answer (the old order) would see that sandbox and kill it.
+        SpringRunsClient spring = () -> {
+            racer.set(service.create(cmd("run-new", 600)));
+            return Optional.of(Set.of());
+        };
+
+        int killed = new RunnerReaper(backend, service, budget, spring, clock).reconcileWithSpring();
+
+        assertThat(killed).isEqualTo(1);
+        assertThat(backend.status(orphan).phase().name()).isEqualTo("GONE");
+        assertThat(backend.status(racer.get()).phase().name()).isEqualTo("RUNNING");
+    }
+
+    @Test
+    void reconcileDoesNotCallSpringWhenNothingIsOwned() {
+        BudgetGuard budget = new BudgetGuard(5, Duration.ofHours(10), tmp.resolve("b.json"), clock);
+        SandboxService service = new SandboxService(backend, budget, "runner-a", Duration.ofMinutes(10), clock);
+        SpringRunsClient spring = () -> { throw new AssertionError("Spring must not be called"); };
+
+        assertThat(new RunnerReaper(backend, service, budget, spring, clock).reconcileWithSpring()).isZero();
+    }
+
+    @Test
+    void scheduledSweepReconcilesWithSpringAndSweepsDeadlines() {
+        RunnerReaper reaper = mock(RunnerReaper.class);
+        new ReaperJob(reaper).sweep();
+        InOrder order = inOrder(reaper);
+        order.verify(reaper).reconcileWithSpring();
+        order.verify(reaper).sweep();
+    }
+
+    @Test
+    void scheduledSweepStillSweepsWhenReconcileFails() {
+        RunnerReaper reaper = mock(RunnerReaper.class);
+        when(reaper.reconcileWithSpring()).thenThrow(new IllegalStateException("backend down"));
+        new ReaperJob(reaper).sweep();
+        verify(reaper).sweep();
+    }
+
+    @Test
+    void startupAlsoRunsBoth() {
+        RunnerReaper reaper = mock(RunnerReaper.class);
+        new ReaperJob(reaper).onStartup();
+        verify(reaper).reconcileWithSpring();
+        verify(reaper).sweep();
     }
 }

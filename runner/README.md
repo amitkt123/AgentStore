@@ -17,7 +17,7 @@ RUNNER_SECRET=dev-runner-secret E2B_API_KEY=e2b_... mvn spring-boot:run
 | `RUNNER_BIND` | `127.0.0.1` | Listen address. Loopback only by default; set `0.0.0.0` when Spring runs on another host. |
 | `RUNNER_BACKEND` | `e2b` | `e2b` now; `gvisor` arrives in WS5d. |
 | `E2B_API_KEY` | (required for e2b) | Only the runner has it. |
-| `SPRING_BASE_URL` | `http://localhost:8080` | Used on startup to find orphaned sandboxes. |
+| `SPRING_BASE_URL` | `http://localhost:8080` | Asked at startup and on every 60 s sweep which runs are active, so orphaned sandboxes are killed. |
 | `RUNNER_STATE_FILE` | `./runner-budget.json` | Monthly sandbox-time ledger. |
 
 Budget guard (protects E2B credit): 2 concurrent sandboxes, 10 min max each, 10 h per month. Change under

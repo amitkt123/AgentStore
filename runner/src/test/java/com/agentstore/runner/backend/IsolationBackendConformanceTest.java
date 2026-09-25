@@ -29,7 +29,7 @@ public abstract class IsolationBackendConformanceTest {
     /** True when the backend enforces allowOut (FakeBackend does not). */
     protected boolean enforcesEgress() { return false; }
 
-    /** True when DNS lookups of non-allowlisted names are blocked. E2B: not verified (accepted gap, spec §5). */
+    /** True when DNS lookups of non-allowlisted names are blocked. The vendor backend: not verified (accepted gap, spec §5). */
     protected boolean filtersDns() { return false; }
 
     protected String allowedHost() { return "example.com"; }
