@@ -1,0 +1,58 @@
+import { parseArgs } from "node:util";
+import { login } from "./commands/login.js";
+import type { Context } from "./context.js";
+import { CliError } from "./errors.js";
+
+const USAGE = `Usage: agentstore <command> [options]
+
+Commands:
+  login [--api-url URL]                 Save an API key (verified against the API first)
+  init [--python|--node] [--name N] [--category C] [--description D]
+                                        Create an agent and scaffold a project in an empty directory
+  validate                              Check the project the way the backend will
+  push [--wait] [--timeout SECONDS]     Upload the project and start a build
+`;
+
+type Values = Record<string, string | boolean | undefined>;
+
+function parse(args: string[], options: Record<string, { type: "string" | "boolean" }>): Values {
+  try {
+    return parseArgs({ args, options, strict: true, allowPositionals: false }).values as Values;
+  } catch (e) {
+    throw new CliError(`${(e as Error).message}\n\n${USAGE}`);
+  }
+}
+
+export const str = (values: Values, key: string): string | undefined =>
+  typeof values[key] === "string" ? (values[key] as string) : undefined;
+
+export const flag = (values: Values, key: string): boolean => values[key] === true;
+
+export async function main(argv: string[], ctx: Context): Promise<number> {
+  const [command, ...args] = argv;
+  try {
+    switch (command) {
+      case "login": {
+        const values = parse(args, { "api-url": { type: "string" } });
+        return await login(ctx, { apiUrl: str(values, "api-url") });
+      }
+      case "help":
+      case "--help":
+      case "-h":
+        ctx.out(USAGE);
+        return 0;
+      case undefined:
+        ctx.err(USAGE);
+        return 2;
+      default:
+        ctx.err(`Unknown command "${command}"\n\n${USAGE}`);
+        return 2;
+    }
+  } catch (e) {
+    if (e instanceof CliError) {
+      ctx.err(e.message);
+      return e.exitCode;
+    }
+    throw e;
+  }
+}
