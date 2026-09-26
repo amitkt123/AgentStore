@@ -16,9 +16,11 @@ import java.util.UUID;
 public class DatasetController {
 
     private final DatasetService datasetService;
+    private final DatasetCheckService checkService;
 
-    public DatasetController(DatasetService datasetService) {
+    public DatasetController(DatasetService datasetService, DatasetCheckService checkService) {
         this.datasetService = datasetService;
+        this.checkService = checkService;
     }
 
     @PostMapping(value = "/datasets", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -46,6 +48,16 @@ public class DatasetController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID id) {
         datasetService.delete(Caller.current().orgId(), id);
+    }
+
+    public record CheckRequest(@jakarta.validation.constraints.NotNull UUID agentVersionId,
+                               @jakarta.validation.constraints.NotBlank String resource) {
+    }
+
+    @PostMapping("/datasets/{id}/check")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    public SchemaChecker.CheckResult check(@PathVariable UUID id, @jakarta.validation.Valid @RequestBody CheckRequest request) {
+        return checkService.check(Caller.current().orgId(), id, request.agentVersionId(), request.resource());
     }
 
     @GetMapping("/orgs/{orgId}/storage")
