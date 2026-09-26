@@ -18,14 +18,24 @@ import org.springframework.web.server.ResponseStatusException;
 public class RuntimeExceptionHandler {
 
     private static ResponseEntity<ProblemBody> problem(HttpStatus status, String code, String detail) {
+        return problem(status, code, detail, null);
+    }
+
+    private static ResponseEntity<ProblemBody> problem(HttpStatus status, String code, String detail, java.util.List<?> errors) {
         return ResponseEntity.status(status)
                 .contentType(MediaType.parseMediaType(ProblemResponses.PROBLEM_JSON))
-                .body(ProblemBody.of(status, code, detail));
+                .body(ProblemBody.of(status, code, detail, errors));
     }
 
     @ExceptionHandler(RuntimeApiException.class)
     ResponseEntity<ProblemBody> api(RuntimeApiException e) {
-        return problem(e.status(), e.code(), e.getMessage());
+        return problem(e.status(), e.code(), e.getMessage(), e.errors());
+    }
+
+    @ExceptionHandler(com.agentstore.platform.storage.StorageException.class)
+    ResponseEntity<ProblemBody> storage(com.agentstore.platform.storage.StorageException e) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "STORAGE_UNAVAILABLE",
+                "The data store is unavailable right now; retry shortly");
     }
 
     @ExceptionHandler(RunTerminatedException.class)

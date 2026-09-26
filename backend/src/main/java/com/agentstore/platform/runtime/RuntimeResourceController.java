@@ -2,9 +2,16 @@ package com.agentstore.platform.runtime;
 
 import com.agentstore.platform.execution.RunStepKind;
 import com.agentstore.platform.manifest.Scope;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Map;
 
 @RestController
@@ -48,6 +55,22 @@ public class RuntimeResourceController {
         ResourceBackend.FileLink link = backend.file(principal, resource);
         recorder.record(principal, RunStepKind.DATA_READ, Map.of("resource", resource, "file", true));
         return link;
+    }
+
+    /** Writes straight to the response (not StreamingResponseBody): the stateless run-token chain must not be re-entered on an async dispatch. */
+    @GetMapping("/{resource}/file/content")
+    @Operation(responses = @ApiResponse(responseCode = "200", description = "The file's bytes",
+            content = @Content(mediaType = "application/octet-stream", schema = @Schema(type = "string", format = "binary"))))
+    public void fileContent(@PathVariable String resource, HttpServletResponse response) throws IOException {
+        RunPrincipal principal = RunPrincipal.current();
+        scopeGuard.read(principal, resource);
+        ResourceBackend.FileContent content = backend.fileContent(principal, resource);
+        try (InputStream in = content.stream()) {
+            recorder.record(principal, RunStepKind.DATA_READ, Map.of("resource", resource, "file", true, "download", true));
+            response.setContentType(content.contentType());
+            response.setContentLengthLong(content.sizeBytes());
+            in.transferTo(response.getOutputStream());
+        }
     }
 
     @PostMapping("/{resource}/records")

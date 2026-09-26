@@ -49,6 +49,7 @@ class RuntimeContractTest extends AbstractIntegrationTest {
         assertThat(generated.get("paths").fieldNames()).toIterable().contains(
                 "/runtime/v1/context", "/runtime/v1/gates", "/runtime/v1/gates/{gateId}", "/runtime/v1/usage",
                 "/runtime/v1/logs", "/runtime/v1/heartbeat", "/runtime/v1/complete", "/runtime/v1/fail",
-                "/runtime/v1/llm/chat", "/runtime/v1/resources/{resource}/records");
+                "/runtime/v1/llm/chat", "/runtime/v1/resources/{resource}/records",
+                "/runtime/v1/resources/{resource}/file/content");
     }
 }
