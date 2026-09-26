@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import { init } from "./commands/init.js";
 import { login } from "./commands/login.js";
 import { validateCommand } from "./commands/validate.js";
 import type { Context } from "./context.js";
@@ -36,6 +37,22 @@ export async function main(argv: string[], ctx: Context): Promise<number> {
       case "login": {
         const values = parse(args, { "api-url": { type: "string" } });
         return await login(ctx, { apiUrl: str(values, "api-url") });
+      }
+      case "init": {
+        const values = parse(args, {
+          python: { type: "boolean" }, node: { type: "boolean" }, typescript: { type: "boolean" },
+          name: { type: "string" }, category: { type: "string" }, description: { type: "string" },
+        });
+        const chosen = [flag(values, "python"), flag(values, "node"), flag(values, "typescript")].filter(Boolean).length;
+        if (chosen > 1) {
+          throw new CliError(`Choose one of --python, --node or --typescript.\n\n${USAGE}`);
+        }
+        return await init(ctx, {
+          runtime: flag(values, "node") ? "node" : flag(values, "typescript") ? "typescript" : "python",
+          name: str(values, "name"),
+          category: str(values, "category"),
+          description: str(values, "description"),
+        });
       }
       case "validate":
         parse(args, {});

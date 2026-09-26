@@ -62,3 +62,11 @@ describe("validate command", () => {
     expect(await main(["validate", "--wat"], ctx)).toBe(2);
   });
 });
+
+describe("init command", () => {
+  it("rejects two runtime flags with exit 2", async () => {
+    const ctx = makeContext();
+    expect(await main(["init", "--python", "--node"], ctx)).toBe(2);
+    expect(ctx.errLines.join("\n")).toContain("Choose one of");
+  });
+});
