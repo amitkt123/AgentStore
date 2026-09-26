@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -42,6 +44,15 @@ public class Run {
     private Instant deadlineAt;
     private Instant lastHeartbeatAt;
     private Instant awaitingSince;
+
+    @Enumerated(EnumType.STRING)
+    private RunMode mode = RunMode.PRODUCTION;
+
+    private int violationCount;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "input_json", columnDefinition = "jsonb")
+    private String inputJson = "{}";
 
     public Run(UUID id, Connection connection, AgentVersion agentVersion, RunStatus status, BigDecimal costCap,
                BigDecimal totalCharged, String sandboxId, String callbackTokenHash) {
