@@ -1,0 +1,484 @@
+openapi: 3.1.0
+info:
+  title: AgentStore Agent Runtime API
+  description: The only interface agent code uses. Authenticate with the run token
+    in AGENTSTORE_RUN_TOKEN.
+  version: "1"
+servers:
+- url: /
+security:
+- runToken: []
+paths:
+  /runtime/v1/usage:
+    post:
+      tags:
+      - runtime-usage-controller
+      operationId: usage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsageRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UsageResponse"
+  /runtime/v1/resources/{resource}/records:
+    get:
+      tags:
+      - runtime-resource-controller
+      operationId: records
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecordPage"
+    post:
+      tags:
+      - runtime-resource-controller
+      operationId: write
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WriteRecordsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WriteResult"
+  /runtime/v1/logs:
+    post:
+      tags:
+      - runtime-lifecycle-controller
+      operationId: logs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogBatch"
+        required: true
+      responses:
+        "204":
+          description: No Content
+  /runtime/v1/llm/chat:
+    post:
+      tags:
+      - runtime-llm-controller
+      operationId: chat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+  /runtime/v1/heartbeat:
+    post:
+      tags:
+      - runtime-lifecycle-controller
+      operationId: heartbeat
+      responses:
+        "204":
+          description: No Content
+  /runtime/v1/gates:
+    post:
+      tags:
+      - runtime-gate-controller
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGateRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GateCreatedResponse"
+  /runtime/v1/fail:
+    post:
+      tags:
+      - runtime-lifecycle-controller
+      operationId: fail
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FailRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RunStateResponse"
+  /runtime/v1/complete:
+    post:
+      tags:
+      - runtime-lifecycle-controller
+      operationId: complete
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RunStateResponse"
+  /runtime/v1/resources/{resource}:
+    get:
+      tags:
+      - runtime-resource-controller
+      operationId: metadata
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceMeta"
+  /runtime/v1/resources/{resource}/file:
+    get:
+      tags:
+      - runtime-resource-controller
+      operationId: file
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/FileLink"
+  /runtime/v1/gates/{gateId}:
+    get:
+      tags:
+      - runtime-gate-controller
+      operationId: get
+      parameters:
+      - name: gateId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: wait
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GateView"
+  /runtime/v1/context:
+    get:
+      tags:
+      - runtime-context-controller
+      operationId: context
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ContextResponse"
+components:
+  schemas:
+    UsageRequest:
+      properties:
+        quantity:
+          type: number
+        unit:
+          type: string
+          maxLength: 100
+          minLength: 0
+        outcomeRef:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - quantity
+      - unit
+    UsageResponse:
+      properties:
+        charged:
+          type: number
+        totalCharged:
+          type: number
+        costCapRemaining:
+          type: number
+    WriteRecordsRequest:
+      properties:
+        records:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - records
+    WriteResult:
+      properties:
+        accepted:
+          type: integer
+          format: int32
+        staged:
+          type: boolean
+    LogBatch:
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogEntry"
+      required:
+      - entries
+    LogEntry:
+      properties:
+        level:
+          type: string
+          maxLength: 16
+          minLength: 0
+        message:
+          type: string
+          maxLength: 4000
+          minLength: 0
+        fields:
+          type: object
+          additionalProperties: {}
+      required:
+      - level
+      - message
+    CreateGateRequest:
+      properties:
+        action:
+          type: string
+          maxLength: 100
+          minLength: 0
+        summary:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        payload:
+          type: object
+          additionalProperties: {}
+        affectsResources:
+          type: array
+          items:
+            type: string
+      required:
+      - action
+      - payload
+      - summary
+    GateCreatedResponse:
+      properties:
+        gateId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PENDING
+          - APPROVED
+          - REJECTED
+          - EXPIRED
+        expiresAt:
+          type: string
+          format: date-time
+    FailRequest:
+      properties:
+        error:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        retriable:
+          type: boolean
+      required:
+      - error
+    RunStateResponse:
+      properties:
+        status:
+          type: string
+          enum:
+          - PENDING
+          - PENDING_BUILD
+          - RUNNING
+          - AWAITING_APPROVAL
+          - COMPLETED
+          - FAILED
+          - CANCELLED
+          - TIMED_OUT
+          - EXPIRED
+    CompleteRequest:
+      properties:
+        summary:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        outputs:
+          type: object
+          additionalProperties: {}
+    ResourceMeta:
+      properties:
+        resource:
+          type: string
+        format:
+          type: string
+        rowCount:
+          type: integer
+          format: int64
+    RecordPage:
+      properties:
+        records:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        nextCursor:
+          type: string
+    FileLink:
+      properties:
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    GateView:
+      properties:
+        gateId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PENDING
+          - APPROVED
+          - REJECTED
+          - EXPIRED
+        note:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type: string
+          format: date-time
+    AgentVersionInfo:
+      properties:
+        id:
+          type: string
+          format: uuid
+        versionNumber:
+          type: string
+    ContextResponse:
+      properties:
+        runId:
+          type: string
+          format: uuid
+        mode:
+          type: string
+          enum:
+          - PRODUCTION
+          - SANDBOX
+          - REVIEW
+          - TRIAL
+        agentVersion:
+          $ref: "#/components/schemas/AgentVersionInfo"
+        input:
+          type: object
+          additionalProperties: {}
+        grantedScopes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GrantedScope"
+        limits:
+          $ref: "#/components/schemas/Limits"
+    GrantedScope:
+      properties:
+        type:
+          type: string
+          enum:
+          - READ
+          - WRITE
+        resource:
+          type: string
+        requiresApproval:
+          type: boolean
+    Limits:
+      properties:
+        deadlineAt:
+          type: string
+          format: date-time
+        costCapRemaining:
+          type: number
+        currency:
+          type: string
+  securitySchemes:
+    runToken:
+      type: http
+      scheme: bearer

@@ -73,6 +73,13 @@ agentstore:
     secret-key: ${STORAGE_SECRET_KEY:agentstore-dev-secret-change-me}
     bucket: ${STORAGE_BUCKET:agentstore}
 
+springdoc:
+  paths-to-match: /runtime/v1/**
+  api-docs:
+    version: openapi_3_1
+  swagger-ui:
+    enabled: false
+
 management:
   endpoints:
     web:
