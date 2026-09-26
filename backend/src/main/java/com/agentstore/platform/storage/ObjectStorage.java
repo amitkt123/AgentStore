@@ -19,6 +19,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -119,6 +120,24 @@ public class ObjectStorage {
             s3.putObject(p -> p.bucket(bucket).key(key), RequestBody.fromBytes(bytes));
         } catch (SdkException e) {
             throw new StorageException("Could not write " + key, e);
+        }
+    }
+
+    /** Streams a local file (up to the upload cap) without holding it in memory. */
+    public void putFile(String key, Path file) {
+        try {
+            s3.putObject(p -> p.bucket(bucket).key(key), RequestBody.fromFile(file));
+        } catch (SdkException e) {
+            throw new StorageException("Could not write " + key, e);
+        }
+    }
+
+    /** Bytes {@code from}..{@code toInclusive} of an object. The caller must keep {@code from} below the object's size. */
+    public InputStream openRange(String key, long from, long toInclusive) {
+        try {
+            return s3.getObject(g -> g.bucket(bucket).key(key).range("bytes=" + from + "-" + toInclusive));
+        } catch (SdkException e) {
+            throw new StorageException("Could not read " + key, e);
         }
     }
 

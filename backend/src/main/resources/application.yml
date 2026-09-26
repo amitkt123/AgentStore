@@ -11,6 +11,10 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: ${agentstore.data.max-file-size:50MB}
+      max-request-size: ${agentstore.data.max-request-size:51MB}
   threads:
     virtual:
       enabled: true      # a long-polling agent (GET /runtime/v1/gates/{id}?wait=) must not tie up a platform thread
@@ -24,6 +28,8 @@ spring:
       mail.smtp.starttls.enable: true
 
 agentstore:
+  data:
+    retention-interval: PT1H
   jwt:
     secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef-0123456789}
     expiration-minutes: 60
