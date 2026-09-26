@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { main } from "../src/cli.js";
-import { makeContext } from "./helpers.js";
+import { validateCommand } from "../src/commands/validate.js";
+import { makeContext, writeFiles } from "./helpers.js";
 
 describe("main", () => {
   it("prints usage and exits 2 when no command is given", async () => {
@@ -31,5 +32,33 @@ describe("main", () => {
     const ctx = makeContext({ secrets: ["not-a-key"] });
     expect(await main(["login"], ctx)).toBe(2);
     expect(ctx.errLines.join("\n")).toContain("ask_live_");
+  });
+});
+
+describe("validate command", () => {
+  it("exits 1 and lists every problem when the project is bad", async () => {
+    const ctx = makeContext();
+    expect(await main(["validate"], ctx)).toBe(1);
+    expect(ctx.errLines.join("\n")).toContain("manifest.json is missing");
+  });
+
+  it("exits 0 for a valid project", async () => {
+    const ctx = makeContext();
+    writeFiles(ctx.cwd, {
+      "manifest.json": JSON.stringify({
+        name: "R", version: "1.0.0", runtime: "python-3.12", entrypoint: "agent/main.py", scopes: [],
+        network: { allowlist: [] },
+        costEnvelope: { currency: "INR", maxPerRun: 1, pricingUnit: "METERED", unitPrice: 1, unitLabel: "u" },
+        approvalGates: [], dataClasses: [],
+      }),
+      "agent/main.py": "x",
+    });
+    expect(await validateCommand(ctx)).toBe(0);
+    expect(ctx.outLines.join("\n")).toMatch(/^OK: 2 files/);
+  });
+
+  it("rejects stray arguments with exit 2", async () => {
+    const ctx = makeContext();
+    expect(await main(["validate", "--wat"], ctx)).toBe(2);
   });
 });

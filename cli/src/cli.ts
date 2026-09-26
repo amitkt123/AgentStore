@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import { login } from "./commands/login.js";
+import { validateCommand } from "./commands/validate.js";
 import type { Context } from "./context.js";
 import { CliError } from "./errors.js";
 
@@ -36,6 +37,9 @@ export async function main(argv: string[], ctx: Context): Promise<number> {
         const values = parse(args, { "api-url": { type: "string" } });
         return await login(ctx, { apiUrl: str(values, "api-url") });
       }
+      case "validate":
+        parse(args, {});
+        return await validateCommand(ctx);
       case "help":
       case "--help":
       case "-h":
