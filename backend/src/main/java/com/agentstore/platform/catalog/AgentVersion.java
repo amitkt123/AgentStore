@@ -1,5 +1,7 @@
 package com.agentstore.platform.catalog;
 
+import com.agentstore.platform.build.AgentBundle;
+import com.agentstore.platform.build.BuildStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -32,6 +34,14 @@ public class AgentVersion {
     private String manifestJson;
 
     private String imageRef;
+
+    /** The bundle the current image is built from; null for versions created with a hand-supplied imageRef. */
+    @ManyToOne
+    @JoinColumn(name = "bundle_id")
+    private AgentBundle bundle;
+
+    @Enumerated(EnumType.STRING)
+    private BuildStatus buildStatus;
 
     @Enumerated(EnumType.STRING)
     private VersionStatus status;

@@ -14,8 +14,10 @@ class RunnerPropertiesTest {
     void toStringRedactsTheSecretAndTheApiKey() {
         var props = new RunnerProperties("runner-s3cret", "runner-1", "e2b", "http://spring",
                 new RunnerProperties.Budget(2, Duration.ofMinutes(10), Duration.ofHours(10), Path.of("b.json")),
+                new RunnerProperties.Build(List.of("gitleaks"), Duration.ofMinutes(15), Duration.ofMinutes(2),
+                        Duration.ofMinutes(5), Duration.ofSeconds(5), Path.of("builds")),
                 new RunnerProperties.E2b("e2b_key_value", "https://api", List.of("node"), Duration.ofSeconds(60),
-                        Duration.ofSeconds(30)));
+                        Duration.ofSeconds(30), Duration.ofMinutes(14)));
 
         String text = props.toString();
 

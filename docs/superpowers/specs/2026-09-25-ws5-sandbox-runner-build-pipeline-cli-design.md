@@ -17,7 +17,8 @@
 | C1 | **No dependence on paid vendors in the long run.** Sandboxing must end up running on our own infrastructure with free, open-source software. | A self-hosted gVisor backend (WS5d) is the production target. |
 | C2 | **Use the $100 of free E2B credit for testing now.** | E2B is the first backend (WS5a). A budget guard protects the credit. |
 | C3 | **Easy to switch vendors.** | Exactly one vendor seam, `IsolationBackend`, inside the runner. Every backend must pass the same conformance tests. Vendor terms never leak outside the backend class. |
-| C4 | **Hosting:** development runs on a Mac (Colima). M1 production is one self-hosted Linux box running Postgres, Spring, MinIO, the registry and the runner. | One runner instance in WS5. Nothing in the design may prevent adding more runners later (§9). |
+| C4 | **Hosting:** development runs on a Mac (Colima). M1 production is one self-hosted Linux box running Postgres, Spring, SeaweedFS (object store), the registry and the runner. | One runner instance in WS5. Nothing in the design may prevent adding more runners later (§9). |
+| C5 | **Object store: SeaweedFS (Apache-2.0), used only through the S3 API.** MinIO stopped publishing free images in October 2025 and is in maintenance mode, so it was dropped on 2026-09-25. | Spring uses the AWS SDK v2 S3 client, so any S3-compatible store (SeaweedFS, Garage, AWS S3) can replace it through config alone. The runner never holds store credentials: it only uses pre-signed URLs. |
 
 **Success criteria:**
 - `agentstore init && agentstore push --wait` produces a SUCCEEDED build.
@@ -34,8 +35,8 @@
 Spring backend ──HTTP + X-Runner-Secret──▶ sandbox-runner (Maven module runner/, Java 21)
   RunnerSandboxProvider                      ├─ RunnerApi        (/builds, /sandboxes)
   (replaces E2bSandboxProvider)              ├─ BuildService / SandboxService
-  BuildDispatcher / BuildPoller              ├─ Shared: BundleFetcher (MinIO), Unpacker, SecretScanner (gitleaks),
-                                             │          LogSink (MinIO), BudgetGuard, Reaper
+  BuildDispatcher / BuildPoller              ├─ Shared: BundleFetcher (S3), Unpacker, SecretScanner (gitleaks),
+                                             │          LogSink (S3), BudgetGuard, Reaper
                                              └─ IsolationBackend  ◀── the only vendor seam
                                                   ├─ E2bBackend    (E2B REST + Node shim)      WS5a/b
                                                   └─ GvisorBackend (Docker + runsc + BuildKit
@@ -102,7 +103,7 @@ All requests need `X-Runner-Secret`, which is compared in constant time. The API
 
 ## 4. Build pipeline (WS5b)
 
-1. **Upload.** `POST /api/v1/agents/{id}/bundles/uploads` returns a pre-signed MinIO PUT URL. The CLI uploads the bundle, then calls `POST /bundles/{id}/finalize {sha256}`. Spring checks the size and hash, reads `manifest.json` from the bundle, and validates it (the backend's answer is final). It then creates or updates a DRAFT `agent_version` and inserts a `template_build` row in `QUEUED`.
+1. **Upload.** `POST /api/v1/agents/{id}/bundles/uploads` returns a pre-signed PUT URL for the object store. The CLI uploads the bundle, then calls `POST /bundles/{id}/finalize {sha256}`. Spring checks the size and hash, reads `manifest.json` from the bundle, and validates it (the backend's answer is final). It then creates or updates a DRAFT `agent_version` and inserts a `template_build` row in `QUEUED`.
 2. **Dispatch.** `BuildDispatcher` (`@Scheduled` + ShedLock) sends queued builds to `POST /builds` with a pre-signed GET URL. `BuildPoller` polls `GET /builds/{id}` and copies the result into `template_build` and `agent_version`.
 3. **Shared runner steps (the same for every backend):**
    - Download the bundle and verify its sha256.
@@ -116,9 +117,9 @@ All requests need `X-Runner-Secret`, which is compared in constant time. The API
    - Run `pip-audit` or `npm audit --audit-level=high`; a failure is `DEP_VULN`.
    - Run the entrypoint import smoke test; a failure is `SMOKE_FAILED`.
    - Install `agentstore-run`.
-   The build log streams to MinIO under `builds/{buildId}.log`, with known secret formats redacted.
+   The build log streams to the object store under `builds/{buildId}.log`, with known secret formats redacted.
 5. **E2B specifics:**
-   - E2B's build servers can't reach MinIO on a private network, so the shim uploads the unpacked directory from the runner with the template builder's `.copy()`.
+   - E2B's build servers can't reach the object store on a private network, so the shim uploads the unpacked directory from the runner with the template builder's `.copy()`.
    - The template starts from the official public images plus our setup steps, so **WS5a/b need no registry**.
    - E2B can't restrict egress during template builds; see §5.
 6. **Result.** On success, `template_build.image_ref` and `agent_version.image_ref` are set and `build_status=SUCCEEDED`. A version can be submitted only when `build_status=SUCCEEDED`, and its bundle can't be changed once submitted.
@@ -168,13 +169,27 @@ If another workstream merges a migration first, WS5 takes the next free number. 
 
 **Manifest:** WS5b adds `runtime` (`python-3.12` or `node-22`) and `entrypoint` to the manifest. The rest of manifest v2 stays with WS1.
 
+
+### 4.2 Decisions made while planning WS5b (2026-09-25)
+
+- **Bundle format:** a zip with `manifest.json` at its root. `entrypoint` is a path relative to the zip root (`.py` for `python-3.12`; `.js`, `.mjs` or `.cjs` for `node-22`).
+- **Run command** comes from the manifest: `sh -c "cd /workspace/app && exec python|node '<entrypoint>'"`. Versions without a `runtime` (created through the older JSON endpoint with a hand-supplied image) keep the `agentstore.runs.agent-command` fallback.
+- **The upload request declares `sha256` and `sizeBytes`** (`POST .../bundles/uploads {sha256, sizeBytes}`). That keeps `agent_bundle.sha256` NOT NULL and lets Spring refuse a bundle over 100 MB before handing out a URL. `finalize {sha256}` must match what was declared, and Spring re-hashes the stored bytes.
+- **`POST /builds` also carries `logUploadUrl`,** a pre-signed PUT URL for `builds/{buildId}.log`. The runner rewrites the whole object every few seconds, because object stores can't append. The runner therefore never holds store credentials, and `GET /builds/{id}` doesn't return `logKey`.
+- **Two more failure codes:** `BUILD_FAILED` (a backend or build-system error that isn't tied to one recipe step) and `SUPERSEDED` (a queued build replaced by a newer push of the same DRAFT version).
+- **`template_build.attempts`:** `RUNNER_RESTARTED` re-queues a build at most 3 times, so a bundle that crashes the runner can't loop forever.
+- **Secret scan command:** `gitleaks dir` (gitleaks 8.19+ replaced `detect --no-git` with `dir`).
+- **Python smoke test:** the entrypoint is imported under a module name other than `__main__`, so code behind `if __name__ == "__main__":` doesn't run during the build. **Node smoke test:** `node --check`.
+- **The run wrapper** is still installed when the sandbox starts, as in WS5a. Baking it into the image (§2.2) is left to WS5d, where there's a Dockerfile to put it in.
+- **Rebuild trigger:** Spring compares the backend of the version's latest successful build with its own `agentstore.runner.backend` setting.
+- **The legacy JSON version endpoint** (`POST /agents/{id}/versions` with `imageRef`) stays until WS5c changes the submission wizard. Submitting a version is refused when it has a bundle whose build hasn't succeeded, or when it has no image at all.
 ---
 
 ## 5. Egress and security
 
 **Egress rules.** A sandbox may reach only the runtime API host plus the manifest's `allowOut` hosts; everything else is denied. The rule is expressed once, in `SandboxLaunch.allowOut`, and enforced per backend:
 - **E2B:** its sandbox network controls at creation, denying all outbound traffic except the allowlisted hosts.
-- **gVisor (WS5d):** each run on its own `internal` Docker network, with traffic forced through the egress proxy, which allows only the run's hosts plus MinIO.
+- **gVisor (WS5d):** each run on its own `internal` Docker network, with traffic forced through the egress proxy, which allows only the run's hosts plus the object store.
 
 **Build-time egress.**
 - **gVisor** limits dependency installs to PyPI and npm through the proxy.
@@ -221,7 +236,7 @@ If another workstream merges a migration first, WS5 takes the next free number. 
 
 ### 6.3 Frontend
 - `SubmissionWizard` drops the template-ID field.
-- The version page shows the build status and the log (read from MinIO through a pre-signed URL).
+- The version page shows the build status and the log (read from the object store through a pre-signed URL).
 - Developer settings gets an **API keys** section to create (showing the key once), list and revoke keys.
 
 ---
@@ -251,7 +266,7 @@ If another workstream merges a migration first, WS5 takes the next free number. 
 3. **Shim.** Vitest with the E2B SDK mocked. On the Java side, the subprocess protocol (JSON I/O, errors, timeout, a crashed shim) is tested against a fake shim script.
 4. **Spring:**
    - `RunnerSandboxProvider` against `MockRestServiceServer`.
-   - `BuildDispatcher` and `BuildPoller` with Testcontainers Postgres and MinIO: success, each `failure_code`, the `RUNNER_RESTARTED` re-queue, a backend-mismatch rebuild, and `CAPACITY_EXHAUSTED` releasing the reservation.
+   - `BuildDispatcher` and `BuildPoller` with Testcontainers Postgres and SeaweedFS: success, each `failure_code`, the `RUNNER_RESTARTED` re-queue, a backend-mismatch rebuild, and `CAPACITY_EXHAUSTED` releasing the reservation.
    - The migration.
    - API keys: shown once, stored hashed, revoked keys rejected, 403 on excluded endpoints.
    - Submit blocked unless the build succeeded.
@@ -267,7 +282,7 @@ Local test prerequisites follow the existing setup: Colima, with `TESTCONTAINERS
 | Plan | Contents | Depends on |
 |---|---|---|
 | **WS5a** | `runner/` module, `IsolationBackend`, `FakeBackend`, `E2bBackend` + Node shim (sandbox lifecycle and the run wrapper), runner API `/sandboxes`, budget guard, reaper, conformance tests, `RunnerSandboxProvider`, the `SandboxSpec`/`SandboxStatus` changes, deleting `E2bSandboxProvider`. **Fixes B2.** Until WS5b lands, the conformance tests and E2E use a hand-built image. | WS0 (merged) |
-| **WS5b** | MinIO in docker-compose, the §4.1 migration, bundle upload/finalize, `BuildDispatcher`/`BuildPoller`, runner `/builds`, unpacking and gitleaks, `E2bBackend.buildImage` (recipe, scans, smoke test), manifest `runtime` + `entrypoint`, `PENDING_BUILD` rebuild, build log in the portal. | WS5a |
+| **WS5b** | SeaweedFS in docker-compose, the §4.1 migration, bundle upload/finalize, `BuildDispatcher`/`BuildPoller`, runner `/builds`, unpacking and gitleaks, `E2bBackend.buildImage` (recipe, scans, smoke test), manifest `runtime` + `entrypoint`, `PENDING_BUILD` rebuild, build log in the portal. | WS5a |
 | **WS5c** | `developer_api_key` + `ApiKeyAuthFilter`, the CLI (`login`/`init`/`validate`/`push --wait`), the API-keys settings UI, removing the wizard's template-ID field. | WS5b (for `push`) |
 | **WS5d** (later) | `GvisorBackend`: Docker + runsc, BuildKit, `registry:2`, per-run internal network + egress proxy, build-time PyPI/npm-only egress, `@Tag("gvisor")` conformance. | WS5b; start when moving off E2B |
 
@@ -288,7 +303,7 @@ Local test prerequisites follow the existing setup: Colima, with `TESTCONTAINERS
 The rest of the platform, realistic case:
 - Spring: 3–4 instances behind a load balancer.
 - Postgres: one primary (16 vCPU / 64 GB, NVMe) plus a replica, with PgBouncer.
-- MinIO: a 4-node distributed setup.
+- Object store: a distributed SeaweedFS cluster (or another S3-compatible store).
 - Registry: cached on each runner.
 
 At that scale a home server isn't viable; rented dedicated servers running the same open-source software are, at roughly €2–4K/month (an estimate to re-check). E2B at that volume would cost tens of thousands of dollars a month. LLM token spend will probably cost more than compute, which makes WS3's BYOK and per-org spend caps important.
@@ -298,7 +313,7 @@ At that scale a home server isn't viable; rented dedicated servers running the s
 2. **Multiple runners.** Spring picks a runner by capacity. The runner already keeps no database; gVisor runners pull from the shared registry.
 3. **One egress proxy per host instead of per run (WS5d decision point).** It identifies runs by source IP and applies each run's allowlist, saving about 20 MB of RAM per run.
 4. **Pools of pre-started sandboxes** for popular agents, if cold starts matter.
-5. Agent logs go to MinIO in batches, **never** row by row into Postgres (already the rule).
+5. Agent logs go to the object store in batches, **never** row by row into Postgres (already the rule).
 
 **Alternatives considered (2026-09-25).** The platform-hosted model was kept.
 - **Who runs the code:** A) platform-hosted (**chosen**; gives control, keeps data on the platform, and allows review); B) developer-hosted, via webhook or MCP endpoint (how Shopify and Slack apps work; almost no compute cost, but data leaves the platform and review is weak); C) declarative agents (config only, run by a platform engine); D) buyer-hosted (in the buyer's own cloud; an enterprise option for later). B or C could later be added as a separately labelled agent type in its own workstream.

@@ -1,13 +1,21 @@
 package com.agentstore.runner.backend.e2b;
 
+import com.agentstore.runner.backend.AgentRuntime;
 import com.agentstore.runner.backend.BackendException;
+import com.agentstore.runner.backend.BuildFailedException;
+import com.agentstore.runner.backend.ImageBuild;
 import com.agentstore.runner.backend.SandboxLaunch;
 import com.agentstore.runner.backend.SandboxState;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.web.client.ResourceAccessException;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class E2bBackendTest {
@@ -107,5 +116,68 @@ class E2bBackendTest {
         when(rest.exists("sbx-1")).thenReturn(false);
         assertThat(backend.readLogs("sbx-1", 5, 1024).data()).isEmpty();
         verifyNoInteractions(shim);
+    }
+
+    ImageBuild imageBuild(Path app) {
+        return new ImageBuild("B1", app, AgentRuntime.PYTHON_3_12, "agent/main.py");
+    }
+
+    @Test
+    void buildSendsTheRecipeInputsAndReturnsTheImageRef(@TempDir Path app) {
+        when(shim.call(any(), any(Duration.class))).thenReturn(om.createObjectNode().put("ok", true).put("imageRef", "tpl-1"));
+
+        assertThat(backend.buildImage(imageBuild(app), l -> { })).isEqualTo("tpl-1");
+        verify(shim).call(argThat(req -> "build".equals(req.get("op")) && "agentstore-b1".equals(req.get("name"))
+                && app.toAbsolutePath().toString().equals(req.get("appDir")) && "python-3.12".equals(req.get("runtime"))
+                && "agent/main.py".equals(req.get("entrypoint")) && req.get("logPath") != null), eq(Duration.ofMinutes(14)));
+    }
+
+    @Test
+    void linesTheShimWritesReachTheBuildLog(@TempDir Path app) {
+        when(shim.call(any(), any(Duration.class))).thenAnswer(inv -> {
+            Map<String, Object> req = inv.getArgument(0);
+            Files.writeString(Path.of((String) req.get("logPath")), "Collecting requests\nInstalled\n");
+            return om.createObjectNode().put("ok", true).put("imageRef", "tpl-1");
+        });
+        List<String> lines = new ArrayList<>();
+        backend.buildImage(imageBuild(app), lines::add);
+        assertThat(lines).containsExactly("Collecting requests", "Installed");
+    }
+
+    @Test
+    void aRecipeStepFailureKeepsItsCode(@TempDir Path app) {
+        when(shim.call(any(), any(Duration.class))).thenThrow(new ShimException("shim build failed: audit", "DEP_VULN"));
+        assertThatThrownBy(() -> backend.buildImage(imageBuild(app), l -> { }))
+                .isInstanceOf(BuildFailedException.class)
+                .satisfies(e -> assertThat(((BuildFailedException) e).code()).isEqualTo("DEP_VULN"));
+    }
+
+    @Test
+    void anyOtherShimFailureIsBuildFailed(@TempDir Path app) {
+        when(shim.call(any(), any(Duration.class))).thenThrow(new ShimException("shim build failed: x", "E2B_ERROR"));
+        assertThatThrownBy(() -> backend.buildImage(imageBuild(app), l -> { }))
+                .satisfies(e -> assertThat(((BuildFailedException) e).code()).isEqualTo("BUILD_FAILED"));
+    }
+
+    @Test
+    void aShimTimeoutIsTimeout(@TempDir Path app) {
+        when(shim.call(any(), any(Duration.class))).thenThrow(new ShimTimeoutException("shim build timed out"));
+        assertThatThrownBy(() -> backend.buildImage(imageBuild(app), l -> { }))
+                .satisfies(e -> assertThat(((BuildFailedException) e).code()).isEqualTo("TIMEOUT"));
+    }
+
+    @Test
+    void aBlankImageRefIsBuildFailed(@TempDir Path app) {
+        when(shim.call(any(), any(Duration.class))).thenReturn(om.createObjectNode().put("ok", true));
+        assertThatThrownBy(() -> backend.buildImage(imageBuild(app), l -> { }))
+                .satisfies(e -> assertThat(((BuildFailedException) e).code()).isEqualTo("BUILD_FAILED"));
+    }
+
+    @Test
+    void aShimFailureWithNoCodeIsBuildFailed(@TempDir Path app) {
+        when(shim.call(any(), any(Duration.class))).thenThrow(new ShimException("shim build could not start: boom"));
+        assertThatThrownBy(() -> backend.buildImage(imageBuild(app), l -> { }))
+                .isInstanceOf(BuildFailedException.class)
+                .satisfies(e -> assertThat(((BuildFailedException) e).code()).isEqualTo("BUILD_FAILED"));
     }
 }

@@ -1,6 +1,8 @@
 package com.agentstore.platform.catalog;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,4 +14,12 @@ public interface AgentVersionRepository extends JpaRepository<AgentVersion, UUID
     Optional<AgentVersion> findFirstByAgentIdAndStatusOrderByApprovedAtDesc(UUID agentId, VersionStatus status);
 
     List<AgentVersion> findByStatus(VersionStatus status);
+
+    Optional<AgentVersion> findByAgentIdAndVersionNumber(UUID agentId, String versionNumber);
+
+    Optional<AgentVersion> findByBundleId(UUID bundleId);
+
+    /** Scalar on purpose: lets a caller lock the agent before it loads (and caches) the version. */
+    @Query("select v.agent.id from AgentVersion v where v.id = :id")
+    Optional<UUID> findAgentIdById(@Param("id") UUID id);
 }

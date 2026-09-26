@@ -18,7 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the background for the rest of the build where it could reap runs other test classes are still using.
  */
 @DirtiesContext
-@TestPropertySource(properties = {"agentstore.jobs.enabled=true", "agentstore.runs.reaper-interval=PT1H"})
+@TestPropertySource(properties = {"agentstore.jobs.enabled=true", "agentstore.runs.reaper-interval=PT1H",
+        "agentstore.builds.poll-interval=PT1H"})
 class SchedulingWiringTest extends AbstractIntegrationTest {
 
     @Autowired

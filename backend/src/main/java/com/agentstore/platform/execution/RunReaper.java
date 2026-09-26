@@ -16,7 +16,7 @@ public class RunReaper {
 
     private static final Logger log = LoggerFactory.getLogger(RunReaper.class);
     private static final List<RunStatus> ACTIVE =
-            List.of(RunStatus.PENDING, RunStatus.RUNNING, RunStatus.AWAITING_APPROVAL);
+            List.of(RunStatus.PENDING, RunStatus.PENDING_BUILD, RunStatus.RUNNING, RunStatus.AWAITING_APPROVAL);
 
     private final RunRepository runRepository;
     private final RunLifecycleService runLifecycleService;

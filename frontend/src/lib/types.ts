@@ -1,11 +1,12 @@
 export type UserRole = "BUYER_ADMIN" | "BUYER_APPROVER" | "DEVELOPER" | "ADMIN";
 export type OrgType = "BUYER" | "DEVELOPER";
 export type VersionStatus = "DRAFT" | "IN_REVIEW" | "LIVE" | "REJECTED";
+export type BuildStatus = "QUEUED" | "BUILDING" | "SUCCEEDED" | "FAILED";
 export type ScopeType = "READ" | "WRITE";
 export type PricingUnit = "METERED" | "OUTCOME" | "SUBSCRIPTION";
 export type ConnectionStatus = "ACTIVE" | "REVOKED";
 export type RunStatus =
-  | "PENDING" | "RUNNING" | "AWAITING_APPROVAL" | "COMPLETED" | "FAILED" | "CANCELLED" | "TIMED_OUT" | "EXPIRED";
+  | "PENDING" | "PENDING_BUILD" | "RUNNING" | "AWAITING_APPROVAL" | "COMPLETED" | "FAILED" | "CANCELLED" | "TIMED_OUT" | "EXPIRED";
 export type RunStepKind = "READ" | "WRITE" | "GATE" | "COST" | "COMPLETE" | "FAILED" | "TIMEOUT" | "COST_CAP_REACHED";
 export type LedgerEntryType = "CHARGE" | "REVERSAL" | "FEE";
 export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -39,6 +40,8 @@ export interface Manifest {
   costEnvelope: CostEnvelope;
   approvalGates: ApprovalGateDecl[];
   dataClasses: string[];
+  runtime?: string | null;
+  entrypoint?: string | null;
 }
 
 // Raw manifest wire format — what POST .../versions expects as manifestJson, built by Task 21's wizard.
@@ -78,6 +81,14 @@ export interface AgentVersionDetailResponse {
   versionNumber: string;
   status: VersionStatus;
   manifest: Manifest;
+  build?: BuildSummary | null;
+}
+export interface BuildSummary {
+  buildId: string;
+  status: BuildStatus;
+  failureCode: string | null;
+  failureReason: string | null;
+  logUrl: string | null;
 }
 export interface MyAgentsResponse {
   agentId: string;

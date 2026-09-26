@@ -5,6 +5,7 @@ import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,20 @@ public class FakeBackend implements IsolationBackend {
     });
     public final AtomicInteger createCalls = new AtomicInteger();
     private volatile RuntimeException failNextCreate;
+
+    /**
+     * Test hook: an app dir containing this file fails the build with the failure code written in it — or, when
+     * the content starts with one of the two prefixes below, with a raw exception instead of a BuildFailedException
+     * (to exercise the "backend threw something unexpected" path).
+     */
+    public static final String FAIL_MARKER = ".fake-build-fail";
+    public static final String RUNTIME_PREFIX = "RUNTIME:";
+    public static final String BACKEND_PREFIX = "BACKEND:";
+    /** Test hook: an app dir containing this file has its content appended to the build log. */
+    public static final String LOG_MARKER = ".fake-build-log";
+
+    public final AtomicInteger buildCalls = new AtomicInteger();
+    public volatile Duration buildDelay = Duration.ZERO;
 
     public FakeBackend(String runnerId) {
         this.runnerId = runnerId;
@@ -73,6 +88,36 @@ public class FakeBackend implements IsolationBackend {
         } catch (IOException e) {
             throw new BackendException("fake create failed", e);
         }
+    }
+
+    @Override
+    public String buildImage(ImageBuild build, BuildLog log) {
+        buildCalls.incrementAndGet();
+        log.append("fake build of " + build.entrypoint() + " on " + build.runtime().id());
+        try {
+            Thread.sleep(buildDelay.toMillis());
+            Path extraLog = build.appDir().resolve(LOG_MARKER);
+            if (Files.exists(extraLog)) {
+                Files.readString(extraLog, StandardCharsets.UTF_8).lines().forEach(log::append);
+            }
+            Path marker = build.appDir().resolve(FAIL_MARKER);
+            if (Files.exists(marker)) {
+                String content = Files.readString(marker, StandardCharsets.UTF_8).trim();
+                if (content.startsWith(RUNTIME_PREFIX)) {
+                    throw new RuntimeException(content.substring(RUNTIME_PREFIX.length()));
+                }
+                if (content.startsWith(BACKEND_PREFIX)) {
+                    throw new BackendException(content.substring(BACKEND_PREFIX.length()));
+                }
+                throw new BuildFailedException(content, "fake " + content);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BackendException("fake build interrupted");
+        } catch (IOException e) {
+            throw new BackendException("fake build failed", e);
+        }
+        return "fake-image-" + build.buildId();
     }
 
     @Override

@@ -1,0 +1,11 @@
+{
+  "identities": [
+    {
+      "name": "agentstore",
+      "credentials": [
+        { "accessKey": "agentstore-dev", "secretKey": "agentstore-dev-secret-change-me" }
+      ],
+      "actions": ["Admin", "Read", "List", "Tagging", "Write"]
+    }
+  ]
+}

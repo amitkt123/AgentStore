@@ -1,5 +1,6 @@
 package com.agentstore.platform.catalog;
 
+import com.agentstore.platform.build.BuildSummaries;
 import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.OrgRepository;
@@ -24,14 +25,17 @@ public class CatalogController {
     private final OrgRepository orgRepository;
     private final ManifestValidator manifestValidator;
     private final ManifestParser manifestParser;
+    private final BuildSummaries buildSummaries;
 
     public CatalogController(AgentRepository agentRepository, AgentVersionRepository agentVersionRepository,
-                              OrgRepository orgRepository, ManifestValidator manifestValidator, ManifestParser manifestParser) {
+                              OrgRepository orgRepository, ManifestValidator manifestValidator, ManifestParser manifestParser,
+                              BuildSummaries buildSummaries) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.orgRepository = orgRepository;
         this.manifestValidator = manifestValidator;
         this.manifestParser = manifestParser;
+        this.buildSummaries = buildSummaries;
     }
 
     @PostMapping
@@ -84,7 +88,8 @@ public class CatalogController {
         }
 
         var manifest = manifestParser.parse(version.getManifestJson());
-        return AgentVersionDetailResponse.from(version, manifest);
+        var build = (isOwningDeveloper || isAdmin) ? buildSummaries.latest(version).orElse(null) : null;
+        return AgentVersionDetailResponse.from(version, manifest, build);
     }
 
     private UUID currentOrgId() {

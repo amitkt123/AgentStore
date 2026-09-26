@@ -5,7 +5,9 @@
   "required": ["name", "version", "scopes", "network", "costEnvelope", "approvalGates", "dataClasses"],
   "properties": {
     "name": { "type": "string", "minLength": 1 },
-    "version": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "minLength": 1, "maxLength": 50 },
+    "runtime": { "type": "string", "enum": ["python-3.12", "node-22"] },
+    "entrypoint": { "type": "string", "maxLength": 255, "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*$" },
     "scopes": {
       "type": "array",
       "items": {

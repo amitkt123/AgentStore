@@ -1,0 +1,13 @@
+{
+  "name": "Bank Reconciliation Agent",
+  "version": "1.0.0",
+  "runtime": "python-3.12",
+  "entrypoint": "agent/main.py",
+  "scopes": [
+    { "type": "READ", "resource": "bank_statement", "description": "Read uploaded bank statement rows" }
+  ],
+  "network": { "allowlist": [] },
+  "costEnvelope": { "currency": "INR", "maxPerRun": 500.00, "pricingUnit": "METERED", "unitPrice": 2.00, "unitLabel": "reconciled_transaction" },
+  "approvalGates": [],
+  "dataClasses": ["BANK_STATEMENT"]
+}

@@ -1,0 +1,16 @@
+# Local infrastructure for AgentStore development.
+#   docker compose up -d seaweedfs      (or: docker-compose up -d seaweedfs)
+# SeaweedFS is the object store (bundles, build logs), used only through its S3 API on :8333 (spec C5).
+# Postgres still runs the way it does today (see the backend README).
+services:
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.47
+    command: server -s3 -s3.config=/etc/seaweedfs/s3.json -dir=/data -ip.bind=0.0.0.0
+    ports:
+      - "8333:8333"
+    volumes:
+      - ./infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+      - seaweedfs-data:/data
+
+volumes:
+  seaweedfs-data:

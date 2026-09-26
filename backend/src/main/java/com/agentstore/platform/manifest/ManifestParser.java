@@ -51,6 +51,11 @@ public class ManifestParser {
         }
 
         return new Manifest(root.get("name").asText(), root.get("version").asText(), scopes, allowlist,
-                costEnvelope, gates, dataClasses);
+                costEnvelope, gates, dataClasses, textOrNull(root, "runtime"), textOrNull(root, "entrypoint"));
+    }
+
+    private static String textOrNull(JsonNode root, String field) {
+        JsonNode node = root.get(field);
+        return node == null || node.isNull() ? null : node.asText();
     }
 }
