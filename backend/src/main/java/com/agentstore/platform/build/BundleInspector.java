@@ -26,6 +26,17 @@ public class BundleInspector {
 
     public static final int MAX_MANIFEST_BYTES = 256 * 1024;
     public static final int MAX_ENTRIES = 20_000;
+    public static final long MAX_UNPACKED_BYTES = 500L * 1024 * 1024;
+
+    private final long maxUnpackedBytes;
+
+    public BundleInspector() {
+        this(MAX_UNPACKED_BYTES);
+    }
+
+    BundleInspector(long maxUnpackedBytes) {
+        this.maxUnpackedBytes = maxUnpackedBytes;
+    }
 
     public record Inspection(String sha256, String manifestJson, Set<String> files) {}
 
@@ -35,6 +46,7 @@ public class BundleInspector {
         String manifest = null;
         Set<String> files = new HashSet<>();
         int entries = 0;
+        long unpacked = 0;
         try {
             ZipInputStream zip = new ZipInputStream(digest);
             ZipEntry entry;
@@ -43,12 +55,16 @@ public class BundleInspector {
                     throw new BundleRejectedException("Bundle has more than " + MAX_ENTRIES + " entries");
                 }
                 String name = normalize(entry.getName());
-                if (entry.isDirectory()) {
-                    continue;
+                boolean isManifest = !entry.isDirectory() && name.equals("manifest.json");
+                if (!entry.isDirectory()) {
+                    files.add(name);
                 }
-                files.add(name);
-                if (name.equals("manifest.json")) {
-                    manifest = readCapped(zip);
+                // Every entry is inflated through a bounded buffer and counted, so a compression bomb is rejected
+                // as soon as the running total passes the limit instead of being inflated to the end.
+                ByteArrayOutputStream captured = isManifest ? new ByteArrayOutputStream() : null;
+                unpacked = inflateCounting(zip, captured, unpacked);
+                if (captured != null) {
+                    manifest = captured.toString(StandardCharsets.UTF_8);
                 }
             }
             digest.transferTo(OutputStream.nullOutputStream());   // hash the central directory too
@@ -74,17 +90,27 @@ public class BundleInspector {
         return n;
     }
 
-    private static String readCapped(ZipInputStream zip) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
+    /** Reads the current entry to its end; keeps its bytes in {@code capture} (if given) and returns the new running total. */
+    private long inflateCounting(ZipInputStream zip, ByteArrayOutputStream capture, long total) throws IOException {
         byte[] buffer = new byte[8192];
+        long entryBytes = 0;
         int n;
         while ((n = zip.read(buffer)) > 0) {
-            if (out.size() + n > MAX_MANIFEST_BYTES) {
-                throw new BundleRejectedException("manifest.json is too large (limit 256 KiB)");
+            total += n;
+            if (total > maxUnpackedBytes) {
+                throw new BundleRejectedException("Bundle is larger than the unpacked-size limit ("
+                        + (maxUnpackedBytes >= 1024 * 1024 ? maxUnpackedBytes / (1024 * 1024) + " MB" : maxUnpackedBytes + " bytes")
+                        + ")");
             }
-            out.write(buffer, 0, n);
+            if (capture != null) {
+                entryBytes += n;
+                if (entryBytes > MAX_MANIFEST_BYTES) {
+                    throw new BundleRejectedException("manifest.json is too large (limit 256 KiB)");
+                }
+                capture.write(buffer, 0, n);
+            }
         }
-        return out.toString(StandardCharsets.UTF_8);
+        return total;
     }
 
     private static MessageDigest sha256() {

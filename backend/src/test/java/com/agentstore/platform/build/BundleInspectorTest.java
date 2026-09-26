@@ -51,4 +51,28 @@ class BundleInspectorTest {
         assertThatThrownBy(() -> inspector.inspect(new ByteArrayInputStream(zip)))
                 .isInstanceOf(BundleRejectedException.class).hasMessageContaining("too large");
     }
+
+    @Test
+    void entriesThatInflatePastTheUnpackedLimitAreRejectedEvenWhenTheyAreNotTheManifest() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("manifest.json", "{}");
+        files.put("bomb.bin", "\0".repeat(200_000));   // deflates to a few hundred bytes
+        byte[] zip = TestBundles.zip(files);
+        assertThat(zip.length).isLessThan(2_000);
+        assertThatThrownBy(() -> new BundleInspector(64 * 1024).inspect(new ByteArrayInputStream(zip)))
+                .isInstanceOf(BundleRejectedException.class).hasMessageContaining("unpacked-size limit");
+    }
+
+    @Test
+    void theUnpackedLimitIsCumulativeAcrossEntries() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("manifest.json", "{}");
+        for (int i = 0; i < 10; i++) {
+            files.put("part" + i + ".bin", "\0".repeat(10_000));
+        }
+        byte[] zip = TestBundles.zip(files);
+        assertThatThrownBy(() -> new BundleInspector(50_000).inspect(new ByteArrayInputStream(zip)))
+                .isInstanceOf(BundleRejectedException.class).hasMessageContaining("unpacked-size limit");
+        assertThat(new BundleInspector(200_000).inspect(new ByteArrayInputStream(zip)).files()).hasSize(11);
+    }
 }

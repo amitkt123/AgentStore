@@ -52,11 +52,13 @@ public class BundleUnpacker {
                 if (!dest.startsWith(root)) {
                     throw invalid("Path escapes the bundle: " + name);
                 }
-                if (dest.equals(root)) {
-                    continue;
-                }
-                if (entry.isDirectory()) {
-                    Files.createDirectories(dest);
+                if (dest.equals(root) || entry.isDirectory()) {
+                    // Nothing is written for these, but a crafted entry can still carry a huge compressed payload:
+                    // inflate it through the same budget so it cannot hold the build slot.
+                    total = copyWithinLimit(in, OutputStream.nullOutputStream(), total);
+                    if (!dest.equals(root)) {
+                        Files.createDirectories(dest);
+                    }
                     continue;
                 }
                 Files.createDirectories(dest.getParent());

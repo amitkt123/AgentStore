@@ -67,6 +67,30 @@ class BundleUnpackerTest {
     }
 
     @Test
+    void rejectsADirectoryEntryThatCarriesAHugePayload() throws Exception {
+        Path zip = write(TestZips.zipBytes(Map.of("dir/", new byte[10_000_000])));   // compresses to a few KB
+        Path app = target();
+        assertInvalid(() -> new BundleUnpacker(1024, 100).unpack(zip, app), "unpacked-size limit");
+    }
+
+    @Test
+    void rejectsARootEntryThatCarriesAHugePayload() throws Exception {
+        Path zip = write(TestZips.zipBytes(Map.of("./", new byte[10_000_000])));
+        Path app = target();
+        assertInvalid(() -> new BundleUnpacker(1024, 100).unpack(zip, app), "unpacked-size limit");
+    }
+
+    @Test
+    void countsSkippedEntriesAndFilesAgainstOneBudget() throws Exception {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        files.put("dir/", new byte[600]);
+        files.put("a.bin", new byte[600]);
+        Path zip = write(TestZips.zipBytes(files));
+        Path app = target();
+        assertInvalid(() -> new BundleUnpacker(1000, 100).unpack(zip, app), "unpacked-size limit");
+    }
+
+    @Test
     void rejectsTooManyEntries() throws Exception {
         Map<String, String> files = new LinkedHashMap<>();
         for (int i = 0; i < 5; i++) {
