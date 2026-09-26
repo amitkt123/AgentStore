@@ -3,8 +3,10 @@ package com.agentstore.platform.execution;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
@@ -17,6 +19,13 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
     List<Run> findByConnectionBuyerOrgIdAndStatusOrderByStartedAtDesc(UUID buyerOrgId, RunStatus status);
 
     List<Run> findByStatusIn(Collection<RunStatus> statuses);
+
+    List<Run> findByStatusAndAgentVersionId(RunStatus status, UUID agentVersionId);
+
+    @Transactional
+    @Modifying
+    @Query("update Run r set r.callbackTokenHash = :hash where r.id = :id")
+    int updateCallbackTokenHash(@Param("id") UUID id, @Param("hash") String hash);
 
     /** Row-locks the run for the rest of the caller's transaction. Every state transition goes through this. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

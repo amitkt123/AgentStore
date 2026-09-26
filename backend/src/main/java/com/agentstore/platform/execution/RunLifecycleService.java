@@ -68,6 +68,22 @@ public class RunLifecycleService {
         runRepository.save(run);
     }
 
+    /**
+     * PENDING_BUILD → PENDING once the rebuild succeeded; the run's time limit restarts. False when the run has
+     * moved on meanwhile (reaped, failed), in which case nothing changes.
+     */
+    @Transactional
+    public boolean promotePendingBuild(UUID runId, Instant deadline) {
+        Run run = lock(runId);
+        if (run.getStatus() != RunStatus.PENDING_BUILD) {
+            return false;
+        }
+        run.setStatus(RunStatus.PENDING);
+        run.setDeadlineAt(deadline);
+        runRepository.save(run);
+        return true;
+    }
+
     @Transactional
     public void recordEvent(UUID runId, RunStepKind kind, Map<String, Object> detail) {
         if (!AGENT_REPORTABLE.contains(kind)) {

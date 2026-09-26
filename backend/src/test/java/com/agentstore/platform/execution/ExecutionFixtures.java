@@ -1,9 +1,12 @@
 package com.agentstore.platform.execution;
 
+import com.agentstore.platform.build.*;
 import com.agentstore.platform.catalog.*;
 import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.OrgRepository;
 import com.agentstore.platform.identity.OrgType;
+import com.agentstore.platform.identity.User;
+import com.agentstore.platform.identity.UserRepository;
 import com.agentstore.platform.ledger.Wallet;
 import com.agentstore.platform.ledger.WalletRepository;
 import org.springframework.stereotype.Component;
@@ -15,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 /** Shared setup for execution tests: a LIVE Tier A agent, a buyer with a wallet, and an ACTIVE connection. */
 @Component
@@ -26,16 +30,24 @@ public class ExecutionFixtures {
     private final ConnectionRepository connectionRepository;
     private final WalletRepository walletRepository;
     private final RunRepository runRepository;
+    private final UserRepository userRepository;
+    private final AgentBundleRepository agentBundleRepository;
+    private final TemplateBuildRepository templateBuildRepository;
 
     public ExecutionFixtures(OrgRepository orgRepository, AgentRepository agentRepository,
                              AgentVersionRepository agentVersionRepository, ConnectionRepository connectionRepository,
-                             WalletRepository walletRepository, RunRepository runRepository) {
+                             WalletRepository walletRepository, RunRepository runRepository,
+                             UserRepository userRepository, AgentBundleRepository agentBundleRepository,
+                             TemplateBuildRepository templateBuildRepository) {
         this.orgRepository = orgRepository;
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.connectionRepository = connectionRepository;
         this.walletRepository = walletRepository;
         this.runRepository = runRepository;
+        this.userRepository = userRepository;
+        this.agentBundleRepository = agentBundleRepository;
+        this.templateBuildRepository = templateBuildRepository;
     }
 
     public record Scenario(Org buyer, AgentVersion version, Connection connection) {}
@@ -56,6 +68,33 @@ public class ExecutionFixtures {
         wallet.setUpdatedAt(Instant.now());
         walletRepository.save(wallet);
         return new Scenario(buyer, version, connection);
+    }
+
+    /**
+     * A LIVE Tier A version built by the platform from a bundle (runtime python-3.12, entrypoint agent/main.py), whose
+     * image was built on {@code builtOnBackend}; buyer, wallet and ACTIVE connection as in {@link #liveTierA}.
+     */
+    public Scenario liveBuiltTierA(BigDecimal spendCap, BigDecimal walletBalance, String builtOnBackend) {
+        Scenario scenario = liveTierA(spendCap, walletBalance);
+        AgentVersion version = scenario.version();
+        User user = userRepository.save(new User(null, "builder-" + UUID.randomUUID() + "@example.com", null, "Builder"));
+        UUID bundleId = UUID.randomUUID();
+        AgentBundle bundle = agentBundleRepository.save(new AgentBundle(bundleId, version.getAgent(), user.getId(),
+                "bundles/" + version.getAgent().getId() + "/" + bundleId + ".zip", "c".repeat(64), 100,
+                BundleStatus.UPLOADED));
+        version.setManifestJson(readManifest("valid-bundle-python.json"));
+        version.setBundle(bundle);
+        version.setBuildStatus(BuildStatus.SUCCEEDED);
+        version.setImageRef("img-" + builtOnBackend);
+        version = agentVersionRepository.save(version);
+        TemplateBuild build = new TemplateBuild(version, bundle, builtOnBackend, "python-3.12", "agent/main.py");
+        build.setStatus(BuildStatus.SUCCEEDED);
+        build.setImageRef("img-" + builtOnBackend);
+        build.setFinishedAt(Instant.now());
+        build = templateBuildRepository.save(build);
+        build.setLogStorageKey("builds/" + build.getId() + ".log");
+        templateBuildRepository.save(build);
+        return new Scenario(scenario.buyer(), version, scenario.connection());
     }
 
     public Run run(Scenario scenario, RunStatus status, String sandboxId, String rawToken) {
