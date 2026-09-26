@@ -3,9 +3,11 @@ package com.agentstore.platform.execution;
 import com.agentstore.platform.build.RebuildService;
 import com.agentstore.platform.catalog.AgentVersion;
 import com.agentstore.platform.catalog.VersionStatus;
+import com.agentstore.platform.data.BindingResolver;
 import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.ledger.InsufficientFundsException;
 import com.agentstore.platform.ledger.WalletReservationService;
+import com.agentstore.platform.manifest.Manifest;
 import com.agentstore.platform.manifest.ManifestParser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -37,11 +40,13 @@ public class RunController {
     private final RunLauncher runLauncher;
     private final RebuildService rebuildService;
     private final PendingBuildRuns pendingBuildRuns;
+    private final BindingResolver bindingResolver;
 
     public RunController(ConnectionRepository connectionRepository, RunRepository runRepository,
                          ManifestParser manifestParser, RunTokenService runTokenService,
                          WalletReservationService walletReservationService, GateService gateService,
-                         RunLauncher runLauncher, RebuildService rebuildService, PendingBuildRuns pendingBuildRuns) {
+                         RunLauncher runLauncher, RebuildService rebuildService, PendingBuildRuns pendingBuildRuns,
+                         BindingResolver bindingResolver) {
         this.connectionRepository = connectionRepository;
         this.runRepository = runRepository;
         this.manifestParser = manifestParser;
@@ -51,6 +56,7 @@ public class RunController {
         this.runLauncher = runLauncher;
         this.rebuildService = rebuildService;
         this.pendingBuildRuns = pendingBuildRuns;
+        this.bindingResolver = bindingResolver;
     }
 
     /** How long a run may wait for its agent to be rebuilt before the reaper times it out. */
@@ -76,7 +82,8 @@ public class RunController {
         if (version.getStatus() != VersionStatus.LIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Pinned agent version is no longer LIVE");
         }
-        manifestParser.parse(version.getManifestJson());   // fail fast on a corrupt manifest, before reserving
+        Manifest manifest = manifestParser.parse(version.getManifestJson());   // fail fast on a corrupt manifest, before reserving
+        List<BindingResolver.ResolvedPin> pins = bindingResolver.resolve(connection, manifest, RunMode.PRODUCTION);   // MISSING_BINDING before any money is reserved
 
         UUID buyerOrgId = connection.getBuyerOrg().getId();
         BigDecimal spendCap = connection.getSpendCap();
@@ -99,7 +106,7 @@ public class RunController {
             if (waitForRebuild) {
                 rebuildService.queueRebuild(version);
             }
-            run = runRepository.save(pending);
+            run = bindingResolver.saveWithPins(pending, pins);
         } catch (RuntimeException e) {
             walletReservationService.release(buyerOrgId, spendCap);
             throw e;

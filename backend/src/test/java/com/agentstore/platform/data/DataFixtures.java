@@ -36,14 +36,20 @@ public class DataFixtures {
     private final JwtService jwtService;
     private final DatasetService datasetService;
     private final RunDatasetPinRepository pinRepository;
+    private final BindingService bindingService;
+    private final com.agentstore.platform.execution.ConnectionRepository connectionRepository;
 
     public DataFixtures(ExecutionFixtures executionFixtures, RunRepository runRepository, JwtService jwtService,
-                        DatasetService datasetService, RunDatasetPinRepository pinRepository) {
+                        DatasetService datasetService, RunDatasetPinRepository pinRepository,
+                        BindingService bindingService,
+                        com.agentstore.platform.execution.ConnectionRepository connectionRepository) {
         this.executionFixtures = executionFixtures;
         this.runRepository = runRepository;
         this.jwtService = jwtService;
         this.datasetService = datasetService;
         this.pinRepository = pinRepository;
+        this.bindingService = bindingService;
+        this.connectionRepository = connectionRepository;
     }
 
     /** A LIVE agent whose manifest declares typed resources, a buyer with a wallet, and an ACTIVE connection. */
@@ -102,5 +108,30 @@ public class DataFixtures {
 
     public void pin(Run run, String resource, Dataset dataset) {
         pinRepository.save(new RunDatasetPin(run.getId(), resource, dataset.getId(), dataset.getSha256()));
+    }
+
+    /** Binds through the service as a buyer admin of the connection's org. */
+    public void bind(com.agentstore.platform.execution.Connection connection, String resource, Dataset dataset) {
+        bindingService.bind(connection.getBuyerOrg().getId(), UUID.randomUUID(), connection.getId(), resource,
+                dataset.getId());
+    }
+
+    /** Narrows what a connection grants, like a buyer who ticked fewer scopes. */
+    public void grantOnly(com.agentstore.platform.execution.Connection connection, List<String> scopes) {
+        connection.setGrantedScopes(scopes);
+        connectionRepository.save(connection);
+    }
+
+    /** A second ACTIVE connection of the same buyer to the same agent version. */
+    public com.agentstore.platform.execution.Connection connectionFor(ExecutionFixtures.Scenario scenario, List<String> scopes) {
+        var connection = new com.agentstore.platform.execution.Connection(null, scenario.buyer(),
+                scenario.version().getAgent(), scopes, new BigDecimal("500.00"),
+                com.agentstore.platform.execution.ConnectionStatus.ACTIVE);
+        connection.setAgentVersion(scenario.version());
+        return connectionRepository.save(connection);
+    }
+
+    public void unbindAll(com.agentstore.platform.execution.Connection connection) {
+        bindingService.unbindAll(connection.getId());
     }
 }
