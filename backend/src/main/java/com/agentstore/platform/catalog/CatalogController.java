@@ -63,7 +63,7 @@ public class CatalogController {
         }
 
         AgentVersion version = new AgentVersion(null, agent, request.versionNumber(), request.manifestJson(),
-                request.imageRef(), VersionStatus.DRAFT, null, request.changelog());
+                null, VersionStatus.DRAFT, null, request.changelog());
         return AgentVersionResponse.from(agentVersionRepository.save(version));
     }
 

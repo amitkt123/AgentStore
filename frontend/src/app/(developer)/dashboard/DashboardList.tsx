@@ -3,8 +3,9 @@ import { StatusPill } from "@/components/StatusPill";
 import type { AgentVersionResponse, MyAgentsResponse } from "@/lib/types";
 
 function linkFor(agentId: string, version: AgentVersionResponse): string {
-  if (version.status === "IN_REVIEW") return `/dashboard/agents/${agentId}/versions/${version.id}/status`;
-  if (version.status === "DRAFT") return `/dashboard/agents/${agentId}/versions/new`;
+  if (version.status === "IN_REVIEW" || version.status === "DRAFT") {
+    return `/dashboard/agents/${agentId}/versions/${version.id}/status`;
+  }
   return `/dashboard/agents/${agentId}`;
 }
 
@@ -25,7 +26,7 @@ export function DashboardList({ agents }: { agents: MyAgentsResponse[] }) {
             </div>
             <StatusPill status={version.status} />
             <span className="text-sm font-medium">
-              {version.status === "IN_REVIEW" ? "View status" : version.status === "DRAFT" ? "Start over" : "Manage"}
+              {version.status === "IN_REVIEW" ? "View status" : version.status === "DRAFT" ? "Finish submission" : "Manage"}
             </span>
           </Link>
         )),

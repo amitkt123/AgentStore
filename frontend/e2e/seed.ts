@@ -53,19 +53,23 @@ async function main() {
     dataClasses: ["BANK_STATEMENT"],
   };
 
+  const pg = new Client({ connectionString: DATABASE_URL });
+  await pg.connect();
+
   const version = (await fetch(`${BACKEND_URL}/api/v1/agents/${agent.id}/versions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${dev.token}` },
-    body: JSON.stringify({ versionNumber: "1.0.0", manifestJson: JSON.stringify(manifest), imageRef: "e2e-template", changelog: "seed" }),
+    body: JSON.stringify({ versionNumber: "1.0.0", manifestJson: JSON.stringify(manifest), changelog: "seed" }),
   }).then((r) => r.json())) as { id: string };
+
+  // A version's image only comes from a build now; the seed has no bundle, so it sets the image directly.
+  await pg.query("update agent_version set image_ref = $1 where id = $2", ["e2e-template", version.id]);
 
   await fetch(`${BACKEND_URL}/api/v1/agents/${agent.id}/versions/${version.id}/submit`, {
     method: "POST",
     headers: { Authorization: `Bearer ${dev.token}` },
   });
 
-  const pg = new Client({ connectionString: DATABASE_URL });
-  await pg.connect();
   const buyerOrgRow = await pg.query("select id from org where name = $1", ["E2E Buyer Co"]);
   const buyerOrgId = buyerOrgRow.rows[0].id;
   await pg.query(

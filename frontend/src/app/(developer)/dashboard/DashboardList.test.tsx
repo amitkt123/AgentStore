@@ -30,4 +30,13 @@ describe("DashboardList", () => {
     render(<DashboardList agents={[]} />);
     expect(screen.getByText(/haven't submitted any agents yet/i)).toBeInTheDocument();
   });
+
+  it("links a draft to its version page, where the next step (push, then submit) is shown", () => {
+    const withDraft: MyAgentsResponse[] = [
+      { agentId: "a2", agentName: "New Agent", category: "GST & TDS", versions: [{ id: "v9", versionNumber: "0.1.0", status: "DRAFT" }] },
+    ];
+    render(<DashboardList agents={withDraft} />);
+    expect(screen.getByRole("link", { name: /0\.1\.0/i })).toHaveAttribute("href", "/dashboard/agents/a2/versions/v9/status");
+    expect(screen.getByText("Finish submission")).toBeInTheDocument();
+  });
 });

@@ -22,7 +22,7 @@ export async function createAgentAction(input: { name: string; category: string;
 
 export async function createVersionAction(
   agentId: string,
-  input: { versionNumber: string; manifestJson: string; imageRef: string; changelog: string },
+  input: { versionNumber: string; manifestJson: string; changelog: string },
 ) {
   try {
     const version = await backend.post<AgentVersionResponse>(`/api/v1/agents/${agentId}/versions`, input);

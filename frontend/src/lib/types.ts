@@ -158,3 +158,19 @@ export interface ReviewItemDetailResponse extends ReviewItemResponse {
   createdAt: string;
   decidedAt: string | null;
 }
+
+export interface ApiKeySummary {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+export interface CreatedApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  key: string;
+  createdAt: string;
+}

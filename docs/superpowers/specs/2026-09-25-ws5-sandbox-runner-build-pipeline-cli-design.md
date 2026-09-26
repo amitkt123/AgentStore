@@ -215,6 +215,8 @@ If another workstream merges a migration first, WS5 takes the next free number. 
 
 ## 6. Developer API keys and CLI (WS5c)
 
+> The detailed WS5c design is `2026-09-26-ws5c-api-keys-cli-design.md`. It supersedes this section where they differ: the CLI is local-only for now (no npm publish or binaries), `init` creates the agent, and the wizard keeps creating image-less drafts.
+
 ### 6.1 API keys
 - **Creating a key.** `POST /api/v1/developer/api-keys {name}` returns `ask_live_<32 random bytes, base62>` **once**.
 - **Table `developer_api_key`:** `id`, `org_id`, `created_by_user_id`, `name`, `prefix` (the first 12 characters, for display), `key_hash` (SHA-256; the keys are high-entropy, so a slow hash isn't needed), `created_at`, `last_used_at`, `revoked_at`. It's added in the same migration series as §4.1.
