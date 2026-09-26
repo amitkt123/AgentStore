@@ -8,6 +8,7 @@ import com.agentstore.platform.manifest.ManifestParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,14 +46,16 @@ public class RunLifecycleService {
     private final SandboxProvider sandboxProvider;
     private final WalletReservationService walletReservationService;
     private final GateRequestRepository gateRequestRepository;
+    private final ApplicationEventPublisher events;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RunLifecycleService(RunRepository runRepository, RunStepRepository runStepRepository,
                                UsageEventRepository usageEventRepository, LedgerService ledgerService,
                                ManifestParser manifestParser, SandboxProvider sandboxProvider,
                                WalletReservationService walletReservationService,
-                               GateRequestRepository gateRequestRepository) {
+                               GateRequestRepository gateRequestRepository, ApplicationEventPublisher events) {
         this.gateRequestRepository = gateRequestRepository;
+        this.events = events;
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.usageEventRepository = usageEventRepository;
@@ -322,7 +325,10 @@ public class RunLifecycleService {
             gate.setDecisionNote("The run ended before a decision was made");
             gate.setDecidedAt(Instant.now());
             gateRequestRepository.save(gate);
+            events.publishEvent(new GateOutcomeEvent(run.getId(), gate.getId(), GateStatus.EXPIRED, gate.affected(),
+                    gate.getCreatedAt()));
         });
+        events.publishEvent(new RunFinishedEvent(run.getId()));
         if (run.getSandboxId() != null) {
             killQuietly(run.getSandboxId());
         }

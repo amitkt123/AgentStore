@@ -28,6 +28,11 @@ public class Org {
     @Column(nullable = false)
     private OrgType type;
 
+    public static final long DEFAULT_STORAGE_LIMIT_BYTES = 5L * 1024 * 1024 * 1024;
+
+    @Column(name = "storage_limit_bytes", nullable = false)
+    private long storageLimitBytes = DEFAULT_STORAGE_LIMIT_BYTES;
+
     private Instant createdAt;
 
     public Org(UUID id, String name, OrgType type) {

@@ -1,6 +1,6 @@
 package com.agentstore.platform.runtime;
 
-import com.agentstore.platform.AbstractIntegrationTest;
+import com.agentstore.platform.AbstractStorageIntegrationTest;
 import com.agentstore.platform.execution.RunStepKind;
 import com.agentstore.platform.execution.RunStepRepository;
 import org.junit.jupiter.api.Test;
@@ -15,7 +15,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class RuntimeResourceEndpointsTest extends AbstractIntegrationTest {
+class RuntimeResourceEndpointsTest extends AbstractStorageIntegrationTest {
 
     @LocalServerPort
     int port;
@@ -38,24 +38,26 @@ class RuntimeResourceEndpointsTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void aGrantedReadReachesTheBackendWhichIsNotImplementedYet() {
+    void aGrantedReadOfAnUnboundResourceIsNotFoundAndNotAViolation() {
         var agent = fx.runningAgent(new BigDecimal("500.00"));
 
         var response = call(HttpMethod.GET, "/runtime/v1/resources/bank_statement/records", agent.token(), null);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
-        assertThat(response.getBody().get("code")).isEqualTo("NOT_IMPLEMENTED");
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody().get("code")).isEqualTo("RESOURCE_NOT_BOUND");
         assertThat(violationSteps(agent.run().getId())).isZero();
     }
 
     @Test
-    void aGrantedWriteReachesTheBackendWhichIsNotImplementedYet() {
+    void aGrantedWriteIsAcceptedAndStagedBecauseTheScopeRequiresApproval() {
         var agent = fx.runningAgent(new BigDecimal("500.00"));
 
         var response = call(HttpMethod.POST, "/runtime/v1/resources/journal_entries/records", agent.token(),
                 Map.of("records", List.of(Map.of("account", "1000"))));
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().get("accepted")).isEqualTo(1);
+        assertThat(response.getBody().get("staged")).isEqualTo(true);
         assertThat(violationSteps(agent.run().getId())).isZero();
     }
 

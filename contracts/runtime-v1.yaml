@@ -211,6 +211,24 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/FileLink"
+  /runtime/v1/resources/{resource}/file/content:
+    get:
+      tags:
+      - runtime-resource-controller
+      operationId: fileContent
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The file's bytes
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
   /runtime/v1/gates/{gateId}:
     get:
       tags:

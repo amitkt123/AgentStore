@@ -1,5 +1,8 @@
 package com.agentstore.platform.runtime;
 
+import org.springframework.http.HttpStatus;
+
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +18,13 @@ public interface ResourceBackend {
 
     /** {@code requiresApproval} tells the backend to stage the records until an approved gate covers them. */
     WriteResult write(RunPrincipal principal, String resource, List<Map<String, Object>> records, boolean requiresApproval);
+
+    /** The bytes behind {@link #file}'s link, streamed under the run token. Backends that have no files may keep the default. */
+    default FileContent fileContent(RunPrincipal principal, String resource) {
+        throw new RuntimeApiException(HttpStatus.NOT_IMPLEMENTED, "NOT_IMPLEMENTED", "File content is not available");
+    }
+
+    record FileContent(String contentType, long sizeBytes, InputStream stream) {}
 
     record ResourceMeta(String resource, String format, Long rowCount) {}
 

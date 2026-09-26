@@ -65,4 +65,14 @@ public class GateRequest {
     void onCreate() {
         if (createdAt == null) createdAt = Instant.now();
     }
+
+    /** The resource names this gate covers, parsed from {@code affects_resources}. */
+    public java.util.List<String> affected() {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(affectsResources,
+                    new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {});
+        } catch (Exception e) {
+            return java.util.List.of();
+        }
+    }
 }
