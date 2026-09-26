@@ -36,11 +36,12 @@ public class RunController {
     private final RunLifecycleService runLifecycleService;
     private final RunLauncher runLauncher;
     private final RebuildService rebuildService;
+    private final PendingBuildRuns pendingBuildRuns;
 
     public RunController(ConnectionRepository connectionRepository, RunRepository runRepository,
                          ManifestParser manifestParser, RunTokenService runTokenService,
                          WalletReservationService walletReservationService, RunLifecycleService runLifecycleService,
-                         RunLauncher runLauncher, RebuildService rebuildService) {
+                         RunLauncher runLauncher, RebuildService rebuildService, PendingBuildRuns pendingBuildRuns) {
         this.connectionRepository = connectionRepository;
         this.runRepository = runRepository;
         this.manifestParser = manifestParser;
@@ -49,6 +50,7 @@ public class RunController {
         this.runLifecycleService = runLifecycleService;
         this.runLauncher = runLauncher;
         this.rebuildService = rebuildService;
+        this.pendingBuildRuns = pendingBuildRuns;
     }
 
     /** How long a run may wait for its agent to be rebuilt before the reaper times it out. */
@@ -103,7 +105,9 @@ public class RunController {
             throw e;
         }
         if (waitForRebuild) {
-            return RunResponse.from(run);
+            // The build we joined may have finished before this run existed, so the listener never saw it.
+            pendingBuildRuns.settle(version.getId(), null);
+            return RunResponse.from(runRepository.findById(run.getId()).orElseThrow());
         }
         runLauncher.launch(run.getId());
         return RunResponse.from(runRepository.findById(run.getId()).orElseThrow());

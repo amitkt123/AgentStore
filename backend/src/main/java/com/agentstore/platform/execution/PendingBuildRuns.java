@@ -4,7 +4,6 @@ import com.agentstore.platform.build.BuildFailureCodes;
 import com.agentstore.platform.build.BuildFinishedEvent;
 import com.agentstore.platform.build.BuildFinishedListener;
 import com.agentstore.platform.build.BuildStatus;
-import com.agentstore.platform.build.TemplateBuild;
 import com.agentstore.platform.build.TemplateBuildRepository;
 import com.agentstore.platform.catalog.AgentVersion;
 import com.agentstore.platform.catalog.AgentVersionRepository;
@@ -15,16 +14,18 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 /**
  * Starts, or fails, the runs that waited in PENDING_BUILD for a rebuild of their version (spec §4 step 7).
  *
- * <p>The event only says that a build finished, not whether its result reached the version: a build for a bundle the
- * version no longer has still reports its outcome. So the version's real state is re-read before any run is touched:
- * runs resume only on an image the version now has, from its current bundle, on the configured backend; they fail only
- * when the current bundle's build on that backend failed and no other build of it is still on its way. Anything else
- * is left alone (the run's own deadline is the backstop).
+ * <p>Decisions come from the version's real state, never from the build-finished event alone: a build for a bundle the
+ * version no longer has still reports its outcome. So {@link #settle} looks at what the version has and what is still
+ * on its way, and the trigger calls the same method after saving a run that joined an in-flight rebuild, so the two
+ * cannot drift. Runs resume when the version's current bundle has a built image on the configured backend, and fail
+ * when it has none and no build of that bundle on the backend is still queued or running. While such a build is on
+ * its way the runs keep waiting (the run's own deadline is the backstop).
  */
 @Component
 public class PendingBuildRuns implements BuildFinishedListener {
@@ -53,17 +54,27 @@ public class PendingBuildRuns implements BuildFinishedListener {
 
     @Override
     public void onBuildFinished(BuildFinishedEvent event) {
+        settle(event.versionId(), event.failureCode());
+    }
+
+    /**
+     * Resumes or fails the PENDING_BUILD runs of a version according to the version's current state; does nothing
+     * while a build of its current bundle on the configured backend is still on its way. Takes no locks of its own;
+     * promote and terminate lock only the run row and are no-ops for a run that already moved on, so racing the
+     * listener is safe. {@code failureCode} (nullable) only labels the runs it fails.
+     */
+    public void settle(UUID versionId, String failureCode) {
         Outcome outcome;
         try {
-            outcome = outcomeFor(event);
+            outcome = outcomeFor(versionId);
         } catch (RuntimeException e) {
-            log.warn("Could not evaluate build {} for waiting runs: {}", event.buildId(), e.getMessage());
+            log.warn("Could not evaluate version {} for waiting runs: {}", versionId, e.getMessage());
             return;
         }
         if (outcome == Outcome.IGNORE) {
             return;
         }
-        for (Run run : runRepository.findByStatusAndAgentVersionId(RunStatus.PENDING_BUILD, event.versionId())) {
+        for (Run run : runRepository.findByStatusAndAgentVersionId(RunStatus.PENDING_BUILD, versionId)) {
             try {
                 if (outcome == Outcome.RESUME) {
                     Instant deadline = Instant.now().plusSeconds(RunController.SANDBOX_TIMEOUT_SECONDS);
@@ -71,36 +82,33 @@ public class PendingBuildRuns implements BuildFinishedListener {
                         runLauncher.launch(run.getId());   // on failure the launcher has already FAILED the run
                     }
                 } else {
-                    String code = event.failureCode() == null ? BuildFailureCodes.BUILD_FAILED : event.failureCode();
                     runLifecycleService.terminate(run.getId(), RunStatus.PENDING_BUILD, RunStatus.FAILED,
                             RunStepKind.FAILED, Map.of("summary", "The agent could not be rebuilt for this platform",
-                                    "code", code));
+                                    "code", failureCode == null ? BuildFailureCodes.BUILD_FAILED : failureCode));
                 }
             } catch (RuntimeException e) {
-                log.warn("Could not resume run {} after build {}: {}", run.getId(), event.buildId(), e.getMessage());
+                log.warn("Could not settle run {} of version {}: {}", run.getId(), versionId, e.getMessage());
             }
         }
     }
 
-    private Outcome outcomeFor(BuildFinishedEvent event) {
-        if (!backend.equals(event.backend())) {
-            return Outcome.IGNORE;   // runs wait for an image on the configured backend only
+    private Outcome outcomeFor(UUID versionId) {
+        AgentVersion version = versions.findById(versionId).orElse(null);
+        if (version == null || version.getBundle() == null) {
+            return Outcome.IGNORE;
         }
-        TemplateBuild build = builds.findById(event.buildId()).orElse(null);
-        AgentVersion version = versions.findById(event.versionId()).orElse(null);
-        if (build == null || version == null || version.getBundle() == null
-                || !build.getBundle().getId().equals(version.getBundle().getId())) {
-            return Outcome.IGNORE;   // a stale build: its result never reached the version
+        UUID bundleId = version.getBundle().getId();
+        boolean coming = Stream.of(BuildStatus.QUEUED, BuildStatus.BUILDING)
+                .flatMap(status -> builds.findByAgentVersionIdAndStatus(versionId, status).stream())
+                .anyMatch(b -> backend.equals(b.getBackend()) && b.getBundle().getId().equals(bundleId));
+        if (coming) {
+            return Outcome.IGNORE;
         }
-        if (event.succeeded()) {
-            boolean versionHasImage = build.getImageRef() != null && build.getImageRef().equals(version.getImageRef())
-                    && version.getBuildStatus() == BuildStatus.SUCCEEDED;
-            return versionHasImage ? Outcome.RESUME : Outcome.IGNORE;
-        }
-        boolean another = Stream.of(BuildStatus.QUEUED, BuildStatus.BUILDING)
-                .flatMap(status -> builds.findByAgentVersionIdAndStatus(version.getId(), status).stream())
-                .anyMatch(b -> backend.equals(b.getBackend())
-                        && b.getBundle().getId().equals(version.getBundle().getId()));
-        return another ? Outcome.IGNORE : Outcome.FAIL;
+        boolean versionHasImage = version.getBuildStatus() == BuildStatus.SUCCEEDED && version.getImageRef() != null
+                && builds.findFirstByAgentVersionIdAndStatusOrderByFinishedAtDesc(versionId, BuildStatus.SUCCEEDED)
+                .filter(b -> b.getBundle().getId().equals(bundleId) && backend.equals(b.getBackend()))
+                .filter(b -> version.getImageRef().equals(b.getImageRef()))
+                .isPresent();
+        return versionHasImage ? Outcome.RESUME : Outcome.FAIL;
     }
 }
