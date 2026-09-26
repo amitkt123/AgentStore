@@ -88,8 +88,8 @@ To run the tagged live build test on real E2B (a few minutes of credit per templ
 E2B_API_KEY=... mvn test -Dsurefire.excludedGroups= -Dgroups=e2b -Dtest=E2bImageBuildLiveTest
 ```
 
-To push a directory through the whole pipeline in development, use `scripts/dev-push-bundle.sh <agentId> <bundleDir>`
-with `AGENTSTORE_TOKEN` set to a developer token.
+To push a directory through the whole pipeline in development, use the CLI (`cli/README.md`): create an API key in the
+portal, then `agentstore login`, `agentstore init` and `agentstore push --wait`.
 
 ## Tests
 
