@@ -257,7 +257,7 @@ If another workstream merges a migration first, WS5 takes the next free number. 
    - the timeout is enforced
    - `listOwned` labels
    - env vars reach the process and are absent from the image
-   - egress: an allowed host is reachable; an unlisted host, a raw IP and `169.254.169.254` are blocked; DNS for unlisted names doesn't leak; the runtime API is reachable
+   - egress: an allowed host is reachable; an unlisted host, a raw IP and `169.254.169.254` are blocked; DNS for unlisted names doesn't leak; the runtime API is reachable Accepted E2B gaps (live run 2026-09-26): DNS filtering is not verified, and `169.254.169.254` cannot be blocked (it is Firecracker's own metadata service), so those two conformance checks are skipped for E2B.
 
    Implementations:
    - `FakeBackend`: lifecycle subset, every build.

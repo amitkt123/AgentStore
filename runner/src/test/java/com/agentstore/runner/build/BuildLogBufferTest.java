@@ -12,7 +12,7 @@ class BuildLogBufferTest {
     void appendsRedactedLines() {
         BuildLogBuffer log = new BuildLogBuffer();
         log.append("Installing");
-        log.append("AKIAQYLPMN5HHHFPZAM2  \n");
+        log.append("AKIAXWNVK4PQ2JT6ZM3C  \n");
         assertThat(new String(log.snapshot(), StandardCharsets.UTF_8)).isEqualTo("Installing\n[REDACTED]\n");
     }
 

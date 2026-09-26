@@ -532,7 +532,7 @@ class LogRedactorTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-            key=AKIAQYLPMN5HHHFPZAM2 done                                        | key=[REDACTED] done
+            key=AKIAXWNVK4PQ2JT6ZM3C done                                        | key=[REDACTED] done
             aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY     | aws_secret_access_key = [REDACTED]
             pip install https://user:hunter2@pypi.example.com/simple              | pip install https://user:[REDACTED]@pypi.example.com/simple
             token ghp_abcdefghijklmnopqrstuvwxyz0123456789                        | token [REDACTED]
@@ -563,7 +563,7 @@ class BuildLogBufferTest {
     void appendsRedactedLines() {
         BuildLogBuffer log = new BuildLogBuffer();
         log.append("Installing");
-        log.append("AKIAQYLPMN5HHHFPZAM2  \n");
+        log.append("AKIAXWNVK4PQ2JT6ZM3C  \n");
         assertThat(new String(log.snapshot(), StandardCharsets.UTF_8)).isEqualTo("Installing\n[REDACTED]\n");
     }
 
@@ -1903,7 +1903,7 @@ class SecretScannerTest {
     @Test
     @EnabledIf("gitleaksInstalled")
     void realGitleaksCatchesAPlantedAwsKeyWithoutEchoingIt(@TempDir Path app) throws Exception {
-        String key = "AKIAQYLPMN5HHHFPZAM2";
+        String key = "AKIAXWNVK4PQ2JT6ZM3C";
         Files.writeString(app.resolve("config.py"), "AWS_ACCESS_KEY_ID = \"" + key + "\"\n");
         assertThatThrownBy(() -> new SecretScanner(List.of("gitleaks"), Duration.ofSeconds(60)).scan(app, l -> { }))
                 .hasMessageContaining("config.py:1")
@@ -2307,9 +2307,9 @@ class BuildServiceTest {
 
     @Test
     void secretsPrintedDuringTheBuildAreMaskedInTheUploadedLog() throws Exception {
-        submit("b9", app(FakeBackend.LOG_MARKER, "Downloading from https://bot:hunter2@pypi.example.com\nAKIAQYLPMN5HHHFPZAM2"));
+        submit("b9", app(FakeBackend.LOG_MARKER, "Downloading from https://bot:hunter2@pypi.example.com\nAKIAXWNVK4PQ2JT6ZM3C"));
         awaitFinished("b9");
-        assertThat(server.lastLog()).doesNotContain("hunter2").doesNotContain("AKIAQYLPMN5HHHFPZAM2").contains("[REDACTED]");
+        assertThat(server.lastLog()).doesNotContain("hunter2").doesNotContain("AKIAXWNVK4PQ2JT6ZM3C").contains("[REDACTED]");
     }
 
     @Test
@@ -6962,7 +6962,7 @@ This also covers the WS5a live checks that are still owed.
    - Spring with `--spring.profiles.active=runner`, with `RUNNER_SECRET=dev-secret`, `CALLBACK_BASE_URL=<cloudflared quick-tunnel URL>` and the `:5433` datasource
 5. Push the sample agent. As a developer, create an agent, then push a sample python bundle: a `manifest.json` with `runtime: python-3.12` and `entrypoint: agent/main.py`, and an `agent/main.py` that POSTs one `COMPLETE` event to `AGENT_CALLBACK_URL` with `AGENT_CALLBACK_TOKEN`. Use `scripts/dev-push-bundle.sh`.
 6. Watch the build go `QUEUED → BUILDING → SUCCEEDED` through `GET /api/v1/agents/{id}/builds/{buildId}`. Open its `logUrl` and check that the log shows the pip, pip-audit and smoke-test output.
-7. Push a bundle with `AWS_ACCESS_KEY_ID = "AKIAQYLPMN5HHHFPZAM2"` in a file. The build must fail with `SECRET_FOUND`, naming the file and line and never the key.
+7. Push a bundle with `AWS_ACCESS_KEY_ID = "AKIAXWNVK4PQ2JT6ZM3C"` in a file. The build must fail with `SECRET_FOUND`, naming the file and line and never the key.
 8. Submit the good version. As a buyer, connect and trigger a run. The run must reach `RUNNING`, the agent's callback must complete it, and Spring must record the exit.
 9. Record what happened in the PR description. If anything fails, stop and report it with the output; don't paper over it.
 

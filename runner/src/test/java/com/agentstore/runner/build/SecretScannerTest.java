@@ -104,7 +104,7 @@ class SecretScannerTest {
     @Test
     @EnabledIf("gitleaksInstalled")
     void realGitleaksCatchesAPlantedAwsKeyWithoutEchoingIt(@TempDir Path app) throws Exception {
-        String key = "AKIAQYLPMN5HHHFPZAM2";
+        String key = "AKIAXWNVK4PQ2JT6ZM3C";
         Files.writeString(app.resolve("config.py"), "AWS_ACCESS_KEY_ID = \"" + key + "\"\n");
         assertThatThrownBy(() -> new SecretScanner(List.of("gitleaks"), Duration.ofSeconds(60)).scan(app, l -> { }))
                 .hasMessageContaining("config.py:1")

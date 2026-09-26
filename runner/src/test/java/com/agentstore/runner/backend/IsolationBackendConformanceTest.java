@@ -32,6 +32,12 @@ public abstract class IsolationBackendConformanceTest {
     /** True when DNS lookups of non-allowlisted names are blocked. The vendor backend: not verified (accepted gap, spec §5). */
     protected boolean filtersDns() { return false; }
 
+    /** True when 169.254.169.254 is unreachable. E2B: not blockable, it is Firecracker's own metadata service (accepted gap, spec §5). */
+    protected boolean blocksMetadataAddress() { return true; }
+
+    /** A well-formed id that no sandbox has, in whatever shape the vendor accepts. */
+    protected String unknownSandboxId() { return "does-not-exist-" + UUID.randomUUID(); }
+
     protected String allowedHost() { return "example.com"; }
 
     protected Duration terminalWait() { return Duration.ofSeconds(60); }
@@ -140,12 +146,12 @@ public abstract class IsolationBackendConformanceTest {
 
     @Test
     void killingAnUnknownSandboxDoesNotThrow() {
-        assertThatCode(() -> backend().kill("does-not-exist-" + UUID.randomUUID())).doesNotThrowAnyException();
+        assertThatCode(() -> backend().kill(unknownSandboxId())).doesNotThrowAnyException();
     }
 
     @Test
     void statusOfAnUnknownSandboxIsGone() {
-        assertThat(backend().status("does-not-exist-" + UUID.randomUUID())).isEqualTo(SandboxState.gone());
+        assertThat(backend().status(unknownSandboxId())).isEqualTo(SandboxState.gone());
     }
 
     @Test
@@ -198,7 +204,7 @@ public abstract class IsolationBackendConformanceTest {
 
     @Test
     void cloudMetadataAddressIsBlocked() {
-        assumeTrue(enforcesEgress());
+        assumeTrue(enforcesEgress() && blocksMetadataAddress());
         assertThat(curl("http://169.254.169.254/").exitCode()).isNotZero();
     }
 

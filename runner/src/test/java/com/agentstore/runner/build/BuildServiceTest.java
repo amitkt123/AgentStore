@@ -165,9 +165,9 @@ class BuildServiceTest {
 
     @Test
     void secretsPrintedDuringTheBuildAreMaskedInTheUploadedLog() throws Exception {
-        submit("b9", app(FakeBackend.LOG_MARKER, "Downloading from https://bot:hunter2@pypi.example.com\nAKIAQYLPMN5HHHFPZAM2"));
+        submit("b9", app(FakeBackend.LOG_MARKER, "Downloading from https://bot:hunter2@pypi.example.com\nAKIAXWNVK4PQ2JT6ZM3C"));
         awaitFinished("b9");
-        assertThat(server.lastLog()).doesNotContain("hunter2").doesNotContain("AKIAQYLPMN5HHHFPZAM2").contains("[REDACTED]");
+        assertThat(server.lastLog()).doesNotContain("hunter2").doesNotContain("AKIAXWNVK4PQ2JT6ZM3C").contains("[REDACTED]");
     }
 
     @Test
