@@ -12,4 +12,8 @@ public interface AgentVersionRepository extends JpaRepository<AgentVersion, UUID
     Optional<AgentVersion> findFirstByAgentIdAndStatusOrderByApprovedAtDesc(UUID agentId, VersionStatus status);
 
     List<AgentVersion> findByStatus(VersionStatus status);
+
+    Optional<AgentVersion> findByAgentIdAndVersionNumber(UUID agentId, String versionNumber);
+
+    Optional<AgentVersion> findByBundleId(UUID bundleId);
 }
