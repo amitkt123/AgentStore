@@ -1,5 +1,6 @@
 package com.agentstore.platform.publishing;
 
+import com.agentstore.platform.build.BuildStatus;
 import com.agentstore.platform.catalog.AgentVersion;
 import com.agentstore.platform.catalog.AgentVersionRepository;
 import com.agentstore.platform.catalog.Tier;
@@ -36,6 +37,13 @@ public class PublishingService {
         }
         if (version.getStatus() != VersionStatus.DRAFT) {
             throw new IllegalStateException("Only DRAFT versions can be submitted, was " + version.getStatus());
+        }
+        if (version.getBundle() != null && version.getBuildStatus() != BuildStatus.SUCCEEDED) {
+            throw new IllegalStateException("The version's build has not succeeded (build status: "
+                    + version.getBuildStatus() + ")");
+        }
+        if (version.getImageRef() == null) {
+            throw new IllegalStateException("The version has no image; push a bundle and wait for its build");
         }
         var validation = manifestValidator.validate(version.getManifestJson());
         if (!validation.valid()) {

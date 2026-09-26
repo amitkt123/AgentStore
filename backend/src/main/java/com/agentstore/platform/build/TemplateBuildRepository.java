@@ -17,6 +17,10 @@ public interface TemplateBuildRepository extends JpaRepository<TemplateBuild, UU
     @Query("select b from TemplateBuild b where b.id = :id")
     Optional<TemplateBuild> findByIdForUpdate(@Param("id") UUID id);
 
+    /** Scalar on purpose: lets a caller lock the agent before it loads (and caches) the build and its version. */
+    @Query("select b.agentVersion.agent.id from TemplateBuild b where b.id = :id")
+    Optional<UUID> findAgentIdById(@Param("id") UUID id);
+
     Optional<TemplateBuild> findFirstByStatusOrderByQueuedAtAsc(BuildStatus status);
 
     List<TemplateBuild> findByStatusOrderByQueuedAtAsc(BuildStatus status);
