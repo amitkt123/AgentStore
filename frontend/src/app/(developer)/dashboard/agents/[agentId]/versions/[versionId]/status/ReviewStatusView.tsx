@@ -1,3 +1,4 @@
+import { BuildPanel } from "@/components/BuildPanel";
 import { StatusPill } from "@/components/StatusPill";
 import type { AgentVersionDetailResponse, VersionStatus } from "@/lib/types";
 
@@ -18,6 +19,7 @@ export function ReviewStatusView({ version }: { version: AgentVersionDetailRespo
         <StatusPill status={version.status} />
       </div>
       <p className="text-ink2">{STATUS_EXPLANATION[version.status]}</p>
+      {version.build ? <BuildPanel build={version.build} /> : null}
     </div>
   );
 }

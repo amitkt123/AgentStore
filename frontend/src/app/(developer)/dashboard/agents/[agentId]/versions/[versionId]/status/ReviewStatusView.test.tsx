@@ -30,4 +30,23 @@ describe("ReviewStatusView", () => {
     render(<ReviewStatusView version={{ ...baseVersion, status: "REJECTED" }} />);
     expect(screen.getByText(/A reviewer rejected this version/)).toBeInTheDocument();
   });
+
+  it("shows the build panel when the version has a build", () => {
+    render(
+      <ReviewStatusView
+        version={{
+          ...baseVersion,
+          status: "DRAFT",
+          build: { buildId: "b1", status: "QUEUED", failureCode: null, failureReason: null, logUrl: null },
+        }}
+      />,
+    );
+    expect(screen.getByRole("region", { name: "Build" })).toBeInTheDocument();
+    expect(screen.getByText(/Waiting for the build runner/)).toBeInTheDocument();
+  });
+
+  it("shows no build panel for versions without a build", () => {
+    render(<ReviewStatusView version={baseVersion} />);
+    expect(screen.queryByRole("region", { name: "Build" })).not.toBeInTheDocument();
+  });
 });
