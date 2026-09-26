@@ -44,12 +44,15 @@ public class RunLifecycleService {
     private final ManifestParser manifestParser;
     private final SandboxProvider sandboxProvider;
     private final WalletReservationService walletReservationService;
+    private final GateRequestRepository gateRequestRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RunLifecycleService(RunRepository runRepository, RunStepRepository runStepRepository,
                                UsageEventRepository usageEventRepository, LedgerService ledgerService,
                                ManifestParser manifestParser, SandboxProvider sandboxProvider,
-                               WalletReservationService walletReservationService) {
+                               WalletReservationService walletReservationService,
+                               GateRequestRepository gateRequestRepository) {
+        this.gateRequestRepository = gateRequestRepository;
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.usageEventRepository = usageEventRepository;
@@ -312,6 +315,14 @@ public class RunLifecycleService {
         run.setCompletedAt(Instant.now());
         run.setAwaitingSince(null);
         runRepository.save(run);
+        // A run that ends for any reason (failure, spend cap, violations, legacy events) must not leave its gate
+        // PENDING: nobody can decide it any more. Decisions close their own gate before reaching here.
+        gateRequestRepository.findFirstByRunIdAndStatusOrderByCreatedAtAsc(run.getId(), GateStatus.PENDING).ifPresent(gate -> {
+            gate.setStatus(GateStatus.EXPIRED);
+            gate.setDecisionNote("The run ended before a decision was made");
+            gate.setDecidedAt(Instant.now());
+            gateRequestRepository.save(gate);
+        });
         if (run.getSandboxId() != null) {
             killQuietly(run.getSandboxId());
         }

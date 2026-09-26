@@ -255,6 +255,7 @@ components:
       properties:
         quantity:
           type: number
+          maximum: 9999999999
         unit:
           type: string
           maxLength: 100

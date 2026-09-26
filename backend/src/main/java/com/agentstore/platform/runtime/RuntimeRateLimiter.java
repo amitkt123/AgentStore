@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Per-run token buckets kept in Redis. It guards against abuse, not money (the cost cap does that), so any Redis
@@ -28,12 +29,14 @@ public class RuntimeRateLimiter {
     public enum Kind { DEFAULT, LOGS, LLM }
 
     private static final Logger log = LoggerFactory.getLogger(RuntimeRateLimiter.class);
-    private static final Duration RECONNECT_BACKOFF = Duration.ofSeconds(5);
+    /** After any Redis failure the limiter skips Redis for this long, so an outage costs one slow call, not every call. */
+    private static final Duration FAILURE_BACKOFF = Duration.ofSeconds(5);
 
     private final RedisClient redisClient;
     private final Map<Kind, Integer> perMinute;
-    private LettuceBasedProxyManager<byte[]> proxyManager;   // guarded by this
-    private Instant nextConnectAttempt = Instant.MIN;         // guarded by this
+    private final ReentrantLock connectLock = new ReentrantLock();   // not synchronized: no virtual-thread pinning
+    private volatile LettuceBasedProxyManager<byte[]> proxyManager;
+    private volatile Instant skipRedisUntil = Instant.MIN;
 
     public RuntimeRateLimiter(RedisClient redisClient,
                               @Value("${agentstore.runtime.rate-limit.per-minute:600}") int perMinute,
@@ -45,6 +48,9 @@ public class RuntimeRateLimiter {
 
     /** Empty when the call is allowed; otherwise how long until the next token. */
     public Optional<Duration> tryAcquire(UUID runId, Kind kind) {
+        if (Instant.now().isBefore(skipRedisUntil)) {
+            return Optional.empty();
+        }
         try {
             LettuceBasedProxyManager<byte[]> manager = manager();
             if (manager == null) {
@@ -58,26 +64,31 @@ public class RuntimeRateLimiter {
             ConsumptionProbe probe = manager.builder().build(key, () -> configuration).tryConsumeAndReturnRemaining(1);
             return probe.isConsumed() ? Optional.empty() : Optional.of(Duration.ofNanos(probe.getNanosToWaitForRefill()));
         } catch (RuntimeException e) {
-            log.warn("Runtime rate limiter unavailable, allowing the call: {}", e.toString());
+            skipRedisUntil = Instant.now().plus(FAILURE_BACKOFF);
+            log.warn("Runtime rate limiter unavailable, allowing calls for {}: {}", FAILURE_BACKOFF, e.toString());
             return Optional.empty();
         }
     }
 
-    private synchronized LettuceBasedProxyManager<byte[]> manager() {
-        if (proxyManager == null) {
-            if (Instant.now().isBefore(nextConnectAttempt)) {
-                return null;
-            }
-            try {
+    /** The connected manager, connecting on first use. A caller that finds another one connecting does not wait: it is allowed. */
+    private LettuceBasedProxyManager<byte[]> manager() {
+        LettuceBasedProxyManager<byte[]> ready = proxyManager;
+        if (ready != null) {
+            return ready;
+        }
+        if (!connectLock.tryLock()) {
+            return null;
+        }
+        try {
+            if (proxyManager == null) {
                 proxyManager = LettuceBasedProxyManager.builderFor(redisClient)
                         .withExpirationStrategy(
                                 ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(2)))
                         .build();
-            } catch (RuntimeException e) {
-                nextConnectAttempt = Instant.now().plus(RECONNECT_BACKOFF);
-                throw e;
             }
+            return proxyManager;
+        } finally {
+            connectLock.unlock();
         }
-        return proxyManager;
     }
 }

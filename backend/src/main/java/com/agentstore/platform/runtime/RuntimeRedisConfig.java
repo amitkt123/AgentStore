@@ -16,10 +16,14 @@ public class RuntimeRedisConfig {
 
     /**
      * Creating the client does not connect. Commands fail fast (300 ms, and immediately while disconnected) so a Redis
-     * outage cannot stall runtime calls; {@link RuntimeRateLimiter} treats any failure as "allow".
+     * outage cannot stall runtime calls; {@link RuntimeRateLimiter} treats any failure as "allow". The URI timeout
+     * matters too: the socket connect timeout only covers TCP, while a Redis that accepts the socket and never answers
+     * would otherwise hold the connection handshake for Lettuce's default 60 s.
      */
     public static RedisClient client(String uri) {
-        RedisClient client = RedisClient.create(RedisURI.create(uri));
+        RedisURI redisUri = RedisURI.create(uri);
+        redisUri.setTimeout(Duration.ofMillis(300));
+        RedisClient client = RedisClient.create(redisUri);
         client.setOptions(ClientOptions.builder()
                 .disconnectedBehavior(ClientOptions.DisconnectedBehavior.REJECT_COMMANDS)
                 .socketOptions(SocketOptions.builder().connectTimeout(Duration.ofMillis(300)).build())

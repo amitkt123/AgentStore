@@ -67,6 +67,20 @@ class RuntimeUsageEndpointTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void absurdlyLargeOrTinyQuantitiesAreClientErrorsNotServerErrorsOrCpuBurns() {
+        var agent = fx.runningAgent(new BigDecimal("500.00"));
+
+        for (String quantity : new String[]{"100000000000", "1e999999999", "1e-10000000", "0.00001"}) {
+            long started = System.nanoTime();
+            var response = usage(agent.token(), "{\"quantity\":" + quantity + ",\"unit\":\"reconciled_transaction\"}");
+            assertThat(response.getStatusCode()).as("quantity %s", quantity).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(java.time.Duration.ofNanos(System.nanoTime() - started)).as("quantity %s", quantity)
+                    .isLessThan(java.time.Duration.ofSeconds(2));
+        }
+        assertThat(runRepository.findById(agent.run().getId()).orElseThrow().getTotalCharged()).isEqualByComparingTo("0");
+    }
+
+    @Test
     void zeroNegativeMissingAndNonNumericQuantitiesAreValidationErrors() {
         var agent = fx.runningAgent(new BigDecimal("500.00"));
 
