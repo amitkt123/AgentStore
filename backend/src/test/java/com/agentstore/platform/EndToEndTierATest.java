@@ -38,6 +38,8 @@ class EndToEndTierATest extends AbstractIntegrationTest {
     @Autowired
     TestRestTemplate rest;
     @Autowired
+    AgentVersionRepository agentVersionRepository;
+    @Autowired
     WalletRepository walletRepository;
 
     String url(String path) {
@@ -66,9 +68,12 @@ class EndToEndTierATest extends AbstractIntegrationTest {
 
         String manifest = Files.readString(Path.of("src/test/resources/manifest/valid-tier-a.json"));
         var version = rest.postForEntity(url("/api/v1/agents/" + agent.id() + "/versions"),
-                new HttpEntity<>(new CreateAgentVersionRequest("1.0.0", manifest, "bank-recon-template-v1", "first cut"),
+                new HttpEntity<>(new CreateAgentVersionRequest("1.0.0", manifest, "first cut"),
                         bearer(devLogin.token())),
                 AgentVersionResponse.class).getBody();
+        var stored = agentVersionRepository.findById(version.id()).orElseThrow();
+        stored.setImageRef("bank-recon-template-v1");
+        agentVersionRepository.save(stored);
 
         rest.exchange(url("/api/v1/agents/" + agent.id() + "/versions/" + version.id() + "/submit"),
                 HttpMethod.POST, new HttpEntity<>(bearer(devLogin.token())), AgentVersionResponse.class);

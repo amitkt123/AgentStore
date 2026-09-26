@@ -2,6 +2,6 @@ package com.agentstore.platform.catalog;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record CreateAgentVersionRequest(@NotBlank String versionNumber, @NotBlank String manifestJson,
-                                         @NotBlank String imageRef, String changelog) {
+/** No image: a version's image comes only from a successful build of a pushed bundle (WS5b/WS5c). */
+public record CreateAgentVersionRequest(@NotBlank String versionNumber, @NotBlank String manifestJson, String changelog) {
 }

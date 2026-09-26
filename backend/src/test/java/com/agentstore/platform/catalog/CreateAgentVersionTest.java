@@ -41,12 +41,12 @@ class CreateAgentVersionTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void createsDraftVersionWithValidManifest() throws Exception {
+    void createsAnImagelessDraftVersionWithValidManifest() throws Exception {
         Org developerOrg = orgRepository.save(new Org(null, "DevCo", OrgType.DEVELOPER));
         Agent agent = agentRepository.save(new Agent(null, developerOrg, "Bank Reconciliation", "reconciliation", "desc"));
         String manifest = Files.readString(Path.of("src/test/resources/manifest/valid-tier-a.json"));
 
-        var request = new HttpEntity<>(new CreateAgentVersionRequest("1.0.0", manifest, "bank-recon-template-v1", "first cut"),
+        var request = new HttpEntity<>(new CreateAgentVersionRequest("1.0.0", manifest, "first cut"),
                 authHeaders(developerOrg.getId()));
 
         var response = rest.postForEntity(url("/api/v1/agents/" + agent.getId() + "/versions"), request, AgentVersionResponse.class);
@@ -54,7 +54,7 @@ class CreateAgentVersionTest extends AbstractIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().status()).isEqualTo(VersionStatus.DRAFT);
         var saved = agentVersionRepository.findById(response.getBody().id()).orElseThrow();
-        assertThat(saved.getImageRef()).isEqualTo("bank-recon-template-v1");
+        assertThat(saved.getImageRef()).isNull();
     }
 
     @Test
@@ -63,7 +63,7 @@ class CreateAgentVersionTest extends AbstractIntegrationTest {
         Agent agent = agentRepository.save(new Agent(null, developerOrg, "Broken", "x", "y"));
         String manifest = Files.readString(Path.of("src/test/resources/manifest/invalid-missing-cost-envelope.json"));
 
-        var request = new HttpEntity<>(new CreateAgentVersionRequest("1.0.0", manifest, "template", "cl"),
+        var request = new HttpEntity<>(new CreateAgentVersionRequest("1.0.0", manifest, "cl"),
                 authHeaders(developerOrg.getId()));
 
         var response = rest.postForEntity(url("/api/v1/agents/" + agent.getId() + "/versions"), request, String.class);
@@ -78,11 +78,29 @@ class CreateAgentVersionTest extends AbstractIntegrationTest {
         Agent agent = agentRepository.save(new Agent(null, owner, "Bank Reconciliation", "reconciliation", "desc"));
         String manifest = Files.readString(Path.of("src/test/resources/manifest/valid-tier-a.json"));
 
-        var request = new HttpEntity<>(new CreateAgentVersionRequest("1.0.0", manifest, "template", "cl"),
+        var request = new HttpEntity<>(new CreateAgentVersionRequest("1.0.0", manifest, "cl"),
                 authHeaders(intruder.getId()));
 
         var response = rest.postForEntity(url("/api/v1/agents/" + agent.getId() + "/versions"), request, String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void ignoresAnImageRefInTheRequestBody() throws Exception {
+        Org developerOrg = orgRepository.save(new Org(null, "DevCo3", OrgType.DEVELOPER));
+        Agent agent = agentRepository.save(new Agent(null, developerOrg, "Legacy Client", "x", "y"));
+        String manifest = Files.readString(Path.of("src/test/resources/manifest/valid-tier-a.json"));
+        var body = new java.util.LinkedHashMap<String, Object>();
+        body.put("versionNumber", "1.0.0");
+        body.put("manifestJson", manifest);
+        body.put("imageRef", "hand-built-template");
+        body.put("changelog", "cl");
+
+        var response = rest.postForEntity(url("/api/v1/agents/" + agent.getId() + "/versions"),
+                new HttpEntity<>(body, authHeaders(developerOrg.getId())), AgentVersionResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(agentVersionRepository.findById(response.getBody().id()).orElseThrow().getImageRef()).isNull();
     }
 }
