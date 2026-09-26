@@ -53,6 +53,19 @@ _Generated from commit `e295ec6` (2026-09-25, branch `feat/ws5a-sandbox-runner`)
   * **`SandboxSpec`** (`backend/src/main/java/com/agentstore/platform/execution/SandboxSpec.java`): The create request. `requestId` is the run id.
   * **`SandboxStatus`** (`backend/src/main/java/com/agentstore/platform/execution/SandboxStatus.java`): `state`: `[RUNNING | EXITED | GONE | UNKNOWN]`, plus `exitCode`.
 
+### Data plane
+* **`Dataset`** (`backend/src/main/java/com/agentstore/platform/data/Dataset.java`): A buyer's file in the workspace library: `ownerOrgId`, `purpose` `[BUYER_DATA | FIXTURE | SAMPLE | EVAL]` (`DatasetPurpose`; only BUYER_DATA is created until WS6/8/9), `displayName`, `sourceLabel`, `format` `[CSV | JSON | PDF]` (`DataFormat`, `backend/src/main/java/com/agentstore/platform/manifest/DataFormat.java`), the original (`storageKey`) and, for CSV/JSON, a normalized JSONL copy (`recordsKey`, one object per line), `sha256`, `sizeBytes`, `recordsSizeBytes`, `rowCount`, `columns`, and the retention stamps `deletedAt`, `purgeAfter`, `purgedAt`. A purged dataset stays as a tombstone (name, size, sha; keys null). Table `dataset` (migration `V27__datasets.sql`, which also adds `org.storage_limit_bytes`, default 5 GiB).
+* **`DatasetBinding`** (`backend/src/main/java/com/agentstore/platform/data/DatasetBinding.java`): A file plugged into one resource of one owner (`ownerType` `[CONNECTION | SANDBOX_PROFILE | EVAL_CASE | TRIAL]`, only CONNECTION today), unique per `(ownerType, ownerId, resourceName)`. Keeps the `checkResult` from bind time. Table `dataset_binding`.
+* **`RunDatasetPin`** (`backend/src/main/java/com/agentstore/platform/data/RunDatasetPin.java`): The file a run reads for one resource, fixed when the run is created (primary key `(runId, resourceName)`, plus the file's `sha256`). Table `run_dataset_pin`.
+* **`RunOutput`** (`backend/src/main/java/com/agentstore/platform/data/RunOutput.java`): One agent write call, stored as a JSONL blob `outputs/{runId}/{outputId}.jsonl`. `status`: `[STAGED | COMMITTED | DISCARDED]` (`OutputStatus`), `recordCount`, `sizeBytes`, `gateRequestId` (the gate that committed it). Table `run_output` (migration `V28__run_output.sql`).
+* **`ResourceDecl` / `ResourceSchema`** (`backend/src/main/java/com/agentstore/platform/manifest/ResourceDecl.java`): The manifest's optional `resources[]`: `name`, `format`, and an inline `schema` `(required[], properties{col: [string | number | integer | boolean | date]})`, absent for a pdf. `ResourceManifestRules` holds the cross-field rules.
+* **`DatasetService` / `DatasetCheckService` / `SchemaChecker` / `ValueCoercer`** (`backend/src/main/java/com/agentstore/platform/data/`): Upload (streamed to a temp file, hashed, normalized by `CsvNormalizer` or `JsonNormalizer`, stored, registered under the org row lock for the quota), list, delete, and the schema check that runs against a stored file and saves nothing.
+* **`BindingService` / `BindingResolver`** (`backend/src/main/java/com/agentstore/platform/data/BindingService.java`, `backend/src/main/java/com/agentstore/platform/data/BindingResolver.java`): `BindingService` binds, unbinds and lists (bind runs the schema check). `BindingResolver` runs inside the run trigger: it resolves the pins for every granted READ resource, blocks the trigger with `MISSING_BINDING`, and creates the run and its pins in one transaction. `DataAccessRules` is the mode guard.
+* **`DatasetResourceBackend`** (`backend/src/main/java/com/agentstore/platform/data/DatasetResourceBackend.java`): The `ResourceBackend` the runtime controllers call (it replaced `UnavailableResourceBackend`). Reads only the run's pins; `RecordCursor` is the byte-offset page cursor; `RunOutputWriter` validates and stores writes.
+* **`OutputCommitService`** (`backend/src/main/java/com/agentstore/platform/data/OutputCommitService.java`): Listens for `GateOutcomeEvent` and `RunFinishedEvent` (`backend/src/main/java/com/agentstore/platform/execution/GateOutcomeEvent.java`, `RunFinishedEvent.java`) and commits or discards staged outputs in the publisher's transaction. `OutputsController` and `OutputFormats` serve them to the buyer.
+* **`DataRetentionService` / `DataRetentionJob`** (`backend/src/main/java/com/agentstore/platform/data/DataRetentionService.java`): Hourly (`agentstore.data.retention-interval`, ShedLock `dataRetention`): purges due datasets to tombstones and deletes the blobs of `DISCARDED` outputs older than 30 days.
+* **`RuntimeBodyLimitFilter`** (`backend/src/main/java/com/agentstore/platform/runtime/RuntimeBodyLimitFilter.java`): Caps an agent's record-write body at 5 MB at the transport, after `RuntimeAuthFilter`.
+
 ### Billing
 * **`Wallet`** (`backend/src/main/java/com/agentstore/platform/ledger/Wallet.java`): Prepaid funds per org (unique `orgId`): `balance`, `reserved`, `cap`.
 * **`UsageEvent`** (`backend/src/main/java/com/agentstore/platform/ledger/UsageEvent.java`): A metered consumption record (`quantity × unitCost = amount`) for a run and org, with a `processed` flag.
@@ -124,6 +137,15 @@ _Generated from commit `e295ec6` (2026-09-25, branch `feat/ws5a-sandbox-runner`)
     - `AWAITING_APPROVAL` past the gate timeout or the deadline -> `EXPIRED`
     - other active run past `deadlineAt` -> `TIMED_OUT` (a `PENDING_BUILD` run's deadline is 25 minutes after the trigger)
     - `RUNNING` whose sandbox has stopped -> `FAILED`
+
+**Data plane**
+- `Dataset` -> **is owned by** -> `Org`. `DatasetBinding` -> **plugs** -> a `Dataset` into `(Connection, resource)`.
+- `Manifest` -> **declares** -> `ResourceDecl` (optional `resources[]`). `Run` -> **pins** -> one `Dataset` per granted READ resource (`RunDatasetPin`). `RunOutput` -> **belongs to** -> `Run`, and is **committed by** -> a `GateRequest`.
+- Upload -> `FormatDetector` -> `CsvNormalizer` / `JsonNormalizer` -> original + JSONL in object storage -> `Dataset` row. The file is untyped: nothing is checked until it is bound.
+- Bind -> `DatasetCheckService.check` against the connection's pinned `AgentVersion` manifest -> `DatasetBinding` (with `checkResult`); a replaced or unplugged file that is bound nowhere else gets `purgeAfter = now + 30 days`.
+- Run trigger -> `BindingResolver.resolve` -> `RunDatasetPin`s written in the run's transaction (`saveWithPins`).
+- Agent read -> `RuntimeResourceController` -> `ScopeGuard` -> `DatasetResourceBackend` -> the run's pin -> ranged read of the JSONL. Agent write -> `RunOutputWriter` -> `run_output` row `STAGED` (scope `requiresApproval`) or `COMMITTED`.
+- `GateService.decide` and `RunLifecycleService.finish` -> **publish** -> `GateOutcomeEvent` -> `OutputCommitService` -> `STAGED` becomes `COMMITTED` (approved) or `DISCARDED` (rejected, expired). `RunLifecycleService.finish` also publishes `RunFinishedEvent` -> remaining `STAGED` become `DISCARDED`.
 
 **Billing**
 - `Run` trigger -> **reserves** -> `Connection.spendCap` on `Wallet.reserved` (`backend/src/main/java/com/agentstore/platform/ledger/WalletReservationService.java`)
@@ -202,6 +224,21 @@ _Generated from commit `e295ec6` (2026-09-25, branch `feat/ws5a-sandbox-runner`)
 - **Rule UnknownIsNotStopped:** `SandboxStatus.UNKNOWN` (runner unreachable) must never be treated as stopped. Only `EXITED` or `GONE` count as stopped. (`backend/src/main/java/com/agentstore/platform/execution/SandboxStatus.java`)
 - **Rule SandboxLimits:** Backend requests `cpu=1`, `memoryMb=1024` and `timeoutSeconds=600`. The runner clamps the timeout to `max-lifetime` (default `PT10M`). (`backend/src/main/java/com/agentstore/platform/execution/RunController.java`, `runner/src/main/java/com/agentstore/runner/sandbox/SandboxService.java`, `runner/src/main/resources/application.yml`)
 - **Rule EgressAllowlist:** Sandbox outbound traffic is limited to the callback host plus `Manifest.networkAllowlist`. (`backend/src/main/java/com/agentstore/platform/execution/RunController.java`)
+
+**Data plane**
+- **Rule FilesAreUntypedUntilBound:** An upload is checked against nothing. Binding runs the schema check for the resource and stores it as `check_result`; a failing check is `422 DATASET_CHECK_FAILED` with the result. `required` means the column is present, not that every cell has a value. (`backend/src/main/java/com/agentstore/platform/data/BindingService.java`, `backend/src/main/java/com/agentstore/platform/data/SchemaChecker.java`)
+- **Rule BindOnlyReadableGranted:** Only a declared READ resource that the connection grants can be bound; a WRITE or undeclared resource is `422 RESOURCE_NOT_BINDABLE`, an ungranted one `422 RESOURCE_NOT_GRANTED`. A pdf resource is READ only (manifest validation). (`backend/src/main/java/com/agentstore/platform/data/ResourceLookup.java`, `backend/src/main/java/com/agentstore/platform/manifest/ResourceManifestRules.java`)
+- **Rule MissingBindingBlocksTrigger:** A declared, granted READ resource with no usable binding fails the trigger with `422 MISSING_BINDING` before money is reserved. A manifest without `resources` is untyped and never blocked. (`backend/src/main/java/com/agentstore/platform/data/BindingResolver.java`, `backend/src/main/java/com/agentstore/platform/execution/RunController.java`)
+- **Rule RunsReadOnlyTheirPins:** A run reads only its `run_dataset_pin` rows, so unplugging, replacing or purging a file mid-run cannot change what the agent reads. A file an open run pins cannot be deleted (`409 DATASET_IN_USE`) or purged. (`backend/src/main/java/com/agentstore/platform/data/DatasetResourceBackend.java`, `backend/src/main/java/com/agentstore/platform/data/DatasetService.java`)
+- **Rule BuyerDataOnlyForProduction:** A `BUYER_DATA` dataset is resolved only for a PRODUCTION run; SANDBOX, REVIEW and TRIAL runs may only resolve FIXTURE, SAMPLE or EVAL data. The resolver and the backend (on every read, `403 DATA_MODE_MISMATCH`) both enforce it. (`backend/src/main/java/com/agentstore/platform/data/DataAccessRules.java`)
+- **Rule GateCommitsWhatItListed:** An approved gate commits only this run's `STAGED` outputs for the resources in its `affects_resources` that were staged before the gate was requested; an approved gate that lists none commits nothing. Rejection and expiry discard the same rows. (`backend/src/main/java/com/agentstore/platform/data/OutputCommitService.java`, `backend/src/main/java/com/agentstore/platform/execution/GateService.java`)
+- **Rule TerminalRunDiscardsStaged:** Every run that reaches a terminal state discards its remaining `STAGED` outputs, including an agent that never asked for approval. (`backend/src/main/java/com/agentstore/platform/data/OutputCommitService.java`, `RunLifecycleService.finish`)
+- **Rule WriteCaps:** An agent write is validated whole against the resource schema (`422 VALIDATION_FAILED`, first 50 row errors), at most 5 MB per call (checked at the transport and again after serialization) and 200 MB per run (`413 WRITE_TOO_LARGE`). A failed write leaves no blob and no row. (`backend/src/main/java/com/agentstore/platform/data/RunOutputWriter.java`, `backend/src/main/java/com/agentstore/platform/runtime/RuntimeBodyLimitFilter.java`)
+- **Rule UploadCaps:** 50 MB per file (`413 FILE_TOO_LARGE`, the multipart limit) and the org's storage quota (default 5 GiB, `413 QUOTA_EXCEEDED`, counted as originals plus JSONL copies of non-purged datasets, checked under the org row lock). (`backend/src/main/java/com/agentstore/platform/data/DatasetService.java`)
+- **Rule RetentionWindows:** An explicit delete sets `purge_after = now`, so the hourly job purges it within about an hour; unplugging or replacing gives 30 days. A purge deletes the blobs, nulls the keys and sets `purged_at`, keeping the row as a tombstone. `DISCARDED` output blobs are deleted after 30 days; `COMMITTED` outputs are kept. (`backend/src/main/java/com/agentstore/platform/data/DataRetentionService.java`, `backend/src/main/java/com/agentstore/platform/data/BindingService.java`)
+- **Rule FilesStreamThroughTheBackend:** File content is served by `GET /runtime/v1/resources/{resource}/file/content` under the run token, never a presigned URL, so agents behind an egress allowlist need no object-store host. (`backend/src/main/java/com/agentstore/platform/runtime/RuntimeResourceController.java`)
+- **Rule CsvDownloadNeutralisesFormulas:** A downloaded CSV prefixes an apostrophe to any string cell starting with `=`, `+`, `-`, `@`, tab or CR; real JSON numbers are untouched. (`backend/src/main/java/com/agentstore/platform/data/OutputFormats.java`)
+- **Rule DataRoles:** Upload, delete, bind and unbind need `BUYER_ADMIN`; list, check, bindings list and outputs need `BUYER_ADMIN` or `BUYER_APPROVER`. A dataset of another org is 404; a connection or run of another org is 403. Developer API keys cannot reach any of these paths (`ApiKeyScope`).
 
 **Billing**
 - **Rule IdempotentCharge:** `chargeUsageEvent` returns the existing `LedgerEntry` if the `UsageEvent` has already been charged. (`backend/src/main/java/com/agentstore/platform/ledger/LedgerService.java`)
@@ -341,10 +378,32 @@ Every backend endpoint except `/api/v1/catalog`, `/api/v1/auth/*`, `/api/v1/invi
 - **`RunDetailController.mine`**: `GET /api/v1/runs/mine?status=` [`BUYER_ADMIN`, `BUYER_APPROVER`]
   - Returns: `RunSummaryResponse[]`
 
+### Datasets & bindings
+Errors on these endpoints are `{code, message, ...}` (`backend/src/main/java/com/agentstore/platform/data/DataApiErrors.java`).
+- **`DatasetController.upload`**: `POST /api/v1/datasets` [`BUYER_ADMIN`] (`backend/src/main/java/com/agentstore/platform/data/DatasetController.java`)
+  - Accepts: multipart `file`, `displayName` (required), `sourceLabel`
+  - Returns: `DatasetResponse(id, displayName, sourceLabel, format, rowCount, sizeBytes, columns, sha256, uploadedBy, createdAt)`
+  - Errors: 400 `VALIDATION_FAILED`; 413 `FILE_TOO_LARGE` or `QUOTA_EXCEEDED`; 415 `UNSUPPORTED_FORMAT`; 422 `INVALID_FILE`
+- **`DatasetController.list`**: `GET /api/v1/datasets?include=usage` [`BUYER_ADMIN`, `BUYER_APPROVER`]
+  - Returns: `DatasetResponse[]`; with `include=usage` each carries `usage: [{connectionId, resource, agent, version, access}]`
+- **`DatasetController.delete`**: `DELETE /api/v1/datasets/{id}` [`BUYER_ADMIN`]: 204. Errors: 404; 409 `DATASET_IN_USE`
+- **`DatasetController.check`**: `POST /api/v1/datasets/{id}/check` [`BUYER_ADMIN`, `BUYER_APPROVER`]
+  - Accepts: `{agentVersionId, resource}`. Returns: `CheckResult(ok, rowCount, columnsMatch, missingColumns, rowErrorCount, rowErrors[{row, column, message}] (first 50))`. Saves nothing.
+  - Errors: 404; 422 `RESOURCE_NOT_BINDABLE`
+- **`DatasetController.storage`**: `GET /api/v1/orgs/{orgId}/storage` [`BUYER_ADMIN`, `BUYER_APPROVER`]: `{usedBytes, limitBytes}`. Errors: 403 other org
+- **`BindingController`**: `/api/v1/connections/{connectionId}/bindings` (`backend/src/main/java/com/agentstore/platform/data/BindingController.java`)
+  - `PUT /{resource}` [`BUYER_ADMIN`] body `{datasetId}`: binds (replacing). Returns `BindingResponse(resource, datasetId, displayName, format, rowCount, boundAt)`. Errors: 403 other org's connection; 404 dataset; 409; 422 `DATASET_CHECK_FAILED` (with `checkResult`), `RESOURCE_NOT_BINDABLE`, `RESOURCE_NOT_GRANTED`
+  - `DELETE /{resource}` [`BUYER_ADMIN`]: 204 (unplugs; 404 if nothing bound)
+  - `GET` [`BUYER_ADMIN`, `BUYER_APPROVER`]: `BindingResponse[]`
+- **`OutputsController`**: `/api/v1/runs/{runId}/outputs` [`BUYER_ADMIN`, `BUYER_APPROVER`] (`backend/src/main/java/com/agentstore/platform/data/OutputsController.java`)
+  - `GET ?preview=N`: `[{id, resource, status, recordCount, createdAt, rows?}]`; `rows` (first `min(N, 50)`) only with `preview`, never for `DISCARDED`. Errors: 403 other org; 404
+  - `GET /{outputId}/download?format=csv|json`: `COMMITTED` outputs only, streamed through the backend as an attachment. Errors: 400 `INVALID_FORMAT`; 404; 409 `OUTPUT_NOT_COMMITTED`
+- `RunController.trigger` additionally returns 422 `MISSING_BINDING` with `resources: [...]`.
+
 ### Agent Runtime API v1 (called from inside the sandbox; `/runtime/v1/**`)
 The interface agent code uses; contract in `contracts/runtime-v1.yaml`. Authenticated by the run token (`Authorization: Bearer $AGENTSTORE_RUN_TOKEN`) on its own `SecurityFilterChain` (`RuntimeAuthFilter`, no JWT); the token identifies the run, so no run id is in the path. Errors are `application/problem+json` with a stable `code`. Per-run rate limits (bucket4j on Redis) fail open.
 * `GET /runtime/v1/context`: run id, mode, agent version, input, granted scopes, limits.
-* `GET /runtime/v1/resources/{resource}`, `/records`, `/file`, `POST /runtime/v1/resources/{resource}/records`: checked by `ScopeGuard`, then delegated to `ResourceBackend` (501 `NOT_IMPLEMENTED` until WS2). Records `DATA_READ` / `DATA_WRITE` / `WRITE_STAGED`.
+* `GET /runtime/v1/resources/{resource}` (format, row count), `/records?cursor=&limit=` (opaque byte-offset cursor, `400 INVALID_CURSOR`; a pdf is `409 NOT_TABULAR`), `/file` (a link to `/file/content`), `GET /runtime/v1/resources/{resource}/file/content` (the bytes, streamed under the run token), `POST /runtime/v1/resources/{resource}/records` (validated against the resource schema, `422 VALIDATION_FAILED` with row `errors`; `413 WRITE_TOO_LARGE`): checked by `ScopeGuard`, then served by `DatasetResourceBackend` from the run's pins (`404 RESOURCE_NOT_BOUND` without one; `503 STORAGE_UNAVAILABLE` when the object store fails). Records `DATA_READ` / `DATA_WRITE` / `WRITE_STAGED`.
 * `POST /runtime/v1/gates` (201), `GET /runtime/v1/gates/{gateId}?wait=` (long-poll, max 30 s): open a gate and wait for the buyer's decision. The buyer decides with `POST /api/v1/runs/{id}/gates/{gateId}/decision {decision: APPROVE|REJECT, note}`; the old `/approve` and `/reject` delegate to the run's single pending gate.
 * `POST /runtime/v1/llm/chat`: delegated to `LlmBackend` (501 until WS3).
 * `POST /runtime/v1/usage`: `unit` must equal `costEnvelope.unitLabel`; charges like the legacy COST event; 402 `BUDGET_EXCEEDED` when the cap is hit (the remainder is charged and the run stops).
@@ -406,3 +465,5 @@ Legacy. New agents use the Agent Runtime API above. Served only while `agentstor
 - **`ReviewController` doesn't map decision errors:** It does not map the `IllegalStateException` or `IllegalArgumentException` from `PublishingService.approve` and `reject` to HTTP statuses, so the resulting status for an already-decided or missing item is unclear. No global handler was found in the files read.
 - **Frontend `AuthResponse` is incomplete:** `frontend/src/lib/types.ts` declares only `token`. The backend `AuthResponse` also returns `refreshToken`.
 - **Raw UUIDs instead of relations:** `LedgerEntry.runId`/`orgId`, `UsageEvent.runId`/`orgId`, `Wallet.orgId`, `ReviewItem.reviewerUserId` and `User.lastOrgId`/`signupOrgId` are raw UUIDs, not JPA relations.
+- **Connection revoke does not exist yet:** `ConnectionStatus.REVOKED` is never set by any code path, so `BindingService.unbindAll` (which starts the 30-day clock for a revoked connection's files) is built and tested but not wired to anything.
+- **Agent writes lose trailing zeros:** A JSON write body is parsed by Spring's default mapper, which reads `12.50` as the double `12.5` before it is stored. Uploaded files keep exact decimals (`Jsonl.MAPPER`). Fixing it needs `spring.jackson.deserialization.use-big-decimal-for-floats`, a global change.
