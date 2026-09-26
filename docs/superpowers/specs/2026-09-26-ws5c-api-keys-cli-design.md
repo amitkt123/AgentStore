@@ -62,7 +62,7 @@ Existing ownership checks still apply, so a key from org A cannot touch org B's 
 **Commands**
 
 - **`login [--api-url URL]`.** Prints the portal's API-keys page URL, reads the pasted key without echo, and verifies it with `GET /agents/mine` (on the allowlist, so a bad key fails immediately). Credentials are saved only if verification passes.
-- **`init [--python|--typescript] [--name --category --description]`.**
+- **`init [--python|--node] [--name --category --description]`.** (`--typescript` is accepted as an alias of `--node`: the build has no TypeScript step and the backend accepts only `.js`, `.mjs` and `.cjs` entrypoints, so the Node scaffold is plain ESM JavaScript on `node-22`.)
   1. Check the target directory is empty and writable (refuse otherwise, and refuse if `agentstore.yaml` exists).
   2. Prompt for anything not given by flag, then `POST /agents`.
   3. Write the scaffold: `agentstore.yaml` (holds the `agentId`; the API URL lives in the credentials, not here), `manifest.json`, `agent/`, the dependency file, `fixtures/`, `evals/`, `schemas/`, `.agentstoreignore`. The plan derives the minimal valid manifest from `manifest-schema.json`.
@@ -70,7 +70,7 @@ Existing ownership checks still apply, so a key from org A cannot touch org B's 
 - **`validate`.** Checks `manifest.json` against a bundled copy of `manifest-schema.json`; applies the same rules as `BundleManifestRules` (runtime is `python-3.12` or `node-22`, entrypoint is a relative path that exists and matches the runtime); checks the dependency file exists; checks the packed limits (100 MB bundle, 20,000 entries, 256 KiB manifest). A test fails if the bundled schema drifts from `backend/src/main/resources/manifest/manifest-schema.json`. This is fast feedback only; the backend's check is final.
 - **`push [--wait] [--timeout SECONDS]`.** Validate → pack a zip (applying `.agentstoreignore`, `manifest.json` at the root) → SHA-256 → `POST …/bundles/uploads` → `PUT` to the signed URL → `POST …/bundles/{id}/finalize` → print version number and build id.
   - With `--wait`: poll `GET …/builds/{buildId}` every 2 s and tail the log by re-fetching the pre-signed `logUrl` and printing only the new bytes (logs are small and bounded).
-  - **Exit codes:** 0 on `SUCCEEDED` (or after finalize without `--wait`); 1 on `FAILED`, printing `failureCode` and `failureReason`; 2 on a usage error, a network error, a rejected upload, or the wait timeout (default 15 minutes).
+  - **Exit codes:** 0 on `SUCCEEDED` (or after finalize without `--wait`); 1 when the project or build is bad (`validate` problems, or a `FAILED` build, printing `failureCode` and `failureReason`); 2 when the tool could not do its job (usage error, network error, rejected upload, wait timeout of 15 minutes by default).
 
 **Error handling.** 401 → "API key rejected or revoked; run `agentstore login`". 403 → the backend message. A finalize rejection (`422`) prints the backend's reason verbatim.
 
@@ -79,6 +79,8 @@ Existing ownership checks still apply, so a key from org A cannot touch org B's 
 - **API keys page** `/dashboard/api-keys` and an "API keys" link in the developer layout. A server component fetches through `lib/backend.ts`; server actions create and revoke. A table shows name, prefix, created, last used, and status with a Revoke button. Creating a key shows the full value once in a copy box with a "you won't see this again" warning; it lives in component state only, never in a URL or `localStorage`.
 - **`SubmissionWizard` (option 1, decided).** The wizard keeps creating a version, minus the template-ID field, so the version is an image-less DRAFT with the typed manifest and changelog. Its final step shows the `agentstore push` command for the agent, and says that **the `manifest.json` inside the pushed bundle is authoritative: `finalize` matches the draft by version number and replaces its manifest**. Submit-for-review stays blocked until a build has succeeded (already enforced in WS5b).
 - `POST /agents/{id}/versions` drops `imageRef` from `CreateAgentVersionRequest`, since nothing can legitimately supply a hand-built image any more (`finalize` already clears it). The entity's `imageRef` stays; a successful build sets it. The plan lists the tests that construct requests with `imageRef`.
+- **Submitting a built draft (added while planning).** Nothing in the UI can submit a DRAFT today (`BuildPanel` says "You can submit this version" but has no button), and keys cannot submit. Once the wizard stops submitting, that would leave no route to review. So the version status page (`ReviewStatusView`) gets: for a DRAFT with no build yet, a "Push your code" panel with the `agentstore push` command and the agent id; for a DRAFT whose build `SUCCEEDED`, a "Submit for review" button (`submitVersionAction`, then refresh). The dashboard links a DRAFT to this page instead of the wizard.
+- `frontend/e2e/seed.ts` created its version with `imageRef`; it now sets `image_ref` directly in the database before submitting.
 - The build status and log on the version page shipped in WS5b and are not repeated here.
 
 ## 5. Testing
