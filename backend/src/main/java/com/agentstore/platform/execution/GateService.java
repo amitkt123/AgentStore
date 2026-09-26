@@ -1,6 +1,7 @@
 package com.agentstore.platform.execution;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,14 +27,17 @@ public class GateService {
     private final GateRequestRepository gateRequestRepository;
     private final RunStepRepository runStepRepository;
     private final RunLifecycleService runLifecycleService;
+    private final ApplicationEventPublisher events;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public GateService(RunRepository runRepository, GateRequestRepository gateRequestRepository,
-                       RunStepRepository runStepRepository, RunLifecycleService runLifecycleService) {
+                       RunStepRepository runStepRepository, RunLifecycleService runLifecycleService,
+                       ApplicationEventPublisher events) {
         this.runRepository = runRepository;
         this.gateRequestRepository = gateRequestRepository;
         this.runStepRepository = runStepRepository;
         this.runLifecycleService = runLifecycleService;
+        this.events = events;
     }
 
     @Transactional
@@ -83,6 +87,8 @@ public class GateService {
             gate.setDecisionNote(note);
             gate.setDecidedAt(Instant.now());
             gateRequestRepository.save(gate);
+            events.publishEvent(new GateOutcomeEvent(runId, gate.getId(), gate.getStatus(),
+                    gate.affected(), gate.getCreatedAt()));
             Map<String, Object> detail = new HashMap<>();
             detail.put("gateId", gate.getId().toString());
             detail.put("decision", approve ? "APPROVED" : "REJECTED");
