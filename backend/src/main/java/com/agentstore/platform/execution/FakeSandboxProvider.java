@@ -84,7 +84,7 @@ public class FakeSandboxProvider implements SandboxProvider {
     /** The spec used for the given run's sandbox (latest if created more than once). Tests read the raw token from it. */
     public SandboxSpec specForRun(UUID runId) {
         return created.stream()
-                .filter(spec -> runId.toString().equals(spec.envVars().get("AGENT_RUN_ID")))
+                .filter(spec -> runId.toString().equals(spec.envVars().get("AGENTSTORE_RUN_ID")))
                 .reduce((first, second) -> second)
                 .orElseThrow(() -> new IllegalStateException("No sandbox created for run " + runId));
     }
