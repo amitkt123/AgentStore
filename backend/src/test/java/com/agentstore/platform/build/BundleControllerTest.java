@@ -279,6 +279,40 @@ class BundleControllerTest extends AbstractStorageIntegrationTest {
     }
 
     @Test
+    void anOverLongEntrypointIsRejectedWithAReadableReasonNotA500() throws Exception {
+        Dev dev = developer();
+        String longEntrypoint = "a".repeat(296) + ".py";
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("manifest.json", TestBundles.manifest("1.0.0").replace("agent/main.py", longEntrypoint));
+        files.put(longEntrypoint, "x");
+        byte[] zip = TestBundles.zip(files);
+        JsonNode upload = createUpload(dev, zip);
+        upload(upload.get("uploadUrl").asText(), zip);
+        var response = finalizeBundle(dev, upload.get("bundleId").asText(), TestBundles.sha256(zip));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(read(response).get("code").asText()).isEqualTo("INVALID_BUNDLE");
+        assertThat(read(response).get("message").asText()).contains("entrypoint");
+        AgentBundle bundle = bundles.findById(UUID.fromString(upload.get("bundleId").asText())).orElseThrow();
+        assertThat(bundle.getStatus()).isEqualTo(BundleStatus.REJECTED);
+        assertThat(storage.size(bundle.getStorageKey())).isEmpty();
+    }
+
+    @Test
+    void anOverLongVersionIsRejectedWithAReadableReasonNotA500() throws Exception {
+        Dev dev = developer();
+        byte[] zip = TestBundles.python("1." + "0".repeat(60));
+        JsonNode upload = createUpload(dev, zip);
+        upload(upload.get("uploadUrl").asText(), zip);
+        var response = finalizeBundle(dev, upload.get("bundleId").asText(), TestBundles.sha256(zip));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(read(response).get("message").asText()).contains("version");
+        AgentBundle bundle = bundles.findById(UUID.fromString(upload.get("bundleId").asText())).orElseThrow();
+        assertThat(bundle.getStatus()).isEqualTo(BundleStatus.REJECTED);
+    }
+
+    @Test
     void aDeclaredSizeOver100MbIsRefusedUpFront() {
         Dev dev = developer();
         var response = post(dev, "/api/v1/agents/" + dev.agent().getId() + "/bundles/uploads",
