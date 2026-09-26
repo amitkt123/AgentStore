@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 import { init } from "./commands/init.js";
 import { login } from "./commands/login.js";
+import { DEFAULT_TIMEOUT_SECONDS, push } from "./commands/push.js";
 import { validateCommand } from "./commands/validate.js";
 import type { Context } from "./context.js";
 import { CliError } from "./errors.js";
@@ -57,6 +58,15 @@ export async function main(argv: string[], ctx: Context): Promise<number> {
       case "validate":
         parse(args, {});
         return await validateCommand(ctx);
+      case "push": {
+        const values = parse(args, { wait: { type: "boolean" }, timeout: { type: "string" } });
+        const raw = str(values, "timeout");
+        const timeoutSeconds = raw === undefined ? DEFAULT_TIMEOUT_SECONDS : Number(raw);
+        if (!Number.isInteger(timeoutSeconds) || timeoutSeconds <= 0) {
+          throw new CliError(`--timeout must be a whole number of seconds, got "${raw}".\n\n${USAGE}`);
+        }
+        return await push(ctx, { wait: flag(values, "wait"), timeoutSeconds });
+      }
       case "help":
       case "--help":
       case "-h":

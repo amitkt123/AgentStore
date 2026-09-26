@@ -70,3 +70,17 @@ describe("init command", () => {
     expect(ctx.errLines.join("\n")).toContain("Choose one of");
   });
 });
+
+describe("push command", () => {
+  it.each(["0", "-5", "abc", "1.5"])("rejects --timeout %s with exit 2", async (timeout) => {
+    const ctx = makeContext();
+    expect(await main(["push", `--timeout=${timeout}`], ctx)).toBe(2);
+    expect(ctx.errLines.join("\n")).toContain("--timeout must be a whole number of seconds");
+  });
+
+  it("reports a missing agentstore.yaml with exit 2", async () => {
+    const ctx = makeContext();
+    expect(await main(["push"], ctx)).toBe(2);
+    expect(ctx.errLines.join("\n")).toContain("agentstore init");
+  });
+});
