@@ -9,6 +9,7 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
         <nav className="flex flex-col gap-1">
           <Link href="/dashboard" className="px-3 py-2 rounded-md text-ink2 hover:bg-paper2">Your agents</Link>
           <Link href="/dashboard/new" className="px-3 py-2 rounded-md text-ink2 hover:bg-paper2">New submission</Link>
+          <Link href="/dashboard/api-keys" className="px-3 py-2 rounded-md text-ink2 hover:bg-paper2">API keys</Link>
         </nav>
         <nav className="flex flex-col gap-1 mt-auto">
           <form action={logoutAction}>
