@@ -6,7 +6,7 @@ import { WizardRail } from "./WizardRail";
 import { PermissionStatementDoc } from "./PermissionStatementDoc";
 import { toParsedManifest, emptyManifestDraft } from "@/lib/manifestDraft";
 import type { ApprovalGateDecl, ManifestDraft, Scope } from "@/lib/types";
-import { createAgentAction, createVersionAction, submitVersionAction } from "./submissionActions";
+import { createAgentAction, createVersionAction } from "./submissionActions";
 
 interface ExistingAgent {
   id: string;
@@ -23,7 +23,6 @@ export function SubmissionWizard({ existingAgent }: { existingAgent?: ExistingAg
   const [category, setCategory] = useState(existingAgent?.category ?? "");
   const [description, setDescription] = useState("");
   const [versionNumber, setVersionNumber] = useState("1.0.0");
-  const [imageRef, setImageRef] = useState("");
   const [changelog, setChangelog] = useState("");
   const [draft, setDraft] = useState<ManifestDraft>(() => emptyManifestDraft(existingAgent?.name ?? ""));
   const [error, setError] = useState<string | null>(null);
@@ -70,19 +69,11 @@ export function SubmissionWizard({ existingAgent }: { existingAgent?: ExistingAg
     const versionResult = await createVersionAction(agentId, {
       versionNumber,
       manifestJson: JSON.stringify(finalDraft),
-      imageRef,
       changelog,
     });
-    if (!versionResult.ok) {
-      setSubmitting(false);
-      setError(versionResult.error);
-      return;
-    }
-
-    const submitResult = await submitVersionAction(agentId, versionResult.versionId);
     setSubmitting(false);
-    if (!submitResult.ok) {
-      setError(submitResult.error);
+    if (!versionResult.ok) {
+      setError(versionResult.error);
       return;
     }
 
@@ -103,7 +94,6 @@ export function SubmissionWizard({ existingAgent }: { existingAgent?: ExistingAg
             </>
           )}
           <input placeholder="Version number, e.g. 1.0.0" value={versionNumber} onChange={(e) => setVersionNumber(e.target.value)} className={inputClass} />
-          <input placeholder="E2B template ID" value={imageRef} onChange={(e) => setImageRef(e.target.value)} className={inputClass} />
           <textarea placeholder="What changed in this version" value={changelog} onChange={(e) => setChangelog(e.target.value)} className={inputClass} />
         </div>
       )}
@@ -188,8 +178,11 @@ export function SubmissionWizard({ existingAgent }: { existingAgent?: ExistingAg
 
       {stepIndex === 3 && (
         <div>
-          <h2 className="font-semibold mb-4">Ready to submit</h2>
-          <p className="text-ink2 mb-4">This is exactly what companies will see. Submitting starts automated review.</p>
+          <h2 className="font-semibold mb-4">Ready to create the draft</h2>
+          <p className="text-ink2 mb-4">
+            This is exactly what companies will see. Creating the draft does not submit it: next you push your code with the
+            AgentStore CLI, and you submit for review once the build succeeds.
+          </p>
           <PermissionStatementDoc manifest={toParsedManifest({ ...draft, name: agentName, version: versionNumber })} mode="preview" />
           {error && <p className="text-red mt-4">{error}</p>}
         </div>
@@ -205,7 +198,7 @@ export function SubmissionWizard({ existingAgent }: { existingAgent?: ExistingAg
           </button>
         ) : (
           <button type="button" disabled={submitting} onClick={handleSubmit} className="bg-green text-white rounded-lg px-5 py-2 font-medium disabled:opacity-50">
-            {submitting ? "Submitting…" : "Submit for review"}
+            {submitting ? "Creating…" : "Create draft"}
           </button>
         )}
       </div>

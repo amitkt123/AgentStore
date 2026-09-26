@@ -1,5 +1,7 @@
 import { BuildPanel } from "@/components/BuildPanel";
+import { PushInstructions } from "@/components/PushInstructions";
 import { StatusPill } from "@/components/StatusPill";
+import { SubmitVersionButton } from "@/components/SubmitVersionButton";
 import type { AgentVersionDetailResponse, VersionStatus } from "@/lib/types";
 
 const STATUS_EXPLANATION: Record<VersionStatus, string> = {
@@ -20,6 +22,12 @@ export function ReviewStatusView({ version }: { version: AgentVersionDetailRespo
       </div>
       <p className="text-ink2">{STATUS_EXPLANATION[version.status]}</p>
       {version.build ? <BuildPanel build={version.build} /> : null}
+      {version.status === "DRAFT" && !version.build ? (
+        <PushInstructions agentId={version.agentId} versionNumber={version.versionNumber} />
+      ) : null}
+      {version.status === "DRAFT" && version.build?.status === "SUCCEEDED" ? (
+        <SubmitVersionButton agentId={version.agentId} versionId={version.id} />
+      ) : null}
     </div>
   );
 }
