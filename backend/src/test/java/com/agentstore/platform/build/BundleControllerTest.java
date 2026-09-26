@@ -141,6 +141,99 @@ class BundleControllerTest extends AbstractStorageIntegrationTest {
         assertThat(builds.findAll().stream().filter(b -> b.getBundle().getId().toString().equals(bundleId))).hasSize(1);
     }
 
+    byte[] variant(String code) {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("manifest.json", TestBundles.manifest("1.0.0"));
+        files.put("agent/main.py", code);
+        return TestBundles.zip(files);
+    }
+
+    /** Uploads both bundles, then finalizes them at the same time; returns the two responses. */
+    java.util.List<JsonNode> finalizeTogether(Dev dev, byte[] a, byte[] b) throws Exception {
+        JsonNode ua = createUpload(dev, a);
+        JsonNode ub = createUpload(dev, b);
+        upload(ua.get("uploadUrl").asText(), a);
+        upload(ub.get("uploadUrl").asText(), b);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var fa = pool.submit(() -> { start.await(); return finalizeBundle(dev, ua.get("bundleId").asText(), TestBundles.sha256(a)); });
+            var fb = pool.submit(() -> { start.await(); return finalizeBundle(dev, ub.get("bundleId").asText(), TestBundles.sha256(b)); });
+            start.countDown();
+            var ra = fa.get();
+            var rb = fb.get();
+            assertThat(ra.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(rb.getStatusCode()).isEqualTo(HttpStatus.OK);
+            return java.util.List.of(read(ra), read(rb));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void twoBundlesFinalizedTogetherForAnExistingDraftLeaveOneQueuedBuild() throws Exception {
+        Dev dev = developer();
+        JsonNode first = read(push(dev, TestBundles.python("1.0.0")));
+        UUID versionId = UUID.fromString(first.get("versionId").asText());
+
+        var responses = finalizeTogether(dev, variant("print('a')\n"), variant("print('b')\n"));
+
+        assertThat(responses.get(0).get("versionId").asText()).isEqualTo(versionId.toString());
+        assertThat(responses.get(1).get("versionId").asText()).isEqualTo(versionId.toString());
+        var queued = builds.findByAgentVersionIdAndStatus(versionId, BuildStatus.QUEUED);
+        assertThat(queued).hasSize(1);
+        AgentVersion version = versions.findById(versionId).orElseThrow();
+        assertThat(version.getBundle().getId()).isEqualTo(queued.get(0).getBundle().getId());
+        assertThat(version.getBuildStatus()).isEqualTo(BuildStatus.QUEUED);
+        var superseded = builds.findByAgentVersionIdAndStatus(versionId, BuildStatus.FAILED);
+        assertThat(superseded).hasSize(2).allSatisfy(b -> assertThat(b.getFailureCode()).isEqualTo(BuildFailureCodes.SUPERSEDED));
+    }
+
+    @Test
+    void twoBundlesFinalizedTogetherForANewVersionShareOneVersion() throws Exception {
+        Dev dev = developer();
+
+        var responses = finalizeTogether(dev, variant("print('a')\n"), variant("print('b')\n"));
+
+        assertThat(responses.get(0).get("versionId")).isEqualTo(responses.get(1).get("versionId"));
+        UUID versionId = UUID.fromString(responses.get(0).get("versionId").asText());
+        assertThat(builds.findByAgentVersionIdAndStatus(versionId, BuildStatus.QUEUED)).hasSize(1);
+        assertThat(builds.findByAgentVersionIdAndStatus(versionId, BuildStatus.FAILED)).hasSize(1);
+        assertThat(versions.findById(versionId).orElseThrow().getBundle().getId())
+                .isEqualTo(builds.findByAgentVersionIdAndStatus(versionId, BuildStatus.QUEUED).get(0).getBundle().getId());
+    }
+
+    @Test
+    void finalizingARejectedBundleIsAConflict() throws Exception {
+        Dev dev = developer();
+        byte[] zip = TestBundles.python("1.0.0");
+        JsonNode upload = createUpload(dev, zip);
+        upload(upload.get("uploadUrl").asText(), TestBundles.python("9.9.9"));
+        String bundleId = upload.get("bundleId").asText();
+        assertThat(finalizeBundle(dev, bundleId, TestBundles.sha256(zip)).getStatusCode())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+
+        assertThat(finalizeBundle(dev, bundleId, TestBundles.sha256(zip)).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void aStoredSizeThatDiffersFromTheDeclaredSizeIsRejectedAndDeleted() throws Exception {
+        Dev dev = developer();
+        byte[] zip = TestBundles.python("1.0.0");
+        byte[] longer = TestBundles.python("10.10.10");
+        var created = post(dev, "/api/v1/agents/" + dev.agent().getId() + "/bundles/uploads",
+                Map.of("sha256", TestBundles.sha256(zip), "sizeBytes", zip.length));
+        JsonNode upload = read(created);
+        upload(upload.get("uploadUrl").asText(), longer);
+        var response = finalizeBundle(dev, upload.get("bundleId").asText(), TestBundles.sha256(zip));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(read(response).get("message").asText()).contains("does not match the declared");
+        AgentBundle bundle = bundles.findById(UUID.fromString(upload.get("bundleId").asText())).orElseThrow();
+        assertThat(bundle.getStatus()).isEqualTo(BundleStatus.REJECTED);
+        assertThat(storage.size(bundle.getStorageKey())).isEmpty();
+    }
+
     @Test
     void finalizingBeforeTheUploadArrivesIsAConflictAndKeepsTheBundle() throws Exception {
         Dev dev = developer();

@@ -9,7 +9,6 @@ import com.agentstore.platform.manifest.ManifestValidator;
 import com.agentstore.platform.storage.ObjectStorage;
 import com.agentstore.platform.storage.StorageException;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -107,12 +106,7 @@ public class BundleService {
             throw new StorageException("Could not read bundle " + bundleId, e);
         }
         String json = manifestJson;
-        try {
-            return tx.execute(status -> record(bundleId, manifest, json));
-        } catch (DataIntegrityViolationException e) {
-            // Two different bundles raced to create the same new version; the loser now finds it and updates the draft.
-            return tx.execute(status -> record(bundleId, manifest, json));
-        }
+        return tx.execute(status -> record(agentId, bundleId, manifest, json));
     }
 
     private Manifest check(BundleInspector.Inspection inspection, AgentBundle bundle) {
@@ -140,7 +134,13 @@ public class BundleService {
         return manifest;
     }
 
-    private FinalizeBundleResponse record(UUID bundleId, Manifest manifest, String manifestJson) {
+    /**
+     * Lock order is always agent row, then bundle row. The agent lock serializes every finalize of one agent, so two
+     * bundles for the same version (new or existing DRAFT) cannot both read the old state, both queue a build, or
+     * overwrite each other's version update. The bundle lock keeps a retried finalize of one bundle idempotent.
+     */
+    private FinalizeBundleResponse record(UUID agentId, UUID bundleId, Manifest manifest, String manifestJson) {
+        agentRepository.findByIdForUpdate(agentId).orElseThrow();
         AgentBundle bundle = bundleRepository.findByIdForUpdate(bundleId).orElseThrow();
         if (bundle.getStatus() == BundleStatus.UPLOADED) {
             return existingResult(bundle);   // a concurrent finalize won the race
