@@ -53,14 +53,20 @@ public class ExecutionFixtures {
     public record Scenario(Org buyer, AgentVersion version, Connection connection) {}
 
     public Scenario liveTierA(BigDecimal spendCap, BigDecimal walletBalance) {
+        return liveWithManifest("valid-tier-a.json", List.of("bank_statement"), spendCap, walletBalance);
+    }
+
+    /** As {@link #liveTierA} but with any manifest from src/test/resources/manifest and the buyer's granted resources. */
+    public Scenario liveWithManifest(String manifestFile, List<String> grantedScopes, BigDecimal spendCap,
+                                     BigDecimal walletBalance) {
         Org developer = orgRepository.save(new Org(null, "DevCo", OrgType.DEVELOPER));
         Org buyer = orgRepository.save(new Org(null, "Acme", OrgType.BUYER));
         Agent agent = agentRepository.save(new Agent(null, developer, "Bank Reconciliation", "reconciliation", "d"));
-        AgentVersion version = new AgentVersion(null, agent, "1.0.0", readManifest("valid-tier-a.json"),
+        AgentVersion version = new AgentVersion(null, agent, "1.0.0", readManifest(manifestFile),
                 "template-v1", VersionStatus.LIVE, Tier.TIER_A, "cl");
         version.setApprovedAt(Instant.now());
         version = agentVersionRepository.save(version);
-        Connection connection = new Connection(null, buyer, agent, List.of("bank_statement"), spendCap,
+        Connection connection = new Connection(null, buyer, agent, grantedScopes, spendCap,
                 ConnectionStatus.ACTIVE);
         connection.setAgentVersion(version);
         connection = connectionRepository.save(connection);

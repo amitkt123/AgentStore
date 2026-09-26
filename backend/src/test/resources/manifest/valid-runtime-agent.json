@@ -1,0 +1,15 @@
+{
+  "name": "Runtime Test Agent",
+  "version": "1.0.0",
+  "scopes": [
+    { "type": "READ", "resource": "bank_statement", "description": "Read statement lines" },
+    { "type": "READ", "resource": "invoices", "description": "Read open invoices" },
+    { "type": "WRITE", "resource": "journal_entries", "description": "Propose entries", "requiresApproval": true }
+  ],
+  "network": { "allowlist": [] },
+  "costEnvelope": { "currency": "INR", "maxPerRun": 500.00, "pricingUnit": "METERED", "unitPrice": 2.00, "unitLabel": "reconciled_transaction" },
+  "approvalGates": [
+    { "trigger": "post_journal_entries", "description": "Buyer approves entries before they are committed", "timeoutMinutes": 5 }
+  ],
+  "dataClasses": ["BANK_STATEMENT"]
+}
