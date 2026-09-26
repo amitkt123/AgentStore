@@ -7,7 +7,11 @@ export type PricingUnit = "METERED" | "OUTCOME" | "SUBSCRIPTION";
 export type ConnectionStatus = "ACTIVE" | "REVOKED";
 export type RunStatus =
   | "PENDING" | "PENDING_BUILD" | "RUNNING" | "AWAITING_APPROVAL" | "COMPLETED" | "FAILED" | "CANCELLED" | "TIMED_OUT" | "EXPIRED";
-export type RunStepKind = "READ" | "WRITE" | "GATE" | "COST" | "COMPLETE" | "FAILED" | "TIMEOUT" | "COST_CAP_REACHED";
+export type RunStepKind =
+  | "READ" | "WRITE" | "GATE" | "COST" | "COMPLETE" | "FAILED" | "TIMEOUT" | "COST_CAP_REACHED"
+  | "DATA_READ" | "DATA_WRITE" | "WRITE_STAGED" | "GATE_REQUESTED" | "GATE_DECIDED"
+  | "LLM_CALL" | "USAGE" | "SCOPE_VIOLATION" | "AGENT_LOG";
+export type RunStepSource = "PLATFORM" | "AGENT";
 export type LedgerEntryType = "CHARGE" | "REVERSAL" | "FEE";
 export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -114,6 +118,7 @@ export interface RunResponse {
 }
 export interface RunStepResponse {
   kind: RunStepKind;
+  source?: RunStepSource;
   detail: string;
   createdAt: string;
 }
