@@ -22,6 +22,8 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
 
     List<Run> findByStatusAndAgentVersionId(RunStatus status, UUID agentVersionId);
 
+    Optional<Run> findFirstByCallbackTokenHash(String callbackTokenHash);
+
     @Transactional
     @Modifying
     @Query("update Run r set r.callbackTokenHash = :hash where r.id = :id")

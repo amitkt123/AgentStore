@@ -33,12 +33,14 @@ public class RunLauncher {
     private final String callbackBaseUrl;
     /** For versions without a manifest runtime (hand-supplied images). */
     private final String fallbackCommand;
+    private final boolean legacyCallback;
 
     public RunLauncher(RunRepository runRepository, SecretRepository secretRepository, SecretService secretService,
                        ManifestParser manifestParser, SandboxProvider sandboxProvider, RunTokenService runTokenService,
                        RunLifecycleService runLifecycleService,
                        @Value("${agentstore.callback.base-url}") String callbackBaseUrl,
-                       @Value("${agentstore.runs.agent-command:/workspace/app/agentstore-entrypoint}") String fallbackCommand) {
+                       @Value("${agentstore.runs.agent-command:/workspace/app/agentstore-entrypoint}") String fallbackCommand,
+                       @Value("${agentstore.runtime.legacy-callback.enabled:true}") boolean legacyCallback) {
         this.runRepository = runRepository;
         this.secretRepository = secretRepository;
         this.secretService = secretService;
@@ -48,6 +50,7 @@ public class RunLauncher {
         this.runLifecycleService = runLifecycleService;
         this.callbackBaseUrl = callbackBaseUrl;
         this.fallbackCommand = fallbackCommand;
+        this.legacyCallback = legacyCallback;
     }
 
     public void launch(UUID runId) {
@@ -69,9 +72,15 @@ public class RunLauncher {
             runRepository.updateCallbackTokenHash(runId, RunTokenService.hash(rawToken));
 
             envVars = new HashMap<>();
-            envVars.put("AGENT_RUN_ID", runId.toString());
-            envVars.put("AGENT_CALLBACK_URL", callbackBaseUrl + "/internal/agent-callback/runs/" + runId);
-            envVars.put("AGENT_CALLBACK_TOKEN", rawToken);
+            envVars.put("AGENTSTORE_API_URL", callbackBaseUrl);
+            envVars.put("AGENTSTORE_RUN_TOKEN", rawToken);
+            envVars.put("AGENTSTORE_RUN_ID", runId.toString());
+            envVars.put("AGENTSTORE_MODE", run.getMode().name());
+            if (legacyCallback) {
+                envVars.put("AGENT_RUN_ID", runId.toString());
+                envVars.put("AGENT_CALLBACK_URL", callbackBaseUrl + "/internal/agent-callback/runs/" + runId);
+                envVars.put("AGENT_CALLBACK_TOKEN", rawToken);
+            }
             for (Secret secret : secretRepository.findByConnectionId(connection.getId())) {
                 envVars.put("AGENT_SECRET_" + secret.getName(), secretService.reveal(connection.getId(), secret.getName()));
             }

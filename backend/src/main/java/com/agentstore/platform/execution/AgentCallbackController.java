@@ -1,6 +1,7 @@
 package com.agentstore.platform.execution;
 
 import jakarta.validation.Valid;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -8,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
+@ConditionalOnProperty(name = "agentstore.runtime.legacy-callback.enabled", havingValue = "true", matchIfMissing = true)
 @RestController
 @RequestMapping("/internal/agent-callback/runs/{runId}")
 public class AgentCallbackController {

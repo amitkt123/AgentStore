@@ -18,13 +18,13 @@ import os
 import urllib.request
 
 
-def report(kind, detail=None):
+def complete(summary):
     request = urllib.request.Request(
-        os.environ["AGENT_CALLBACK_URL"] + "/events",
-        data=json.dumps({"kind": kind, "detail": detail or {}}).encode(),
+        os.environ["AGENTSTORE_API_URL"] + "/runtime/v1/complete",
+        data=json.dumps({"summary": summary}).encode(),
         headers={
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + os.environ["AGENT_CALLBACK_TOKEN"],
+            "Authorization": "Bearer " + os.environ["AGENTSTORE_RUN_TOKEN"],
         },
         method="POST",
     )
@@ -32,7 +32,7 @@ def report(kind, detail=None):
 
 
 def main():
-    report("COMPLETE", {"message": "hello from my agent"})
+    complete("hello from my agent")
 
 
 if __name__ == "__main__":
@@ -40,24 +40,24 @@ if __name__ == "__main__":
 `;
 
 const NODE_MAIN = `// AgentStore runs this file with node. The build only syntax-checks it.
-async function report(kind, detail = {}) {
-  const res = await fetch(process.env.AGENT_CALLBACK_URL + "/events", {
+async function complete(summary) {
+  const res = await fetch(process.env.AGENTSTORE_API_URL + "/runtime/v1/complete", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: "Bearer " + process.env.AGENT_CALLBACK_TOKEN,
+      Authorization: "Bearer " + process.env.AGENTSTORE_RUN_TOKEN,
     },
-    body: JSON.stringify({ kind, detail }),
+    body: JSON.stringify({ summary }),
   });
-  if (!res.ok) throw new Error("callback failed: " + res.status);
+  if (!res.ok) throw new Error("runtime call failed: " + res.status);
 }
 
-await report("COMPLETE", { message: "hello from my agent" });
+await complete("hello from my agent");
 `;
 
 /**
- * The minimal project: a manifest that passes the backend's schema and bundle rules, a working agent that reports
- * COMPLETE over the callback protocol, and the empty directories the developer platform expects. The Node scaffold
+ * The minimal project: a manifest that passes the backend's schema and bundle rules, a working agent that completes
+ * the run through the runtime API (`/runtime/v1/complete`), and the empty directories the developer platform expects. The Node scaffold
  * is plain ESM JavaScript: the build has no TypeScript step and the backend accepts only .js, .mjs and .cjs
  * entrypoints. It has no package.json, because a package.json needs a package-lock.json next to it.
  */

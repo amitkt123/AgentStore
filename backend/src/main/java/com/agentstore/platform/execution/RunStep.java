@@ -32,13 +32,21 @@ public class RunStep {
     @Column(columnDefinition = "jsonb")
     private String detail;
 
+    @Enumerated(EnumType.STRING)
+    private RunStepSource source = RunStepSource.AGENT;
+
     private Instant createdAt;
 
     public RunStep(UUID id, Run run, RunStepKind kind, String detail) {
+        this(id, run, kind, detail, kind.defaultSource());
+    }
+
+    public RunStep(UUID id, Run run, RunStepKind kind, String detail, RunStepSource source) {
         this.id = id;
         this.run = run;
         this.kind = kind;
         this.detail = detail;
+        this.source = source;
     }
 
     @PrePersist

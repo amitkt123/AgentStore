@@ -33,21 +33,21 @@ public class RunController {
     private final ManifestParser manifestParser;
     private final RunTokenService runTokenService;
     private final WalletReservationService walletReservationService;
-    private final RunLifecycleService runLifecycleService;
+    private final GateService gateService;
     private final RunLauncher runLauncher;
     private final RebuildService rebuildService;
     private final PendingBuildRuns pendingBuildRuns;
 
     public RunController(ConnectionRepository connectionRepository, RunRepository runRepository,
                          ManifestParser manifestParser, RunTokenService runTokenService,
-                         WalletReservationService walletReservationService, RunLifecycleService runLifecycleService,
+                         WalletReservationService walletReservationService, GateService gateService,
                          RunLauncher runLauncher, RebuildService rebuildService, PendingBuildRuns pendingBuildRuns) {
         this.connectionRepository = connectionRepository;
         this.runRepository = runRepository;
         this.manifestParser = manifestParser;
         this.runTokenService = runTokenService;
         this.walletReservationService = walletReservationService;
-        this.runLifecycleService = runLifecycleService;
+        this.gateService = gateService;
         this.runLauncher = runLauncher;
         this.rebuildService = rebuildService;
         this.pendingBuildRuns = pendingBuildRuns;
@@ -123,14 +123,27 @@ public class RunController {
     @PreAuthorize("hasRole('BUYER_APPROVER')")
     public RunResponse approve(@PathVariable UUID runId, @RequestBody ApproveRunRequest request) {
         requireOwnedByCaller(runId);
-        return RunResponse.from(runLifecycleService.approveGate(runId));
+        return RunResponse.from(gateService.decide(runId, null, true, callerUserId(), request.notes()));
     }
 
     @PostMapping("/{runId}/reject")
     @PreAuthorize("hasRole('BUYER_APPROVER')")
     public RunResponse reject(@PathVariable UUID runId, @RequestBody ApproveRunRequest request) {
         requireOwnedByCaller(runId);
-        return RunResponse.from(runLifecycleService.rejectGate(runId));
+        return RunResponse.from(gateService.decide(runId, null, false, callerUserId(), request.notes()));
+    }
+
+    @PostMapping("/{runId}/gates/{gateId}/decision")
+    @PreAuthorize("hasRole('BUYER_APPROVER')")
+    public RunResponse decide(@PathVariable UUID runId, @PathVariable UUID gateId,
+                              @Valid @RequestBody GateDecisionRequest request) {
+        requireOwnedByCaller(runId);
+        return RunResponse.from(gateService.decide(runId, gateId, request.decision() == GateDecision.APPROVE,
+                callerUserId(), request.note()));
+    }
+
+    private UUID callerUserId() {
+        return ((JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal()).userId();
     }
 
     private void requireOwnedByCaller(UUID runId) {

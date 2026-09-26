@@ -24,7 +24,7 @@ public class ManifestParser {
         List<Scope> scopes = new ArrayList<>();
         for (JsonNode s : root.path("scopes")) {
             scopes.add(new Scope(ScopeType.valueOf(s.get("type").asText()), s.get("resource").asText(),
-                    s.path("description").asText("")));
+                    s.path("description").asText(""), s.path("requiresApproval").asBoolean(false)));
         }
 
         List<String> allowlist = new ArrayList<>();
@@ -42,7 +42,8 @@ public class ManifestParser {
 
         List<ApprovalGateDecl> gates = new ArrayList<>();
         for (JsonNode g : root.path("approvalGates")) {
-            gates.add(new ApprovalGateDecl(g.get("trigger").asText(), g.path("description").asText("")));
+            gates.add(new ApprovalGateDecl(g.get("trigger").asText(), g.path("description").asText(""),
+                    g.path("timeoutMinutes").asInt(ApprovalGateDecl.DEFAULT_TIMEOUT_MINUTES)));
         }
 
         List<String> dataClasses = new ArrayList<>();

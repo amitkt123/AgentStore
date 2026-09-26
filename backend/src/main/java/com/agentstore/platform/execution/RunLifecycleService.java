@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -29,6 +30,9 @@ import java.util.UUID;
 public class RunLifecycleService {
 
     private static final Logger log = LoggerFactory.getLogger(RunLifecycleService.class);
+
+    /** A PRODUCTION run that keeps calling outside its granted scopes is stopped at this many violations. */
+    static final int MAX_PRODUCTION_VIOLATIONS = 3;
     private static final Set<RunStepKind> AGENT_REPORTABLE = EnumSet.of(
             RunStepKind.READ, RunStepKind.WRITE, RunStepKind.GATE, RunStepKind.COST,
             RunStepKind.COMPLETE, RunStepKind.FAILED);
@@ -40,12 +44,15 @@ public class RunLifecycleService {
     private final ManifestParser manifestParser;
     private final SandboxProvider sandboxProvider;
     private final WalletReservationService walletReservationService;
+    private final GateRequestRepository gateRequestRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RunLifecycleService(RunRepository runRepository, RunStepRepository runStepRepository,
                                UsageEventRepository usageEventRepository, LedgerService ledgerService,
                                ManifestParser manifestParser, SandboxProvider sandboxProvider,
-                               WalletReservationService walletReservationService) {
+                               WalletReservationService walletReservationService,
+                               GateRequestRepository gateRequestRepository) {
+        this.gateRequestRepository = gateRequestRepository;
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.usageEventRepository = usageEventRepository;
@@ -92,7 +99,7 @@ public class RunLifecycleService {
         Map<String, Object> safeDetail = detail == null ? Map.of() : detail;
         Run run = lock(runId);
         if (run.getStatus().isTerminal()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Run not accepting events: " + run.getStatus());
+            throw new RunTerminatedException(run.getStatus());
         }
         run.setLastHeartbeatAt(Instant.now());
 
@@ -167,15 +174,102 @@ public class RunLifecycleService {
         return true;
     }
 
+    /** Records a platform-observed step (DATA_READ, LLM_CALL, …) for a run that is still open. */
+    @Transactional
+    public void recordStep(UUID runId, RunStepKind kind, RunStepSource source, Map<String, Object> detail) {
+        Run run = lockOpen(runId);
+        run.setLastHeartbeatAt(Instant.now());
+        step(run, kind, source, detail == null ? Map.of() : detail);
+        runRepository.save(run);
+    }
+
+    /** Stores what the agent logged, one AGENT_LOG step per entry, clearly marked as agent-reported. */
+    @Transactional
+    public void recordAgentLogs(UUID runId, List<Map<String, Object>> entries) {
+        Run run = lockOpen(runId);
+        run.setLastHeartbeatAt(Instant.now());
+        for (Map<String, Object> entry : entries) {
+            step(run, RunStepKind.AGENT_LOG, RunStepSource.AGENT, entry);
+        }
+        runRepository.save(run);
+    }
+
+    @Transactional
+    public void heartbeat(UUID runId) {
+        Run run = lockOpen(runId);
+        run.setLastHeartbeatAt(Instant.now());
+        runRepository.save(run);
+    }
+
+    /**
+     * Records a call outside the run's granted scopes. Returns true when this violation stopped the run
+     * (PRODUCTION runs stop at {@link #MAX_PRODUCTION_VIOLATIONS}; other modes only report).
+     */
+    @Transactional
+    public boolean recordViolation(UUID runId, Map<String, Object> detail) {
+        Run run = lockOpen(runId);
+        step(run, RunStepKind.SCOPE_VIOLATION, RunStepSource.PLATFORM, detail);
+        run.setViolationCount(run.getViolationCount() + 1);
+        boolean stop = run.getMode() == RunMode.PRODUCTION && run.getViolationCount() >= MAX_PRODUCTION_VIOLATIONS;
+        if (stop) {
+            step(run, RunStepKind.FAILED, RunStepSource.PLATFORM, Map.of(
+                    "summary", "Run stopped after repeated calls outside its permissions", "code", "SCOPE_VIOLATIONS"));
+            finish(run, RunStatus.FAILED);
+        } else {
+            runRepository.save(run);
+        }
+        return stop;
+    }
+
+    /** A usage report from /runtime/v1/usage: same charging, cap clamping and reservation release as the legacy COST event. */
+    @Transactional
+    public UsageOutcome recordUsage(UUID runId, BigDecimal quantity, Map<String, Object> detail) {
+        if (quantity == null || quantity.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "quantity must be positive");
+        }
+        Run run = lockOpen(runId);
+        run.setLastHeartbeatAt(Instant.now());
+        return charge(run, quantity, detail == null ? Map.of() : detail, RunStepKind.USAGE, RunStepSource.PLATFORM);
+    }
+
+    @Transactional
+    public void complete(UUID runId, Map<String, Object> detail) {
+        Run run = lockOpen(runId);
+        if (run.getStatus() == RunStatus.AWAITING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A gate is awaiting approval; the run cannot complete yet");
+        }
+        step(run, RunStepKind.COMPLETE, RunStepSource.PLATFORM, detail == null ? Map.of() : detail);
+        finish(run, RunStatus.COMPLETED);
+    }
+
+    @Transactional
+    public void fail(UUID runId, Map<String, Object> detail) {
+        Run run = lockOpen(runId);
+        step(run, RunStepKind.FAILED, RunStepSource.PLATFORM, detail == null ? Map.of() : detail);
+        finish(run, RunStatus.FAILED);
+    }
+
+    private Run lockOpen(UUID runId) {
+        Run run = lock(runId);
+        if (run.getStatus().isTerminal()) {
+            throw new RunTerminatedException(run.getStatus());
+        }
+        return run;
+    }
+
     private void recordCost(Run run, Map<String, Object> detail) {
-        BigDecimal quantity = parseQuantity(detail.get("quantity"));
+        charge(run, parseQuantity(detail.get("quantity")), detail, RunStepKind.COST, RunStepSource.AGENT);
+    }
+
+    private UsageOutcome charge(Run run, BigDecimal quantity, Map<String, Object> detail, RunStepKind stepKind,
+                                RunStepSource source) {
         var manifest = manifestParser.parse(run.getAgentVersion().getManifestJson());
         BigDecimal unitCost = manifest.costEnvelope().unitPrice();
         BigDecimal requested = quantity.multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
         BigDecimal remaining = run.getCostCap().subtract(run.getTotalCharged()).max(BigDecimal.ZERO);
         BigDecimal charged = requested.min(remaining);
 
-        step(run, RunStepKind.COST, detail);
+        step(run, stepKind, source, detail);
         if (charged.signum() > 0) {
             UUID buyerOrgId = run.getConnection().getBuyerOrg().getId();
             UsageEvent usageEvent = usageEventRepository.save(new UsageEvent(null, run.getId(), buyerOrgId,
@@ -187,7 +281,8 @@ public class RunLifecycleService {
             run.setReservedAmount(run.getReservedAmount().subtract(consumed));
         }
 
-        if (requested.compareTo(remaining) > 0) {
+        boolean capReached = requested.compareTo(remaining) > 0;
+        if (capReached) {
             step(run, RunStepKind.COST_CAP_REACHED, Map.of(
                     "summary", "Spend limit reached; run stopped",
                     "requested", requested, "charged", charged, "costCap", run.getCostCap()));
@@ -195,6 +290,8 @@ public class RunLifecycleService {
         } else {
             runRepository.save(run);
         }
+        return new UsageOutcome(charged, run.getTotalCharged(),
+                run.getCostCap().subtract(run.getTotalCharged()).max(BigDecimal.ZERO), capReached);
     }
 
     private BigDecimal parseQuantity(Object raw) {
@@ -218,6 +315,14 @@ public class RunLifecycleService {
         run.setCompletedAt(Instant.now());
         run.setAwaitingSince(null);
         runRepository.save(run);
+        // A run that ends for any reason (failure, spend cap, violations, legacy events) must not leave its gate
+        // PENDING: nobody can decide it any more. Decisions close their own gate before reaching here.
+        gateRequestRepository.findFirstByRunIdAndStatusOrderByCreatedAtAsc(run.getId(), GateStatus.PENDING).ifPresent(gate -> {
+            gate.setStatus(GateStatus.EXPIRED);
+            gate.setDecisionNote("The run ended before a decision was made");
+            gate.setDecidedAt(Instant.now());
+            gateRequestRepository.save(gate);
+        });
         if (run.getSandboxId() != null) {
             killQuietly(run.getSandboxId());
         }
@@ -244,8 +349,12 @@ public class RunLifecycleService {
     }
 
     private void step(Run run, RunStepKind kind, Map<String, Object> detail) {
+        step(run, kind, kind.defaultSource(), detail);
+    }
+
+    private void step(Run run, RunStepKind kind, RunStepSource source, Map<String, Object> detail) {
         try {
-            runStepRepository.save(new RunStep(null, run, kind, objectMapper.writeValueAsString(detail)));
+            runStepRepository.save(new RunStep(null, run, kind, objectMapper.writeValueAsString(detail), source));
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid detail payload");
         }

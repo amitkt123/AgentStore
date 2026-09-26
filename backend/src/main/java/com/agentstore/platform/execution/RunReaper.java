@@ -20,14 +20,18 @@ public class RunReaper {
 
     private final RunRepository runRepository;
     private final RunLifecycleService runLifecycleService;
+    private final GateService gateService;
+    private final GateRequestRepository gateRequestRepository;
     private final SandboxProvider sandboxProvider;
     private final Duration gateTimeout;
 
-    public RunReaper(RunRepository runRepository, RunLifecycleService runLifecycleService,
-                     SandboxProvider sandboxProvider,
+    public RunReaper(RunRepository runRepository, RunLifecycleService runLifecycleService, GateService gateService,
+                     GateRequestRepository gateRequestRepository, SandboxProvider sandboxProvider,
                      @Value("${agentstore.runs.gate-timeout:PT30M}") Duration gateTimeout) {
         this.runRepository = runRepository;
         this.runLifecycleService = runLifecycleService;
+        this.gateService = gateService;
+        this.gateRequestRepository = gateRequestRepository;
         this.sandboxProvider = sandboxProvider;
         this.gateTimeout = gateTimeout;
     }
@@ -60,12 +64,17 @@ public class RunReaper {
         RunStatus snapshotStatus = run.getStatus();
         boolean deadlinePassed = run.getDeadlineAt() != null && run.getDeadlineAt().isBefore(now);
         if (snapshotStatus == RunStatus.AWAITING_APPROVAL) {
-            boolean gateExpired = run.getAwaitingSince() != null
-                    && run.getAwaitingSince().plus(gateTimeout).isBefore(now);
+            // A run with a gate row expires when that gate does (the manifest's timeoutMinutes); a legacy run
+            // without one falls back to the global gate timeout.
+            Instant gateExpiresAt = gateRequestRepository
+                    .findFirstByRunIdAndStatusOrderByCreatedAtAsc(run.getId(), GateStatus.PENDING)
+                    .map(GateRequest::getExpiresAt)
+                    .orElseGet(() -> run.getAwaitingSince() == null ? null : run.getAwaitingSince().plus(gateTimeout));
+            boolean gateExpired = gateExpiresAt != null && gateExpiresAt.isBefore(now);
             if (!gateExpired && !deadlinePassed) {
                 return false;
             }
-            return runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.EXPIRED, RunStepKind.TIMEOUT,
+            return gateService.expire(run.getId(), snapshotStatus,
                     Map.of("summary", "No approval decision in time; run stopped"));
         }
         if (deadlinePassed) {

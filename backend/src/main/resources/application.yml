@@ -11,6 +11,9 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  threads:
+    virtual:
+      enabled: true      # a long-polling agent (GET /runtime/v1/gates/{id}?wait=) must not tie up a platform thread
   mail:
     host: ${SMTP_HOST:localhost}
     port: ${SMTP_PORT:587}
@@ -38,6 +41,14 @@ agentstore:
     encryption-key-base64: ${SECRET_ENCRYPTION_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
   callback:
     base-url: ${CALLBACK_BASE_URL:http://localhost:8080}
+  runtime:
+    redis-uri: ${REDIS_URI:redis://localhost:6379}
+    legacy-callback:
+      enabled: ${AGENTSTORE_LEGACY_CALLBACK_ENABLED:true}
+    rate-limit:
+      per-minute: 600
+      logs-per-minute: 120
+      llm-per-minute: 60
   jobs:
     enabled: ${AGENTSTORE_JOBS_ENABLED:true}
   runs:
@@ -61,6 +72,13 @@ agentstore:
     access-key: ${STORAGE_ACCESS_KEY:agentstore-dev}
     secret-key: ${STORAGE_SECRET_KEY:agentstore-dev-secret-change-me}
     bucket: ${STORAGE_BUCKET:agentstore}
+
+springdoc:
+  paths-to-match: /runtime/v1/**
+  api-docs:
+    version: openapi_3_1
+  swagger-ui:
+    enabled: false
 
 management:
   endpoints:
