@@ -1,6 +1,7 @@
 # Local infrastructure for AgentStore development.
-#   docker compose up -d seaweedfs      (or: docker-compose up -d seaweedfs)
+#   docker compose up -d seaweedfs redis      (or: docker-compose up -d seaweedfs redis)
 # SeaweedFS is the object store (bundles, build logs), used only through its S3 API on :8333 (spec C5).
+# Redis backs the runtime API's per-run rate limits (WS1). redis:7.2 is the last BSD-licensed release.
 # Postgres still runs the way it does today (see the backend README).
 services:
   seaweedfs:
@@ -11,6 +12,10 @@ services:
     volumes:
       - ./infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
       - seaweedfs-data:/data
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
 
 volumes:
   seaweedfs-data:
