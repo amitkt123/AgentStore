@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 public class ManifestValidator {
 
     private final ObjectMapper mapper = new ObjectMapper();
+    private final ManifestParser parser = new ManifestParser();
     private final JsonSchema schema;
 
     public ManifestValidator() {
@@ -30,10 +31,11 @@ public class ManifestValidator {
             return new Result(false, List.of("Manifest is not valid JSON: " + e.getMessage()));
         }
         var errors = schema.validate(node);
-        if (errors.isEmpty()) {
-            return new Result(true, List.of());
+        if (!errors.isEmpty()) {
+            return new Result(false, errors.stream().map(Object::toString).collect(Collectors.toList()));
         }
-        return new Result(false, errors.stream().map(Object::toString).collect(Collectors.toList()));
+        List<String> semantic = ResourceManifestRules.check(parser.parse(rawJson));
+        return semantic.isEmpty() ? new Result(true, List.of()) : new Result(false, semantic);
     }
 
     public record Result(boolean valid, List<String> errors) {

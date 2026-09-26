@@ -1,0 +1,25 @@
+{
+  "name": "Data Test Agent",
+  "version": "1.0.0",
+  "resources": [
+    { "name": "bank_statement", "format": "csv",
+      "schema": { "required": ["date", "narration", "amount"],
+                  "properties": { "date": { "type": "date" }, "amount": { "type": "number" } } } },
+    { "name": "statement_pdf", "format": "pdf" },
+    { "name": "journal_entries", "format": "json",
+      "schema": { "required": ["bank_line", "amount"], "properties": { "amount": { "type": "number" } } } },
+    { "name": "audit_log", "format": "json" }
+  ],
+  "scopes": [
+    { "type": "READ", "resource": "bank_statement", "description": "Read statement lines" },
+    { "type": "READ", "resource": "statement_pdf", "description": "Read the statement PDF" },
+    { "type": "WRITE", "resource": "journal_entries", "description": "Propose entries", "requiresApproval": true },
+    { "type": "WRITE", "resource": "audit_log", "description": "Append audit lines" }
+  ],
+  "network": { "allowlist": [] },
+  "costEnvelope": { "currency": "INR", "maxPerRun": 500.00, "pricingUnit": "METERED", "unitPrice": 2.00, "unitLabel": "reconciled_transaction" },
+  "approvalGates": [
+    { "trigger": "post_journal_entries", "description": "Buyer approves entries before they are committed", "timeoutMinutes": 5 }
+  ],
+  "dataClasses": ["BANK_STATEMENT"]
+}
