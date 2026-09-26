@@ -9,7 +9,7 @@ class LogRedactorTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-            key=AKIAQYLPMN5HHHFPZAM2 done                                        | key=[REDACTED] done
+            key=AKIAXWNVK4PQ2JT6ZM3C done                                        | key=[REDACTED] done
             aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY     | aws_secret_access_key = [REDACTED]
             pip install https://user:hunter2@pypi.example.com/simple              | pip install https://user:[REDACTED]@pypi.example.com/simple
             token ghp_abcdefghijklmnopqrstuvwxyz0123456789                        | token [REDACTED]

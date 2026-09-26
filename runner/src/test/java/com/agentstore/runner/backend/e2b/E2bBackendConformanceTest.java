@@ -8,6 +8,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -37,6 +38,15 @@ class E2bBackendConformanceTest extends IsolationBackendConformanceTest {
 
     @Override
     protected boolean filtersDns() { return false; }   // accepted gap for dev/testing (spec §5)
+
+    @Override
+    protected boolean blocksMetadataAddress() { return false; }   // Firecracker's own metadata service; accepted gap (spec §5)
+
+    @Override
+    protected String unknownSandboxId() {
+        // E2B ids are ~20 lowercase alphanumerics; a malformed id is rejected with 400 instead of "not found".
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+    }
 
     @Override
     protected Duration terminalWait() { return Duration.ofSeconds(90); }
