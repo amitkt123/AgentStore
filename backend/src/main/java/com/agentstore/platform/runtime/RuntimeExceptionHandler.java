@@ -74,6 +74,11 @@ public class RuntimeExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ProblemBody> unreadable(HttpMessageNotReadableException e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof RuntimeBodyLimitFilter.PayloadTooLargeException) {
+                return problem(HttpStatus.PAYLOAD_TOO_LARGE, "WRITE_TOO_LARGE", "A write may carry at most 5 MB");
+            }
+        }
         return problem(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Request body is missing or not valid JSON");
     }
 }

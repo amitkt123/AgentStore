@@ -49,7 +49,6 @@ class RuntimeResourceEndpointsTest extends AbstractStorageIntegrationTest {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("enabled in Task 8")
     void aGrantedWriteIsAcceptedAndStagedBecauseTheScopeRequiresApproval() {
         var agent = fx.runningAgent(new BigDecimal("500.00"));
 

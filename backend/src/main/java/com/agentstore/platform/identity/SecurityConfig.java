@@ -3,6 +3,7 @@ package com.agentstore.platform.identity;
 import com.agentstore.platform.execution.RunRepository;
 import com.agentstore.platform.manifest.ManifestParser;
 import com.agentstore.platform.runtime.RuntimeAuthFilter;
+import com.agentstore.platform.runtime.RuntimeBodyLimitFilter;
 import com.agentstore.platform.runtime.RuntimeRateLimiter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,7 +39,8 @@ public class SecurityConfig {
             .exceptionHandling(handling -> handling.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
             .addFilterBefore(new RuntimeAuthFilter(runRepository, manifestParser, rateLimiter),
-                    UsernamePasswordAuthenticationFilter.class);
+                    UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(new RuntimeBodyLimitFilter(), RuntimeAuthFilter.class);
         return http.build();
     }
 
