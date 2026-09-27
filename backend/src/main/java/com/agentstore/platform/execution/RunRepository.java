@@ -33,4 +33,21 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Run r where r.id = :id")
     Optional<Run> findByIdForUpdate(@Param("id") UUID id);
+
+    /**
+     * Reserves LLM tokens for a call if they fit the run's budget: one conditional statement, so concurrent calls can
+     * never oversubscribe {@code maxTokensPerRun}. Returns 1 when reserved, 0 when it does not fit.
+     */
+    @Transactional
+    @Modifying
+    @Query(value = "UPDATE run SET llm_tokens_reserved = llm_tokens_reserved + :tokens "
+            + "WHERE id = :id AND llm_tokens_used + llm_tokens_reserved + :tokens <= :max", nativeQuery = true)
+    int reserveLlmTokens(@Param("id") UUID id, @Param("tokens") int tokens, @Param("max") long max);
+
+    /** Moves a reservation to actual usage in one statement (release = {@code used} of 0). */
+    @Transactional
+    @Modifying
+    @Query(value = "UPDATE run SET llm_tokens_reserved = llm_tokens_reserved - :reserved, "
+            + "llm_tokens_used = llm_tokens_used + :used WHERE id = :id", nativeQuery = true)
+    int settleLlmTokens(@Param("id") UUID id, @Param("reserved") int reserved, @Param("used") int used);
 }
