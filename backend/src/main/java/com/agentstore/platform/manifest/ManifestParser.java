@@ -55,7 +55,28 @@ public class ManifestParser {
 
         return new Manifest(root.get("name").asText(), root.get("version").asText(), scopes, allowlist,
                 costEnvelope, gates, dataClasses, textOrNull(root, "runtime"), textOrNull(root, "entrypoint"),
-                parseResources(root));
+                parseResources(root), parseLlm(root));
+    }
+
+    private static LlmDecl parseLlm(JsonNode root) {
+        JsonNode llm = root.get("llm");
+        if (llm == null || !llm.isObject()) {
+            return null;
+        }
+        String modeWire = llm.get("mode").asText();
+        LlmMode mode = LlmMode.fromWire(modeWire)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown llm mode: " + modeWire));
+        List<String> models = new ArrayList<>();
+        for (JsonNode model : llm.path("models")) {
+            models.add(model.asText());
+        }
+        LlmVendor provider = null;
+        if (llm.hasNonNull("provider")) {
+            String providerWire = llm.get("provider").asText();
+            provider = LlmVendor.fromWire(providerWire)
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown llm provider: " + providerWire));
+        }
+        return new LlmDecl(mode, models, llm.get("maxTokensPerRun").asLong(), provider);
     }
 
     private static List<ResourceDecl> parseResources(JsonNode root) {

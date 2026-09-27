@@ -59,6 +59,25 @@
       }
     },
     "dataClasses": { "type": "array", "items": { "type": "string" } },
+    "llm": {
+      "type": "object",
+      "required": ["mode", "models", "maxTokensPerRun"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["platform", "byok_proxy", "byok_direct"] },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 100 }
+        },
+        "maxTokensPerRun": { "type": "integer", "minimum": 1 },
+        "provider": { "type": "string", "enum": ["anthropic", "openai"] }
+      },
+      "if": { "properties": { "mode": { "const": "platform" } }, "required": ["mode"] },
+      "then": { "not": { "required": ["provider"] } },
+      "else": { "required": ["provider"] }
+    },
     "resources": {
       "type": "array",
       "items": {

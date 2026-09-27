@@ -1,0 +1,35 @@
+{
+  "name": "LLM BYOK Direct Agent",
+  "version": "1.0.0",
+  "scopes": [
+    {
+      "type": "READ",
+      "resource": "bank_statement",
+      "description": "Read statement lines"
+    }
+  ],
+  "network": {
+    "allowlist": [
+      "api.anthropic.com"
+    ]
+  },
+  "costEnvelope": {
+    "currency": "INR",
+    "maxPerRun": 500.0,
+    "pricingUnit": "METERED",
+    "unitPrice": 2.0,
+    "unitLabel": "reconciled_transaction"
+  },
+  "approvalGates": [],
+  "dataClasses": [
+    "BANK_STATEMENT"
+  ],
+  "llm": {
+    "mode": "byok_direct",
+    "provider": "anthropic",
+    "models": [
+      "test-claude"
+    ],
+    "maxTokensPerRun": 100000
+  }
+}
