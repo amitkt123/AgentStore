@@ -52,6 +52,11 @@ public class Dataset {
     @Column(name = "columns", columnDefinition = "jsonb")
     private String columnsJson = "[]";
 
+    /** {status: 'CLEAN'|'FOUND', findingCount, findings: [...]}, null until scanned (never scanned for non-FIXTURE purposes or PDF). */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "pii_scan", columnDefinition = "jsonb")
+    private String piiScanJson;
+
     private Instant createdAt;
     private Instant deletedAt;
     private Instant purgeAfter;

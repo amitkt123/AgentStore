@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,6 +22,7 @@ class SandboxDataModelTest extends AbstractIntegrationTest {
     @Autowired SandboxFixtures fx;
     @Autowired RunRepository runs;
     @Autowired SandboxProfileRepository profiles;
+    @Autowired com.agentstore.platform.identity.UserRepository users;
 
     @Test
     void aSandboxRunHasNoConnectionAndKeepsItsSandboxFields() {
@@ -62,5 +65,32 @@ class SandboxDataModelTest extends AbstractIntegrationTest {
 
         SandboxProfile dup = new SandboxProfile(dev.agent().getId(), "happy-path");
         assertThatThrownBy(() -> profiles.saveAndFlush(dup)).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void newProfileFieldsRoundTripWithPortalDefaults() {
+        var dev = fx.developer("valid-tier-a.json");
+        SandboxProfile profile = fx.profile(dev, "p1");
+
+        assertThat(profile.getSource()).isEqualTo(ProfileSource.PORTAL);
+        assertThat(profile.isTrialEnabled()).isFalse();
+        assertThat(profile.getDescription()).isNull();
+        assertThat(profile.getNoRealDataAttestedBy()).isNull();
+        assertThat(profile.getRepoSourceHash()).isNull();
+
+        var attester = users.save(new com.agentstore.platform.identity.User(null,
+                "attester-" + UUID.randomUUID() + "@example.com", null, "Attester"));
+        profile.setDescription("Clean invoice batch");
+        profile.setTrialEnabled(true);
+        profile.setNoRealDataAttestedBy(attester.getId());
+        profile.setNoRealDataAttestedAt(Instant.now());
+        profile.setSource(ProfileSource.REPO);
+        profile.setRepoSourceHash("abc123");
+        SandboxProfile reloaded = profiles.saveAndFlush(profile);
+
+        assertThat(reloaded.getDescription()).isEqualTo("Clean invoice batch");
+        assertThat(reloaded.isTrialEnabled()).isTrue();
+        assertThat(reloaded.getSource()).isEqualTo(ProfileSource.REPO);
+        assertThat(reloaded.getRepoSourceHash()).isEqualTo("abc123");
     }
 }

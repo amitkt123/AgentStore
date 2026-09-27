@@ -26,6 +26,7 @@ public class SandboxProfile {
 
     private UUID agentId;
     private String name;
+    private String description;
 
     /** A one-off profile created by {@code POST /sandbox/runs}; listings exclude it. */
     private boolean inline;
@@ -51,6 +52,15 @@ public class SandboxProfile {
 
     /** Null means the manifest's {@code costEnvelope.maxPerRun}. */
     private BigDecimal spendCap;
+
+    private boolean trialEnabled;
+    private UUID noRealDataAttestedBy;
+    private Instant noRealDataAttestedAt;
+
+    @Enumerated(EnumType.STRING)
+    private ProfileSource source = ProfileSource.PORTAL;
+
+    private String repoSourceHash;
 
     private byte[] fakeSecretsEncrypted;
     private byte[] fakeSecretsNonce;
