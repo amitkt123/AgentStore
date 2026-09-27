@@ -7,9 +7,12 @@ import com.agentstore.platform.manifest.LlmMode;
 import com.agentstore.platform.runtime.LlmBackend;
 import com.agentstore.platform.runtime.RunPrincipal;
 import com.agentstore.platform.runtime.RuntimeApiException;
+import com.agentstore.platform.sandbox.SandboxQuotaService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,10 +34,11 @@ public class GatewayLlmBackend implements LlmBackend {
     private final MockResponder mock;
     private final ReplayResponder replay;
     private final LlmRecorder recorder;
+    private final SandboxQuotaService quota;
 
     public GatewayLlmBackend(LlmRequestNormalizer normalizer, LlmModelRepository models, RunLlmContextLoader contexts,
                              LlmKeyResolver keys, LlmBudget budget, ProviderClient providers, LlmCallLog callLog,
-                             MockResponder mock, ReplayResponder replay, LlmRecorder recorder) {
+                             MockResponder mock, ReplayResponder replay, LlmRecorder recorder, SandboxQuotaService quota) {
         this.normalizer = normalizer;
         this.models = models;
         this.contexts = contexts;
@@ -45,6 +49,7 @@ public class GatewayLlmBackend implements LlmBackend {
         this.mock = mock;
         this.replay = replay;
         this.recorder = recorder;
+        this.quota = quota;
     }
 
     @Override
@@ -102,6 +107,20 @@ public class GatewayLlmBackend implements LlmBackend {
         LlmRequest request = normalized.request();
         LlmSource source = llm.mode() == LlmMode.PLATFORM ? LlmSource.PLATFORM : LlmSource.BYOK_PROXY;
         long started = System.nanoTime();
+
+        if (principal.mode() == RunMode.SANDBOX && source == LlmSource.PLATFORM) {
+            BigDecimal worstCase = BigDecimal.valueOf(request.maxTokens()).multiply(model.getOutputPricePerMtok())
+                    .divide(BigDecimal.valueOf(1_000_000), 4, RoundingMode.HALF_UP);
+            if (!quota.llmAllows(principal.orgId(), worstCase)) {
+                LlmCall rejected = new LlmCall(UUID.randomUUID(), runId, model.getId(), source, LlmCallStatus.BUDGET_REJECTED,
+                        normalized.hash());
+                rejected.setErrorCode("BUDGET_EXCEEDED");
+                rejected.setLatencyMs(millisSince(started));
+                callLog.record(principal, rejected);
+                throw new RuntimeApiException(HttpStatus.PAYMENT_REQUIRED, "BUDGET_EXCEEDED",
+                        "This call would take the workspace over its monthly sandbox LLM allowance");
+            }
+        }
 
         String apiKey;
         try {
