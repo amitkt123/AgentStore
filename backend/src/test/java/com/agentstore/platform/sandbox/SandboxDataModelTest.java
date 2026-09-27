@@ -22,7 +22,6 @@ class SandboxDataModelTest extends AbstractIntegrationTest {
     @Autowired SandboxFixtures fx;
     @Autowired RunRepository runs;
     @Autowired SandboxProfileRepository profiles;
-    @Autowired com.agentstore.platform.identity.UserRepository users;
 
     @Test
     void aSandboxRunHasNoConnectionAndKeepsItsSandboxFields() {
@@ -78,11 +77,9 @@ class SandboxDataModelTest extends AbstractIntegrationTest {
         assertThat(profile.getNoRealDataAttestedBy()).isNull();
         assertThat(profile.getRepoSourceHash()).isNull();
 
-        var attester = users.save(new com.agentstore.platform.identity.User(null,
-                "attester-" + UUID.randomUUID() + "@example.com", null, "Attester"));
         profile.setDescription("Clean invoice batch");
         profile.setTrialEnabled(true);
-        profile.setNoRealDataAttestedBy(attester.getId());
+        profile.setNoRealDataAttestedBy(UUID.randomUUID());
         profile.setNoRealDataAttestedAt(Instant.now());
         profile.setSource(ProfileSource.REPO);
         profile.setRepoSourceHash("abc123");

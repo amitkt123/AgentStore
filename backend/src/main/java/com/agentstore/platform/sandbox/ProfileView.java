@@ -9,9 +9,10 @@ import java.util.List;
 import java.util.UUID;
 
 /** What the API returns for a profile. Fake secret values are write-only: only their names are listed. */
-public record ProfileView(UUID id, UUID agentId, String name, JsonNode input, GatePolicy gatePolicy, RunLlmMode llmMode,
-                          UUID replayRunId, JsonNode llmMock, BigDecimal spendCap, List<String> fakeSecretNames,
-                          List<BindingView> bindings, Instant createdAt, Instant updatedAt) {
+public record ProfileView(UUID id, UUID agentId, String name, String description, JsonNode input, GatePolicy gatePolicy,
+                          RunLlmMode llmMode, UUID replayRunId, JsonNode llmMock, BigDecimal spendCap,
+                          List<String> fakeSecretNames, List<BindingView> bindings, boolean trialEnabled,
+                          ProfileSource source, ProfileStatus status, Instant createdAt, Instant updatedAt) {
 
     public record BindingView(String resource, UUID datasetId, String displayName) {
     }

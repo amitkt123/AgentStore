@@ -3,6 +3,7 @@ package com.agentstore.platform.sandbox;
 import com.agentstore.platform.catalog.Agent;
 import com.agentstore.platform.catalog.AgentRepository;
 import com.agentstore.platform.data.BindingOwnerType;
+import com.agentstore.platform.data.Dataset;
 import com.agentstore.platform.data.DatasetBindingRepository;
 import com.agentstore.platform.data.DatasetRepository;
 import com.agentstore.platform.execution.RunLlmMode;
@@ -38,15 +39,18 @@ public class SandboxProfileService {
     private final DatasetBindingRepository bindings;
     private final DatasetRepository datasets;
     private final ReplaySource replaySource;
+    private final ProfileStatusService statusService;
 
     public SandboxProfileService(SandboxProfileRepository profiles, AgentRepository agents, FakeSecrets fakeSecrets,
-                                 DatasetBindingRepository bindings, DatasetRepository datasets, ReplaySource replaySource) {
+                                 DatasetBindingRepository bindings, DatasetRepository datasets, ReplaySource replaySource,
+                                 ProfileStatusService statusService) {
         this.profiles = profiles;
         this.agents = agents;
         this.fakeSecrets = fakeSecrets;
         this.bindings = bindings;
         this.datasets = datasets;
         this.replaySource = replaySource;
+        this.statusService = statusService;
     }
 
     @Transactional
@@ -60,6 +64,7 @@ public class SandboxProfileService {
             throw nameTaken();
         }
         SandboxProfile profile = new SandboxProfile(agent.getId(), name);
+        profile.setDescription(description(in.description(), null));
         apply(orgId, agent.getId(), profile, in, true);
         return save(profile);
     }
@@ -75,7 +80,7 @@ public class SandboxProfileService {
     }
 
     @Transactional
-    public SandboxProfile update(UUID orgId, UUID agentId, UUID profileId, ProfileInput in) {
+    public SandboxProfile update(UUID orgId, UUID userId, UUID agentId, UUID profileId, ProfileInput in) {
         ownedAgent(orgId, agentId);
         SandboxProfile profile = owned(agentId, profileId);
         String name = in.name() == null ? profile.getName() : in.name().strip();
@@ -86,8 +91,52 @@ public class SandboxProfileService {
             throw nameTaken();
         }
         profile.setName(name);
+        profile.setDescription(description(in.description(), profile.getDescription()));
         apply(orgId, agentId, profile, in, in.fakeSecrets() != null);
+        applyTrial(userId, profile, in);
+        profile.setSource(ProfileSource.PORTAL);   // any portal-driven PUT reclaims PORTAL, unconditionally
         return save(profile);
+    }
+
+    private static String description(String requested, String existing) {
+        if (requested == null) {
+            return existing;
+        }
+        String stripped = requested.strip();
+        if (stripped.length() > 255) {
+            throw SandboxApiException.invalid("description may be at most 255 characters");
+        }
+        return stripped.isEmpty() ? null : stripped;
+    }
+
+    private void applyTrial(UUID userId, SandboxProfile profile, ProfileInput in) {
+        if (in.trialEnabled() == null) {
+            return;
+        }
+        if (!in.trialEnabled()) {
+            clearAttestation(profile);
+            return;
+        }
+        if (in.attest() == null || !in.attest()) {
+            throw SandboxApiException.attestationRequired();
+        }
+        List<String> dirty = bindings.findByOwnerTypeAndOwnerId(BindingOwnerType.SANDBOX_PROFILE, profile.getId())
+                .stream()
+                .filter(b -> !datasets.findById(b.getDatasetId()).map(Dataset::piiClean).orElse(false))
+                .map(com.agentstore.platform.data.DatasetBinding::getResourceName)
+                .toList();
+        if (!dirty.isEmpty()) {
+            throw SandboxApiException.piiFound(dirty);
+        }
+        profile.setTrialEnabled(true);
+        profile.setNoRealDataAttestedBy(userId);
+        profile.setNoRealDataAttestedAt(java.time.Instant.now());
+    }
+
+    private static void clearAttestation(SandboxProfile profile) {
+        profile.setTrialEnabled(false);
+        profile.setNoRealDataAttestedBy(null);
+        profile.setNoRealDataAttestedAt(null);
     }
 
     @Transactional
@@ -116,10 +165,11 @@ public class SandboxProfileService {
                 .stream().map(b -> new ProfileView.BindingView(b.getResourceName(), b.getDatasetId(),
                         datasets.findById(b.getDatasetId()).map(d -> d.getDisplayName()).orElse(null)))
                 .sorted(java.util.Comparator.comparing(ProfileView.BindingView::resource)).toList();
-        return new ProfileView(p.getId(), p.getAgentId(), p.getName(), readTree(p.getInputJson()),
+        return new ProfileView(p.getId(), p.getAgentId(), p.getName(), p.getDescription(), readTree(p.getInputJson()),
                 GatePolicy.parse(p.getGatePolicy()), p.getLlmMode(), p.getReplayRunId(),
                 p.getLlmMockJson() == null ? null : readTree(p.getLlmMockJson()), p.getSpendCap(),
-                fakeSecrets.names(p), bound, p.getCreatedAt(), p.getUpdatedAt());
+                fakeSecrets.names(p), bound, p.isTrialEnabled(), p.getSource(), statusService.compute(p),
+                p.getCreatedAt(), p.getUpdatedAt());
     }
 
     private Agent ownedAgent(UUID orgId, UUID agentId) {

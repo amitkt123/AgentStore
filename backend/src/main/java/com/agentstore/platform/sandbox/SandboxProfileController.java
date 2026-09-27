@@ -37,7 +37,8 @@ public class SandboxProfileController {
 
     @PutMapping("/{profileId}")
     public ProfileView update(@PathVariable UUID agentId, @PathVariable UUID profileId, @RequestBody ProfileInput body) {
-        return service.view(service.update(Caller.current().orgId(), agentId, profileId, body));
+        var caller = Caller.current();
+        return service.view(service.update(caller.orgId(), caller.userId(), agentId, profileId, body));
     }
 
     @DeleteMapping("/{profileId}")

@@ -216,7 +216,7 @@ class SandboxRunStartTest extends AbstractStorageIntegrationTest {
         var dev = fx.developer("valid-tier-a.json");
 
         Run run = service.start(dev.org().getId(), UUID.randomUUID(), dev.version().getId(), null,
-                new ProfileInput(null, null, null, null, null, null, null, null, null));
+                new ProfileInput(null, null, null, null, null, null, null, null, null, null, null, null));
 
         assertThat(profiles.findById(run.getSandboxProfileId())).get().satisfies(p -> {
             assertThat(p.isInline()).isTrue();
@@ -233,8 +233,8 @@ class SandboxRunStartTest extends AbstractStorageIntegrationTest {
 
         assertThatThrownBy(() -> service.start(devWithTypedManifest.org().getId(), UUID.randomUUID(),
                 devWithTypedManifest.version().getId(), null,
-                new ProfileInput(null, null, null, null, null, null, null, null,
-                        java.util.Map.of("bank_statement", foreignFixture.getId()))))
+                new ProfileInput(null, null, null, null, null, null, null, null, null,
+                        java.util.Map.of("bank_statement", foreignFixture.getId()), null, null)))
                 .isInstanceOf(com.agentstore.platform.data.DataApiException.class);
         assertThat(profiles.count()).isEqualTo(profilesBefore);
         assertThat(runs.count()).isEqualTo(runsBefore);

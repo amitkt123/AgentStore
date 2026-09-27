@@ -3,8 +3,11 @@ package com.agentstore.platform.sandbox;
 import com.agentstore.platform.AbstractStorageIntegrationTest;
 import com.agentstore.platform.data.BindingOwnerType;
 import com.agentstore.platform.data.DataFixtures;
+import com.agentstore.platform.data.Dataset;
 import com.agentstore.platform.data.DatasetBinding;
 import com.agentstore.platform.data.DatasetBindingRepository;
+import com.agentstore.platform.data.DatasetPurpose;
+import com.agentstore.platform.data.DatasetService;
 import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.UserRole;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +37,14 @@ class SandboxProfileApiTest extends AbstractStorageIntegrationTest {
     @Autowired SandboxProfileRepository profiles;
     @Autowired DatasetBindingRepository bindings;
     @Autowired DataFixtures dataFx;
+    @Autowired DatasetService datasetService;
+    @Autowired com.agentstore.platform.data.SandboxBindingService sandboxBindingService;
+
+    /** A FIXTURE-purpose upload (unlike {@code dataFx.upload}, which is always BUYER_DATA) so the PII scan actually runs. */
+    Dataset fixture(Org org, String filename, String csv) {
+        return datasetService.upload(org.getId(), UUID.randomUUID(), filename,
+                new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)), filename, null, DatasetPurpose.FIXTURE, null);
+    }
 
     String base(SandboxFixtures.Dev dev) {
         return "http://localhost:" + port + "/api/v1/agents/" + dev.agent().getId() + "/sandbox-profiles";
@@ -145,7 +158,7 @@ class SandboxProfileApiTest extends AbstractStorageIntegrationTest {
         var dev = fx.developer("valid-tier-a.json");
         call(HttpMethod.POST, base(dev), body("saved"), dev.org(), UserRole.DEVELOPER);
         service.createInline(dev.org().getId(), dev.agent().getId(),
-                new ProfileInput(null, null, null, null, null, null, null, null, null));
+                new ProfileInput(null, null, null, null, null, null, null, null, null, null, null, null));
 
         var list = rest.exchange(base(dev), HttpMethod.GET, new HttpEntity<>(null, fx.bearer(dev.org(), UserRole.DEVELOPER)), List.class);
 
@@ -201,5 +214,132 @@ class SandboxProfileApiTest extends AbstractStorageIntegrationTest {
         assertThat(deleted.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(profiles.findById(profileId)).isEmpty();
         assertThat(bindings.findByOwnerTypeAndOwnerId(BindingOwnerType.SANDBOX_PROFILE, profileId)).isEmpty();
+    }
+
+    @Test
+    void trialCanBeEnabledWithAttestationWhenBoundFilesAreClean() {
+        var dev = fx.developer("valid-tier-a.json");
+        var created = call(HttpMethod.POST, base(dev), body("t1"), dev.org(), UserRole.DEVELOPER);
+        UUID profileId = UUID.fromString((String) created.getBody().get("id"));
+        var clean = fixture(dev.org(), "clean.csv", "name,amount\nA,100\n");
+        bindings.save(new DatasetBinding(BindingOwnerType.SANDBOX_PROFILE, profileId, "bank_statement", clean.getId(), "{}", null));
+        Map<String, Object> withTrial = body("t1");
+        withTrial.put("trialEnabled", true);
+        withTrial.put("attest", true);
+
+        var response = call(HttpMethod.PUT, base(dev) + "/" + profileId, withTrial, dev.org(), UserRole.DEVELOPER);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().get("trialEnabled")).isEqualTo(true);
+    }
+
+    @Test
+    void trialIsRejectedWithPiiFoundWhenABoundFileIsDirty() {
+        var dev = fx.developer("valid-tier-a.json");
+        var created = call(HttpMethod.POST, base(dev), body("t2"), dev.org(), UserRole.DEVELOPER);
+        UUID profileId = UUID.fromString((String) created.getBody().get("id"));
+        var dirty = fixture(dev.org(), "dirty.csv", "name,email\nA,person@example.com\n");
+        bindings.save(new DatasetBinding(BindingOwnerType.SANDBOX_PROFILE, profileId, "bank_statement", dirty.getId(), "{}", null));
+        Map<String, Object> withTrial = body("t2");
+        withTrial.put("trialEnabled", true);
+        withTrial.put("attest", true);
+
+        var response = call(HttpMethod.PUT, base(dev) + "/" + profileId, withTrial, dev.org(), UserRole.DEVELOPER);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().get("code")).isEqualTo("PII_FOUND");
+    }
+
+    @Test
+    void trialIsRejectedWithA409WhenABoundFileWasNeverScanned() {
+        // dataFx.upload always uploads BUYER_DATA (never scanned); binding it to a profile simulates a null scan.
+        var dev = fx.developer("valid-tier-a.json");
+        var created = call(HttpMethod.POST, base(dev), body("t3"), dev.org(), UserRole.DEVELOPER);
+        UUID profileId = UUID.fromString((String) created.getBody().get("id"));
+        var unscanned = dataFx.upload(dev.org(), "u.csv", "name,amount\nA,1\n");
+        bindings.save(new DatasetBinding(BindingOwnerType.SANDBOX_PROFILE, profileId, "bank_statement", unscanned.getId(), "{}", null));
+        Map<String, Object> withTrial = body("t3");
+        withTrial.put("trialEnabled", true);
+        withTrial.put("attest", true);
+
+        var response = call(HttpMethod.PUT, base(dev) + "/" + profileId, withTrial, dev.org(), UserRole.DEVELOPER);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().get("code")).isEqualTo("PII_FOUND");
+    }
+
+    @Test
+    void trialWithoutAttestIs400() {
+        var dev = fx.developer("valid-tier-a.json");
+        var created = call(HttpMethod.POST, base(dev), body("t4"), dev.org(), UserRole.DEVELOPER);
+        Map<String, Object> withTrial = body("t4");
+        withTrial.put("trialEnabled", true);
+
+        var response = call(HttpMethod.PUT, base(dev) + "/" + created.getBody().get("id"), withTrial, dev.org(), UserRole.DEVELOPER);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("ATTESTATION_REQUIRED");
+    }
+
+    @Test
+    void settingTrialFalseNeverRequiresAttestAndAlwaysSucceeds() {
+        var dev = fx.developer("valid-tier-a.json");
+        var created = call(HttpMethod.POST, base(dev), body("t5"), dev.org(), UserRole.DEVELOPER);
+        Map<String, Object> withoutAttest = body("t5");
+        withoutAttest.put("trialEnabled", false);
+
+        var response = call(HttpMethod.PUT, base(dev) + "/" + created.getBody().get("id"), withoutAttest, dev.org(), UserRole.DEVELOPER);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().get("trialEnabled")).isEqualTo(false);
+    }
+
+    @Test
+    void omittingTrialEnabledOnAnUnrelatedEditLeavesAnExistingTrialUntouched() {
+        var dev = fx.developer("valid-tier-a.json");
+        var created = call(HttpMethod.POST, base(dev), body("t6"), dev.org(), UserRole.DEVELOPER);
+        UUID profileId = UUID.fromString((String) created.getBody().get("id"));
+        var clean = fixture(dev.org(), "clean.csv", "name,amount\nA,100\n");
+        bindings.save(new DatasetBinding(BindingOwnerType.SANDBOX_PROFILE, profileId, "bank_statement", clean.getId(), "{}", null));
+        Map<String, Object> withTrial = body("t6");
+        withTrial.put("trialEnabled", true);
+        withTrial.put("attest", true);
+        call(HttpMethod.PUT, base(dev) + "/" + profileId, withTrial, dev.org(), UserRole.DEVELOPER);
+
+        Map<String, Object> unrelatedEdit = body("t6");
+        unrelatedEdit.put("spendCap", 77);   // no "trialEnabled" key at all
+
+        var response = call(HttpMethod.PUT, base(dev) + "/" + profileId, unrelatedEdit, dev.org(), UserRole.DEVELOPER);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().get("trialEnabled")).isEqualTo(true);
+    }
+
+    @Test
+    void bindingChangeClearsAnExistingTrialAttestation() {
+        var dev = fx.developer("valid-tier-a.json");
+        var created = call(HttpMethod.POST, base(dev), body("t7"), dev.org(), UserRole.DEVELOPER);
+        UUID profileId = UUID.fromString((String) created.getBody().get("id"));
+        var clean = fixture(dev.org(), "clean.csv", "name,amount\nA,100\n");
+        bindings.save(new DatasetBinding(BindingOwnerType.SANDBOX_PROFILE, profileId, "bank_statement", clean.getId(), "{}", null));
+        Map<String, Object> withTrial = body("t7");
+        withTrial.put("trialEnabled", true);
+        withTrial.put("attest", true);
+        call(HttpMethod.PUT, base(dev) + "/" + profileId, withTrial, dev.org(), UserRole.DEVELOPER);
+
+        sandboxBindingService.unbind(dev.org().getId(), profileId, "bank_statement");
+
+        var fetched = call(HttpMethod.GET, base(dev) + "/" + profileId, null, dev.org(), UserRole.DEVELOPER);
+        assertThat(fetched.getBody().get("trialEnabled")).isEqualTo(false);
+    }
+
+    @Test
+    void aPortalPutAlwaysReclaimsSourcePortal() {
+        var dev = fx.developer("valid-tier-a.json");
+        var created = call(HttpMethod.POST, base(dev), body("t8"), dev.org(), UserRole.DEVELOPER);
+
+        var response = call(HttpMethod.PUT, base(dev) + "/" + created.getBody().get("id"), body("t8"), dev.org(), UserRole.DEVELOPER);
+
+        assertThat(response.getBody().get("source")).isEqualTo("PORTAL");
     }
 }

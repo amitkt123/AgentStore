@@ -1,5 +1,6 @@
 package com.agentstore.platform.catalog;
 
+import com.agentstore.platform.build.BuildStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +13,10 @@ public interface AgentVersionRepository extends JpaRepository<AgentVersion, UUID
     List<AgentVersion> findByAgentIdAndStatus(UUID agentId, VersionStatus status);
 
     Optional<AgentVersion> findFirstByAgentIdAndStatusOrderByApprovedAtDesc(UUID agentId, VersionStatus status);
+
+    Optional<AgentVersion> findFirstByAgentIdAndStatusOrderByCreatedAtDesc(UUID agentId, VersionStatus status);
+
+    Optional<AgentVersion> findFirstByAgentIdAndBuildStatusOrderByCreatedAtDesc(UUID agentId, BuildStatus buildStatus);
 
     List<AgentVersion> findByStatus(VersionStatus status);
 
