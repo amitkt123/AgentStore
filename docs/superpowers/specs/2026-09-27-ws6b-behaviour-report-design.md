@@ -7,12 +7,14 @@
 After a sandbox run (WS6a) finishes, a developer needs to see exactly what their agent actually did versus what its manifest declares, whether it's ready to submit, and a way to fix a DRAFT manifest without a rebuild.
 
 **In scope**
+
 - `run_step.block` and `GET /runs/{id}/flow` (any run the caller can already view) — the block/flow slice of WS1b, pulled in because the report needs it.
 - `run_report`: declared-vs-actual, cost, LLM, gates, timing, logs pointer, result classification. Generated once per SANDBOX run on `RunFinishedEvent`.
 - `GET /agents/{id}/versions/{vid}/readiness`.
 - `POST /agents/{id}/versions/{vid}/manifest/patches`, DRAFT-only, with `agent_version.manifest_revision` and a diff against the current LIVE version.
 
 **Out of scope (with owner)**
+
 - Callsite header, SDK, in-sandbox logging proxy, `NETWORK_BLOCKED` step kind, `POST /runtime/v1/network-events`: deferred until the SDK exists (planned next after WS6b). Network section of the report/flow shows the declared allowlist only.
 - Display IDs, `terminal_reason`, grouped run list, gate `estimated_units`/`preview`/`decided_via`/`eligible_approver_ids`: remain WS1b proper.
 - PII scan, `trial_enabled`, REPO profile sync, CLI profile/fixture commands: 6c.
@@ -42,7 +44,7 @@ ALTER TABLE agent_version ADD COLUMN manifest_revision INT NOT NULL DEFAULT 1;
 Existing recording call sites set `block` from data they already have:
 
 | Step kind | Block |
-|---|---|
+| --- | --- |
 | `DATA_READ` | `read:<resource>` |
 | `DATA_WRITE` | `write:<resource>` |
 | `WRITE_STAGED` | `draft:<resource>` |
@@ -79,6 +81,7 @@ Declared blocks come from the manifest (every scope/resource/gate/llm/charge, st
 **Trigger:** `@TransactionalEventListener` on `RunFinishedEvent`, filtered to `run.getMode() == SANDBOX` — same pattern as `OutputCommitService`. `RunReportService` loads `run_step`, `llm_call`, and the version's manifest, writes one `run_report` row.
 
 **`report_json`:**
+
 - **Declared vs actual** — same block aggregation as `/flow`, plus `UNDECLARED` extras and unused declared scopes flagged.
 - **Network** — `{ declaredAllowlist: [...], note: "live visibility not yet available" }`.
 - **Cost** — `{ simulatedCharged, requestedCharge, capUsed }` from `Run` (no new computation; `RunLifecycleService.charge()` already computes this).
@@ -88,6 +91,7 @@ Declared blocks come from the manifest (every scope/resource/gate/llm/charge, st
 - **Logs** — pointer to existing agent-log/stdout retrieval.
 
 **`result`** (precedence order):
+
 1. Failed via `TIMEOUT` step → `TIMED_OUT`
 2. `COST_CAP_REACHED` step present → `OVER_COST_LIMIT`
 3. `run.status == FAILED` (other reason) → `FAILED`
@@ -101,20 +105,24 @@ Declared blocks come from the manifest (every scope/resource/gate/llm/charge, st
 ```jsonc
 { "op": "add_read_scope" | "add_resource" | "add_allowlist_host" | "remove_scope", ... }
 ```
+
 - `add_read_scope { resource, description?, requiresApproval? }`
 - `add_resource { name, format, schema? }`
 - `add_allowlist_host { host }`
 - `remove_scope { type, resource }`
 
 Each patch re-validates the resulting manifest through the existing `ManifestParser` validation path, replaces `manifest_json`, increments `manifest_revision`, returns:
+
 ```jsonc
 { "manifestRevision": 4, "diff": { "addedScopes": [...], "removedScopes": [...], "addedHosts": [...] } }
 ```
+
 `diff` compares against the agent's current LIVE version's manifest (empty if none).
 
 ## 7. Readiness
 
 `GET /agents/{id}/versions/{vid}/readiness` → `{ ready, blockers: [{ code, message, runId }] }`:
+
 - `buildStatus != SUCCEEDED` → `BUILD_NOT_READY`
 - Latest SANDBOX run's `run_report` for this version: `ISSUES` → `UNDECLARED_ACCESS` per violation; `OVER_COST_LIMIT` → `COST_ENVELOPE_EXCEEDED`
 - `ready = blockers.isEmpty()`
