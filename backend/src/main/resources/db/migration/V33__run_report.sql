@@ -1,0 +1,7 @@
+CREATE TABLE run_report (
+  run_id UUID PRIMARY KEY REFERENCES run(id),
+  result VARCHAR(20) NOT NULL,        -- CLEAN, ISSUES, TIMED_OUT, OVER_COST_LIMIT, FAILED
+  issue_count INT NOT NULL DEFAULT 0,
+  report_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
