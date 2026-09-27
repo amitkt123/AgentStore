@@ -21,7 +21,14 @@ mkdir my-agent && cd my-agent
 agentstore init --python               # creates the agent, then scaffolds the project (or --node)
 agentstore validate                    # the same checks the backend runs, offline
 agentstore push --wait                 # upload, build, follow the log; exit 0 on success, 1 on a failed build
+agentstore sandbox run --follow        # run the latest built version in the sandbox: no buyer, no money moving
+agentstore sandbox logs RUN_ID         # show what a past sandbox run did
 ```
+
+`sandbox run` picks the highest built version unless `--version` names one, and a one-off (inline) profile unless
+`--profile NAME` names a saved one. `--follow` prints each step as it happens, prompts in the terminal for a `MANUAL`
+gate decision, and exits 0 for a `COMPLETED` run or 1 otherwise. A quota refusal (`SANDBOX_QUOTA_EXCEEDED`, HTTP 429)
+prints as any other API error, exit 2.
 
 | Exit code | Meaning |
 |---|---|
