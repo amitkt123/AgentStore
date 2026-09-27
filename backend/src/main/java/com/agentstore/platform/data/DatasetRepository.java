@@ -33,4 +33,7 @@ public interface DatasetRepository extends JpaRepository<Dataset, UUID> {
     @Query("select coalesce(sum(d.sizeBytes), 0) from Dataset d "
             + "where d.ownerOrgId = :orgId and d.purpose = :purpose and d.purgedAt is null")
     long usedBytesByPurpose(@Param("orgId") java.util.UUID orgId, @Param("purpose") DatasetPurpose purpose);
+
+    Optional<Dataset> findFirstByOwnerOrgIdAndPurposeAndDisplayNameAndDeletedAtIsNullOrderByCreatedAtDesc(
+            UUID ownerOrgId, DatasetPurpose purpose, String displayName);
 }
