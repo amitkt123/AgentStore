@@ -21,6 +21,7 @@
     <jjwt.version>0.12.6</jjwt.version>
     <shedlock.version>5.16.0</shedlock.version>
     <bucket4j.version>8.20.0</bucket4j.version>
+    <resilience4j.version>2.2.0</resilience4j.version>
     <surefire.excludedGroups>e2b</surefire.excludedGroups>
   </properties>
 
@@ -116,6 +117,11 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-csv</artifactId>
       <version>1.11.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.resilience4j</groupId>
+      <artifactId>resilience4j-circuitbreaker</artifactId>
+      <version>${resilience4j.version}</version>
     </dependency>
     <dependency>
       <groupId>org.projectlombok</groupId>

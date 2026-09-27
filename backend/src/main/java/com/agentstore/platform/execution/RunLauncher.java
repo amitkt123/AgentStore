@@ -1,7 +1,11 @@
 package com.agentstore.platform.execution;
 
 import com.agentstore.platform.catalog.AgentVersion;
+import com.agentstore.platform.llm.ByokKeyService;
+import com.agentstore.platform.llm.LlmKeyMissingException;
 import com.agentstore.platform.manifest.AgentRuntime;
+import com.agentstore.platform.manifest.LlmMode;
+import com.agentstore.platform.manifest.LlmVendor;
 import com.agentstore.platform.manifest.Manifest;
 import com.agentstore.platform.manifest.ManifestParser;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +34,7 @@ public class RunLauncher {
     private final SandboxProvider sandboxProvider;
     private final RunTokenService runTokenService;
     private final RunLifecycleService runLifecycleService;
+    private final ByokKeyService byokKeys;
     private final String callbackBaseUrl;
     /** For versions without a manifest runtime (hand-supplied images). */
     private final String fallbackCommand;
@@ -37,7 +42,7 @@ public class RunLauncher {
 
     public RunLauncher(RunRepository runRepository, SecretRepository secretRepository, SecretService secretService,
                        ManifestParser manifestParser, SandboxProvider sandboxProvider, RunTokenService runTokenService,
-                       RunLifecycleService runLifecycleService,
+                       RunLifecycleService runLifecycleService, ByokKeyService byokKeys,
                        @Value("${agentstore.callback.base-url}") String callbackBaseUrl,
                        @Value("${agentstore.runs.agent-command:/workspace/app/agentstore-entrypoint}") String fallbackCommand,
                        @Value("${agentstore.runtime.legacy-callback.enabled:true}") boolean legacyCallback) {
@@ -48,6 +53,7 @@ public class RunLauncher {
         this.sandboxProvider = sandboxProvider;
         this.runTokenService = runTokenService;
         this.runLifecycleService = runLifecycleService;
+        this.byokKeys = byokKeys;
         this.callbackBaseUrl = callbackBaseUrl;
         this.fallbackCommand = fallbackCommand;
         this.legacyCallback = legacyCallback;
@@ -84,6 +90,13 @@ public class RunLauncher {
             for (Secret secret : secretRepository.findByConnectionId(connection.getId())) {
                 envVars.put("AGENT_SECRET_" + secret.getName(), secretService.reveal(connection.getId(), secret.getName()));
             }
+            // After the buyer's secrets, so a connection secret of the same name can never replace the developer's key.
+            if (manifest.llm() != null && manifest.llm().mode() == LlmMode.BYOK_DIRECT) {
+                LlmVendor vendor = manifest.llm().provider();
+                UUID developerOrgId = version.getAgent().getDeveloperOrg().getId();
+                envVars.put("AGENT_SECRET_" + vendor.name() + "_API_KEY", byokKeys.reveal(developerOrgId, vendor)
+                        .orElseThrow(() -> new LlmKeyMissingException(vendor)));
+            }
 
             allowOut = new ArrayList<>();
             allowOut.add(URI.create(callbackBaseUrl).getHost());
@@ -92,6 +105,11 @@ public class RunLauncher {
             command = AgentRuntime.fromId(manifest.runtime())
                     .map(runtime -> runtime.runCommand(manifest.entrypoint()))
                     .orElse(List.of("sh", "-c", fallbackCommand));
+        } catch (LlmKeyMissingException e) {
+            runLifecycleService.terminate(runId, RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
+                    Map.of("summary", "The agent cannot start because its LLM key is not configured",
+                            "code", "LLM_KEY_MISSING"));
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "LLM_KEY_MISSING", e);
         } catch (RuntimeException e) {
             runLifecycleService.terminate(runId, RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
                     Map.of("summary", "Run could not be launched"));

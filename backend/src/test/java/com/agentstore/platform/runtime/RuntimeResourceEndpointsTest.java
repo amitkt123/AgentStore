@@ -114,12 +114,13 @@ class RuntimeResourceEndpointsTest extends AbstractStorageIntegrationTest {
     }
 
     @Test
-    void theLlmEndpointIsNotImplementedYet() {
+    void anAgentWithoutAnLlmBlockCannotUseTheLlmEndpoint() {
         var agent = fx.runningAgent(new BigDecimal("500.00"));
 
         var response = call(HttpMethod.POST, "/runtime/v1/llm/chat", agent.token(),
                 Map.of("messages", List.of(Map.of("role", "user", "content", "hi"))));
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("LLM_NOT_DECLARED");
     }
 }

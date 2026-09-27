@@ -2,6 +2,7 @@ package com.agentstore.platform.execution;
 
 import com.agentstore.platform.catalog.AgentVersion;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -53,6 +54,29 @@ public class Run {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "input_json", columnDefinition = "jsonb")
     private String inputJson = "{}";
+
+    /**
+     * Read-only here on purpose: these counters change only through the gateway's atomic statements
+     * ({@code RunRepository.reserveLlmTokens/settleLlmTokens}). A full entity save must never write a stale copy back.
+     */
+    @Setter(AccessLevel.NONE)
+    @Column(name = "llm_tokens_used", insertable = false, updatable = false)
+    private int llmTokensUsed;
+
+    @Setter(AccessLevel.NONE)
+    @Column(name = "llm_tokens_reserved", insertable = false, updatable = false)
+    private int llmTokensReserved;
+
+    /** MOCK or REPLAY for a non-production run whose LLM calls are not real; null means real. Set by WS6. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "llm_mode")
+    private RunLlmMode llmMode;
+
+    private UUID replayRunId;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "llm_mock_json", columnDefinition = "jsonb")
+    private String llmMockJson;
 
     public Run(UUID id, Connection connection, AgentVersion agentVersion, RunStatus status, BigDecimal costCap,
                BigDecimal totalCharged, String sandboxId, String callbackTokenHash) {

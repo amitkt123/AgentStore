@@ -78,6 +78,26 @@ agentstore:
     access-key: ${STORAGE_ACCESS_KEY:agentstore-dev}
     secret-key: ${STORAGE_SECRET_KEY:agentstore-dev-secret-change-me}
     bucket: ${STORAGE_BUCKET:agentstore}
+  llm:
+    max-tokens-per-run-limit: 5000000
+    max-output-tokens: 32000
+    recording-ttl: P14D
+    retention-interval: PT1H
+    retry-backoff: PT0.25S
+    connect-timeout: PT5S
+    read-timeout: PT120S
+    breaker:
+      window-size: 20
+      minimum-calls: 10
+      failure-rate-percent: 50
+      open-duration: PT30S
+    providers:
+      anthropic:
+        base-url: https://api.anthropic.com
+        api-key: ${ANTHROPIC_API_KEY:}
+      openai:
+        base-url: https://api.openai.com
+        api-key: ${OPENAI_API_KEY:}
 
 springdoc:
   paths-to-match: /runtime/v1/**

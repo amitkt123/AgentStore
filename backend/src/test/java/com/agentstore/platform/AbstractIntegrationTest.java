@@ -20,7 +20,10 @@ public abstract class AbstractIntegrationTest {
             new PostgreSQLContainer<>("postgres:16-alpine")
                     .withDatabaseName("agentstore")
                     .withUsername("agentstore")
-                    .withPassword("agentstore");
+                    .withPassword("agentstore")
+                    // Each cached Spring context keeps its own connection pool; the default of 100 runs out once the
+                    // suite has ten or so distinct contexts ("sorry, too many clients already").
+                    .withCommand("postgres", "-c", "max_connections=300");
 
     static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7.2-alpine").withExposedPorts(6379);
 

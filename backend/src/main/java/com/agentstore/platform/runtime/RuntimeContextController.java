@@ -2,6 +2,7 @@ package com.agentstore.platform.runtime;
 
 import com.agentstore.platform.execution.Run;
 import com.agentstore.platform.execution.RunRepository;
+import com.agentstore.platform.manifest.LlmDecl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,9 +38,16 @@ public class RuntimeContextController {
                 .map(s -> new ContextResponse.GrantedScope(s.type(), s.resource(), s.requiresApproval()))
                 .toList();
         BigDecimal remaining = run.getCostCap().subtract(run.getTotalCharged()).max(BigDecimal.ZERO);
+        ContextResponse.Llm llm = null;
+        LlmDecl declared = principal.manifest().llm();
+        if (declared != null) {
+            long tokensRemaining = Math.max(0,
+                    declared.maxTokensPerRun() - run.getLlmTokensUsed() - run.getLlmTokensReserved());
+            llm = new ContextResponse.Llm(declared.mode().wire(), declared.models(), tokensRemaining);
+        }
         return new ContextResponse(run.getId(), run.getMode(),
                 new ContextResponse.AgentVersionInfo(run.getAgentVersion().getId(), run.getAgentVersion().getVersionNumber()),
                 input, scopes,
-                new ContextResponse.Limits(run.getDeadlineAt(), remaining, principal.manifest().costEnvelope().currency()));
+                new ContextResponse.Limits(run.getDeadlineAt(), remaining, principal.manifest().costEnvelope().currency(), llm));
     }
 }

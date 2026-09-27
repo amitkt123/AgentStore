@@ -52,4 +52,13 @@ class RuntimeContractTest extends AbstractIntegrationTest {
                 "/runtime/v1/llm/chat", "/runtime/v1/resources/{resource}/records",
                 "/runtime/v1/resources/{resource}/file/content");
     }
+
+    @Test
+    void theContractDescribesTheLlmLimitsInTheContext() throws Exception {
+        JsonNode generated = new ObjectMapper().readTree(rest.getForObject("http://localhost:" + port + "/v3/api-docs", String.class));
+
+        assertThat(generated.at("/components/schemas/Limits/properties").has("llm")).isTrue();
+        assertThat(generated.at("/components/schemas/Llm/properties").fieldNames()).toIterable()
+                .containsExactlyInAnyOrder("mode", "models", "tokensRemaining");
+    }
 }

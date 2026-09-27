@@ -5,19 +5,31 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
 public class ManifestValidator {
 
+    public static final long DEFAULT_MAX_TOKENS_PER_RUN_LIMIT = 5_000_000L;
+
     private final ObjectMapper mapper = new ObjectMapper();
     private final ManifestParser parser = new ManifestParser();
     private final JsonSchema schema;
+    private final long maxTokensPerRunLimit;
 
     public ManifestValidator() {
+        this(DEFAULT_MAX_TOKENS_PER_RUN_LIMIT);
+    }
+
+    @Autowired
+    public ManifestValidator(@Value("${agentstore.llm.max-tokens-per-run-limit:5000000}") long maxTokensPerRunLimit) {
+        this.maxTokensPerRunLimit = maxTokensPerRunLimit;
         JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7);
         this.schema = factory.getSchema(
                 getClass().getClassLoader().getResourceAsStream("manifest/manifest-schema.json"));
@@ -34,7 +46,9 @@ public class ManifestValidator {
         if (!errors.isEmpty()) {
             return new Result(false, errors.stream().map(Object::toString).collect(Collectors.toList()));
         }
-        List<String> semantic = ResourceManifestRules.check(parser.parse(rawJson));
+        Manifest manifest = parser.parse(rawJson);
+        List<String> semantic = new ArrayList<>(ResourceManifestRules.check(manifest));
+        semantic.addAll(LlmManifestRules.check(manifest, maxTokensPerRunLimit));
         return semantic.isEmpty() ? new Result(true, List.of()) : new Result(false, semantic);
     }
 

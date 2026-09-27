@@ -33,6 +33,9 @@ public class Org {
     @Column(name = "storage_limit_bytes", nullable = false)
     private long storageLimitBytes = DEFAULT_STORAGE_LIMIT_BYTES;
 
+    /** Set by the developer verification workflow (WS7). Until that exists, tests and local development set it directly. */
+    private Instant developerVerifiedAt;
+
     private Instant createdAt;
 
     public Org(UUID id, String name, OrgType type) {

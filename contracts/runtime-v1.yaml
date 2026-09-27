@@ -497,6 +497,19 @@ components:
           type: number
         currency:
           type: string
+        llm:
+          $ref: "#/components/schemas/Llm"
+    Llm:
+      properties:
+        mode:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+        tokensRemaining:
+          type: integer
+          format: int64
   securitySchemes:
     runToken:
       type: http
