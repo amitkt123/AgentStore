@@ -29,4 +29,8 @@ public interface DatasetRepository extends JpaRepository<Dataset, UUID> {
 
     @Query("select d from Dataset d where d.purgeAfter <= :now and d.purgedAt is null")
     List<Dataset> findDueForPurge(@Param("now") Instant now);
+
+    @Query("select coalesce(sum(d.sizeBytes), 0) from Dataset d "
+            + "where d.ownerOrgId = :orgId and d.purpose = :purpose and d.purgedAt is null")
+    long usedBytesByPurpose(@Param("orgId") java.util.UUID orgId, @Param("purpose") DatasetPurpose purpose);
 }

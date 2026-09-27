@@ -30,4 +30,8 @@ public interface LlmCallRepository extends JpaRepository<LlmCall, UUID> {
     @Query("select c from LlmCall c where c.recordingExpiresAt < :now and c.recordingPurgedAt is null "
             + "order by c.recordingExpiresAt asc")
     List<LlmCall> findRecordingsDueForPurge(@Param("now") Instant now, Pageable pageable);
+
+    @Query(value = "SELECT COALESCE(SUM(c.cost), 0) FROM llm_call c JOIN run r ON r.id = c.run_id "
+            + "WHERE r.mode = 'SANDBOX' AND r.initiated_by_org_id = :orgId AND c.created_at >= :since", nativeQuery = true)
+    java.math.BigDecimal sandboxSpendSince(@Param("orgId") java.util.UUID orgId, @Param("since") Instant since);
 }

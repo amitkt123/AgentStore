@@ -78,6 +78,20 @@ agentstore:
     access-key: ${STORAGE_ACCESS_KEY:agentstore-dev}
     secret-key: ${STORAGE_SECRET_KEY:agentstore-dev-secret-change-me}
     bucket: ${STORAGE_BUCKET:agentstore}
+  sandbox:
+    quota:
+      unverified:
+        run-seconds: 7200
+        concurrent-runs: 1
+        llm-spend: 200
+        fixture-bytes: 524288000
+        builds-per-day: 20
+      verified:
+        run-seconds: 60000
+        concurrent-runs: 5
+        llm-spend: 2000
+        fixture-bytes: 5368709120
+        builds-per-day: 100
   llm:
     max-tokens-per-run-limit: 5000000
     max-output-tokens: 32000

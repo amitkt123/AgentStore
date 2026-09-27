@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +25,13 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
     List<Run> findByStatusAndAgentVersionId(RunStatus status, UUID agentVersionId);
 
     Optional<Run> findFirstByCallbackTokenHash(String callbackTokenHash);
+
+    long countByModeAndInitiatedByOrgIdAndStatusIn(RunMode mode, java.util.UUID orgId, Collection<RunStatus> statuses);
+
+    @Query(value = "SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(completed_at, now()) - started_at))), 0) FROM run "
+            + "WHERE mode = 'SANDBOX' AND initiated_by_org_id = :orgId AND started_at >= :since AND status <> 'PENDING_BUILD'",
+            nativeQuery = true)
+    BigDecimal sandboxRunSecondsSince(@Param("orgId") java.util.UUID orgId, @Param("since") Instant since);
 
     @Transactional
     @Modifying

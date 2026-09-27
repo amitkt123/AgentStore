@@ -36,4 +36,7 @@ public interface TemplateBuildRepository extends JpaRepository<TemplateBuild, UU
     Optional<TemplateBuild> findFirstByAgentVersionIdAndStatusOrderByFinishedAtDesc(UUID agentVersionId, BuildStatus status);
 
     boolean existsByAgentVersionIdAndBackendAndStatusIn(UUID agentVersionId, String backend, Collection<BuildStatus> statuses);
+
+    @Query("select count(b) from TemplateBuild b where b.agentVersion.agent.developerOrg.id = :orgId and b.queuedAt >= :since")
+    long countQueuedSince(@Param("orgId") UUID orgId, @Param("since") java.time.Instant since);
 }
