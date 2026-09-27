@@ -35,6 +35,10 @@ public class RunStep {
     @Enumerated(EnumType.STRING)
     private RunStepSource source = RunStepSource.AGENT;
 
+    /** The manifest-facing shape of this step: 'read:<resource>' | 'write:<resource>' | 'draft:<resource>' |
+     * 'gate:<action>' | 'llm' | 'charge' | null. See {@link RunStepBlocks}. */
+    private String block;
+
     private Instant createdAt;
 
     public RunStep(UUID id, Run run, RunStepKind kind, String detail) {
