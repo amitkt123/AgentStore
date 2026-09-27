@@ -1,0 +1,183 @@
+openapi: 3.1.0
+info:
+  title: OpenAPI definition
+  version: v0
+servers:
+- url: /
+paths:
+  /api/v1/agents/{agentId}/versions/{versionId}/manifest/patches:
+    post:
+      tags:
+      - catalog-controller
+      operationId: patchManifest
+      parameters:
+      - name: agentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: versionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManifestPatchRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ManifestPatchResponse"
+  /api/v1/runs/{runId}/flow:
+    get:
+      tags:
+      - run-detail-controller
+      operationId: flow
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/FlowView"
+  /api/v1/agents/{agentId}/versions/{versionId}/readiness:
+    get:
+      tags:
+      - catalog-controller
+      operationId: readiness
+      parameters:
+      - name: agentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: versionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+components:
+  schemas:
+    JsonNode: {}
+    ManifestPatchRequest:
+      properties:
+        op:
+          type: string
+        resource:
+          type: string
+        description:
+          type: string
+        requiresApproval:
+          type: boolean
+        name:
+          type: string
+        format:
+          type: string
+        schema:
+          $ref: "#/components/schemas/JsonNode"
+        host:
+          type: string
+        type:
+          type: string
+      required:
+      - op
+    Diff:
+      properties:
+        addedScopes:
+          type: array
+          items:
+            type: string
+        removedScopes:
+          type: array
+          items:
+            type: string
+        addedHosts:
+          type: array
+          items:
+            type: string
+    ManifestPatchResponse:
+      properties:
+        manifestRevision:
+          type: integer
+          format: int32
+        diff:
+          $ref: "#/components/schemas/Diff"
+    FlowBlock:
+      properties:
+        block:
+          type: string
+        state:
+          type: string
+          enum:
+          - DONE
+          - WAITING
+          - FAILED
+          - SKIPPED
+          - IDLE
+        metrics:
+          type: object
+          additionalProperties: {}
+        gateId:
+          type: string
+        flag:
+          type: string
+    FlowView:
+      properties:
+        blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlowBlock"
+        reachedBlock:
+          type: string
+        spend:
+          $ref: "#/components/schemas/Spend"
+        deadlineAt:
+          type: string
+          format: date-time
+    Spend:
+      properties:
+        charged:
+          type: number
+        cap:
+          type: number
+    Blocker:
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        runId:
+          type: string
+          format: uuid
+    ReadinessResponse:
+      properties:
+        ready:
+          type: boolean
+        blockers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Blocker"
