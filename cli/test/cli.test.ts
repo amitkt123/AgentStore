@@ -102,3 +102,15 @@ describe("fixtures command", () => {
     expect(await main(["fixtures", "list"], ctx)).toBe(0);
   });
 });
+
+describe("profile command", () => {
+  it("dispatches profile list and profile pull", async () => {
+    const base = `/api/v1/agents/${AGENT_ID}/sandbox-profiles`;
+    const server = await startServer([{ method: "GET", path: base, reply: { json: [] } }]);
+    const ctx = makeContext({ env: { AGENTSTORE_API_KEY: "ask_live_test", AGENTSTORE_API_URL: server.url } });
+    writeFiles(ctx.cwd, { "agentstore.yaml": `agentId: ${AGENT_ID}\n` });
+
+    expect(await main(["profile", "list"], ctx)).toBe(0);
+    expect(await main(["profile", "pull"], ctx)).toBe(0);
+  });
+});

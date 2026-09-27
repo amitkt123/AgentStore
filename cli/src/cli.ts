@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 import { fixturesList, fixturesPush } from "./commands/fixtures.js";
 import { init } from "./commands/init.js";
 import { login } from "./commands/login.js";
+import { profileList, profilePull } from "./commands/profile.js";
 import { DEFAULT_TIMEOUT_SECONDS, push } from "./commands/push.js";
 import { sandboxLogs, sandboxRun } from "./commands/sandbox.js";
 import { validateCommand } from "./commands/validate.js";
@@ -22,6 +23,8 @@ Commands:
   fixtures push FILE [--display-name N] [--source-label L]
                                         Upload a local fixture file
   fixtures list                        List the org's fixtures with PII scan status
+  profile list                          List sandbox profiles for the project's agent
+  profile pull                          Write every server-side profile to fixtures/profiles/<name>.yaml
 `;
 
 type Values = Record<string, string | boolean | undefined>;
@@ -127,6 +130,23 @@ export async function main(argv: string[], ctx: Context): Promise<number> {
             return 2;
           default:
             ctx.err(`Unknown fixtures command "${sub}"\n\n${USAGE}`);
+            return 2;
+        }
+      }
+      case "profile": {
+        const [sub, ...rest] = args;
+        switch (sub) {
+          case "list":
+            parse(rest, {});
+            return await profileList(ctx);
+          case "pull":
+            parse(rest, {});
+            return await profilePull(ctx);
+          case undefined:
+            ctx.err(`Usage: agentstore profile <list|pull>\n\n${USAGE}`);
+            return 2;
+          default:
+            ctx.err(`Unknown profile command "${sub}"\n\n${USAGE}`);
             return 2;
         }
       }
