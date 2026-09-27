@@ -6,9 +6,11 @@ import com.agentstore.platform.catalog.AgentVersion;
 import com.agentstore.platform.catalog.AgentVersionRepository;
 import com.agentstore.platform.catalog.Tier;
 import com.agentstore.platform.catalog.VersionStatus;
+import com.agentstore.platform.llm.LlmApiException;
 import com.agentstore.platform.manifest.ManifestParser;
 import com.agentstore.platform.manifest.ManifestValidator;
 import com.agentstore.platform.manifest.ScopeType;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,7 +66,12 @@ public class PublishingService {
         }
 
         var manifest = manifestParser.parse(version.getManifestJson());
-        boolean isTierB = manifest.scopes().stream().anyMatch(s -> s.type() == ScopeType.WRITE);
+        boolean byok = manifest.llm() != null && manifest.llm().mode().isByok();
+        if (byok && version.getAgent().getDeveloperOrg().getDeveloperVerifiedAt() == null) {
+            throw new LlmApiException(HttpStatus.FORBIDDEN, "BYOK_NOT_VERIFIED",
+                    "Only verified developer organisations can use llm.mode " + manifest.llm().mode().wire());
+        }
+        boolean isTierB = byok || manifest.scopes().stream().anyMatch(s -> s.type() == ScopeType.WRITE);
         version.setTier(isTierB ? Tier.TIER_B : Tier.TIER_A);
 
         if (isTierB) {
