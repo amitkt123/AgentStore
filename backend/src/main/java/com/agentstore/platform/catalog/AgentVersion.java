@@ -53,6 +53,8 @@ public class AgentVersion {
     private Instant createdAt;
     private Instant approvedAt;
 
+    private int manifestRevision = 1;
+
     public AgentVersion(UUID id, Agent agent, String versionNumber, String manifestJson, String imageRef,
                          VersionStatus status, Tier tier, String changelog) {
         this.id = id;

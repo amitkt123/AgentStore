@@ -368,7 +368,9 @@ public class RunLifecycleService {
 
     private void step(Run run, RunStepKind kind, RunStepSource source, Map<String, Object> detail) {
         try {
-            runStepRepository.save(new RunStep(null, run, kind, objectMapper.writeValueAsString(detail), source));
+            RunStep step = new RunStep(null, run, kind, objectMapper.writeValueAsString(detail), source);
+            step.setBlock(RunStepBlocks.of(kind, detail));
+            runStepRepository.save(step);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid detail payload");
         }

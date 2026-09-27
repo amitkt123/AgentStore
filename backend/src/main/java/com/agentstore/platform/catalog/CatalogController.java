@@ -1,11 +1,18 @@
 package com.agentstore.platform.catalog;
 
+import com.agentstore.platform.build.BuildStatus;
 import com.agentstore.platform.build.BuildSummaries;
+import com.agentstore.platform.execution.RunReportRepository;
+import com.agentstore.platform.execution.RunReportResult;
 import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.OrgRepository;
 import com.agentstore.platform.identity.UserRole;
+import com.agentstore.platform.manifest.ManifestApiException;
 import com.agentstore.platform.manifest.ManifestParser;
+import com.agentstore.platform.manifest.ManifestPatchRequest;
+import com.agentstore.platform.manifest.ManifestPatchResponse;
+import com.agentstore.platform.manifest.ManifestPatchService;
 import com.agentstore.platform.manifest.ManifestValidator;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -14,6 +21,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -26,16 +35,21 @@ public class CatalogController {
     private final ManifestValidator manifestValidator;
     private final ManifestParser manifestParser;
     private final BuildSummaries buildSummaries;
+    private final RunReportRepository runReportRepository;
+    private final ManifestPatchService manifestPatchService;
 
     public CatalogController(AgentRepository agentRepository, AgentVersionRepository agentVersionRepository,
                               OrgRepository orgRepository, ManifestValidator manifestValidator, ManifestParser manifestParser,
-                              BuildSummaries buildSummaries) {
+                              BuildSummaries buildSummaries, RunReportRepository runReportRepository,
+                              ManifestPatchService manifestPatchService) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.orgRepository = orgRepository;
         this.manifestValidator = manifestValidator;
         this.manifestParser = manifestParser;
         this.buildSummaries = buildSummaries;
+        this.runReportRepository = runReportRepository;
+        this.manifestPatchService = manifestPatchService;
     }
 
     @PostMapping
@@ -90,6 +104,63 @@ public class CatalogController {
         var manifest = manifestParser.parse(version.getManifestJson());
         var build = (isOwningDeveloper || isAdmin) ? buildSummaries.latest(version).orElse(null) : null;
         return AgentVersionDetailResponse.from(version, manifest, build);
+    }
+
+    @GetMapping("/{agentId}/versions/{versionId}/readiness")
+    @PreAuthorize("hasRole('DEVELOPER')")
+    public ReadinessResponse readiness(@PathVariable UUID agentId, @PathVariable UUID versionId) {
+        AgentVersion version = ownedVersion(agentId, versionId);
+        List<ReadinessResponse.Blocker> blockers = new ArrayList<>();
+        if (version.getBuildStatus() != BuildStatus.SUCCEEDED) {
+            blockers.add(new ReadinessResponse.Blocker("BUILD_NOT_READY",
+                    "This version has no successful build yet", null));
+        }
+        runReportRepository.findLatestForVersion(versionId).ifPresent(report -> {
+            UUID runId = report.getRunId();
+            // issueCount is checked directly, not gated on result == ISSUES: a run that had violations and then
+            // timed out or otherwise failed still carries that issue count and must still block readiness.
+            for (int i = 0; i < report.getIssueCount(); i++) {
+                blockers.add(new ReadinessResponse.Blocker("UNDECLARED_ACCESS",
+                        "The last sandbox run attempted access outside its declared manifest", runId));
+            }
+            if (report.getResult() == RunReportResult.OVER_COST_LIMIT) {
+                blockers.add(new ReadinessResponse.Blocker("COST_ENVELOPE_EXCEEDED",
+                        "The last sandbox run asked for more than its cost envelope allows", runId));
+            }
+        });
+        return new ReadinessResponse(blockers.isEmpty(), blockers);
+    }
+
+    @PostMapping("/{agentId}/versions/{versionId}/manifest/patches")
+    @PreAuthorize("hasRole('DEVELOPER')")
+    public ManifestPatchResponse patchManifest(@PathVariable UUID agentId, @PathVariable UUID versionId,
+                                               @Valid @RequestBody ManifestPatchRequest request) {
+        AgentVersion version = ownedVersion(agentId, versionId);
+        if (version.getStatus() != VersionStatus.DRAFT) {
+            throw new ManifestApiException(HttpStatus.CONFLICT, "VERSION_NOT_EDITABLE",
+                    "Only a DRAFT version's manifest can be patched");
+        }
+        String liveManifest = agentVersionRepository.findFirstByAgentIdAndStatusOrderByApprovedAtDesc(agentId, VersionStatus.LIVE)
+                .map(AgentVersion::getManifestJson).orElse(null);
+        var result = manifestPatchService.apply(version.getManifestJson(), request, liveManifest);
+        version.setManifestJson(result.manifestJson());
+        version.setManifestRevision(version.getManifestRevision() + 1);
+        agentVersionRepository.save(version);
+        return new ManifestPatchResponse(version.getManifestRevision(), result.diff());
+    }
+
+    /** Shared by {@link #readiness} and (Task 6) the manifest-patches endpoint: 404 if the version isn't this
+     * agent's, 403 if the agent isn't the caller's (spec §6's rule, applied identically to readiness). */
+    private AgentVersion ownedVersion(UUID agentId, UUID versionId) {
+        AgentVersion version = agentVersionRepository.findById(versionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found"));
+        if (!version.getAgent().getId().equals(agentId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found for this agent");
+        }
+        if (!version.getAgent().getDeveloperOrg().getId().equals(currentOrgId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Agent not owned by caller's org");
+        }
+        return version;
     }
 
     private UUID currentOrgId() {

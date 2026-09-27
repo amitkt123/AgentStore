@@ -91,6 +91,7 @@ public class GateService {
                     gate.affected(), gate.getCreatedAt()));
             Map<String, Object> detail = new HashMap<>();
             detail.put("gateId", gate.getId().toString());
+            detail.put("action", gate.getAction());
             detail.put("decision", approve ? "APPROVED" : "REJECTED");
             if (note != null) {
                 detail.put("note", note);
@@ -140,7 +141,9 @@ public class GateService {
 
     private void step(Run run, RunStepKind kind, Map<String, Object> detail) {
         try {
-            runStepRepository.save(new RunStep(null, run, kind, objectMapper.writeValueAsString(detail), RunStepSource.PLATFORM));
+            RunStep step = new RunStep(null, run, kind, objectMapper.writeValueAsString(detail), RunStepSource.PLATFORM);
+            step.setBlock(RunStepBlocks.of(kind, detail));
+            runStepRepository.save(step);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid detail payload");
         }
