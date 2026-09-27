@@ -36,6 +36,35 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ManifestPatchResponse"
+  /api/v1/agents/{agentId}/sandbox-profiles/sync:
+    post:
+      tags:
+      - sandbox-profile-controller
+      operationId: sync
+      parameters:
+      - name: agentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/SandboxProfileSyncRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SandboxProfileSyncResult"
   /api/v1/runs/{runId}/flow:
     get:
       tags:
@@ -126,6 +155,61 @@ components:
           format: int32
         diff:
           $ref: "#/components/schemas/Diff"
+    BindingEntry:
+      properties:
+        resource:
+          type: string
+        fixture:
+          type: string
+    GatePolicy:
+      properties:
+        actions:
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+            - MANUAL
+            - AUTO_APPROVE
+            - AUTO_REJECT
+        default:
+          type: string
+          enum:
+          - MANUAL
+          - AUTO_APPROVE
+          - AUTO_REJECT
+    SandboxProfileSyncRequest:
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        input:
+          $ref: "#/components/schemas/JsonNode"
+        gatePolicy:
+          $ref: "#/components/schemas/GatePolicy"
+        llmMode:
+          type: string
+          enum:
+          - MOCK
+          - REPLAY
+        spendCap:
+          type: number
+        bindings:
+          type: array
+          items:
+            $ref: "#/components/schemas/BindingEntry"
+        contentHash:
+          type: string
+    SandboxProfileSyncResult:
+      properties:
+        name:
+          type: string
+        action:
+          type: string
+        unresolvedFixtures:
+          type: array
+          items:
+            type: string
     FlowBlock:
       properties:
         block:
