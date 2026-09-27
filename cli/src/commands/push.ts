@@ -58,7 +58,13 @@ export async function push(ctx: Context, opts: PushOptions): Promise<number> {
   const finalized = await api.post<FinalizeResponse>(`${base}/bundles/${upload.bundleId}/finalize`, { sha256: bundle.sha256 });
   ctx.out(`Pushed version ${finalized.versionNumber} (build ${finalized.buildId}, ${finalized.buildStatus}).`);
 
-  await syncProfiles(ctx, api, base);
+  // The version is already pushed at this point; a sync problem (a bad request, an unreachable server, a
+  // malformed fixtures/profiles/*.yaml file) is reported as a warning, never as a reason to fail the push.
+  try {
+    await syncProfiles(ctx, api, base);
+  } catch (e) {
+    ctx.err(`Profile sync failed: ${(e as Error).message}`);
+  }
 
   if (!opts.wait) {
     return 0;

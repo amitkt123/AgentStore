@@ -94,6 +94,16 @@ class PiiScannerTest {
     }
 
     @Test
+    void raggedCsvOverflowCellsAreScannedNotSkipped() {
+        // CsvNormalizer stows a row's extra cells (beyond the header) as a JSON array under Normalized.EXTRA_KEY;
+        // those are still plain scalar values from the original row and must be scanned like any other cell.
+        assertThat(scan(row("name", "A", com.agentstore.platform.data.Normalized.EXTRA_KEY, List.of("person@example.com")))
+                .status()).isEqualTo(PiiScanner.Result.FOUND);
+        assertThat(scan(row("name", "A", com.agentstore.platform.data.Normalized.EXTRA_KEY, List.of("harmless")))
+                .status()).isEqualTo(PiiScanner.Result.CLEAN);
+    }
+
+    @Test
     void nullCellsAreSkipped() {
         assertThat(scan(row("col", null)).status()).isEqualTo(PiiScanner.Result.CLEAN);
     }

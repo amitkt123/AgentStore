@@ -52,7 +52,10 @@ class SandboxProfileStatusTest extends AbstractStorageIntegrationTest {
 
     @Test
     void draftTakesPrecedenceOverLive() {
-        var dev = fx.developer("valid-data-agent.json");
+        // LIVE declares bank_statement only as an untyped scope (always OK); DRAFT types it as CSV, so a bound PDF
+        // fails only if DRAFT is the one actually checked against — this is what distinguishes precedence, not
+        // just that compute() picks some version without throwing.
+        var dev = fx.developer("valid-tier-a.json");
         dev.version().setStatus(VersionStatus.LIVE);
         dev.version().setBuildStatus(BuildStatus.SUCCEEDED);
         fx.versions().save(dev.version());
@@ -61,9 +64,6 @@ class SandboxProfileStatusTest extends AbstractStorageIntegrationTest {
         var pdf = dataFx.upload(dev.org(), "f.pdf", DataFixtures.PDF);
         bindings.save(new DatasetBinding(BindingOwnerType.SANDBOX_PROFILE, profile.getId(), "bank_statement", pdf.getId(), "{}", null));
 
-        // Both the LIVE and the DRAFT version declare the same manifest shape here, so this alone doesn't
-        // distinguish precedence; the point of this test is that compute() does not throw picking between two
-        // candidate versions and resolves to the newer (DRAFT) row, per findFirstByAgentIdAndStatus...
         assertThat(statusService.compute(profile)).isEqualTo(ProfileStatus.FILE_ERRORS);
     }
 }

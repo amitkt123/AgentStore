@@ -41,4 +41,11 @@ describe("writeProfileFile", () => {
     expect(existsSync(path)).toBe(true);
     expect(readFileSync(path, "utf8")).toContain("name: pulled");
   });
+
+  it("rejects a profile name that would write outside fixtures/profiles", () => {
+    const dir = tempDir();
+
+    expect(() => writeProfileFile(dir, { name: "../../etc/evil", bindings: [] })).toThrow(/name/);
+    expect(() => writeProfileFile(dir, { name: "sub/dir", bindings: [] })).toThrow(/name/);
+  });
 });

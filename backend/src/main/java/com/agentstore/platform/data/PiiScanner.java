@@ -63,19 +63,37 @@ public final class PiiScanner {
             n++;
             for (Map.Entry<String, Object> cell : rows.next().entrySet()) {
                 Object raw = cell.getValue();
-                if (raw == null || raw instanceof Map || raw instanceof List) {
+                // A ragged CSV row's overflow cells (CsvNormalizer, Normalized.EXTRA_KEY) are plain scalars from the
+                // original row, just parked in a JSON array; scan each one instead of skipping the whole cell.
+                if (Normalized.EXTRA_KEY.equals(cell.getKey()) && raw instanceof List<?> extras) {
+                    for (Object extra : extras) {
+                        if (scanScalar(cell.getKey(), extra, n, findings)) {
+                            count++;
+                        }
+                    }
                     continue;
                 }
-                Type type = detect(cell.getKey(), String.valueOf(raw));
-                if (type != null) {
+                if (scanScalar(cell.getKey(), raw, n, findings)) {
                     count++;
-                    if (findings.size() < MAX_FINDINGS) {
-                        findings.add(new Finding(type, n, cell.getKey()));
-                    }
                 }
             }
         }
         return count == 0 ? Result.clean() : new Result(Result.FOUND, count, List.copyOf(findings));
+    }
+
+    /** Null, a nested object, or a nested array (other than the extra-cells one, unwrapped by the caller) is skipped. */
+    private static boolean scanScalar(String column, Object raw, long row, List<Finding> findings) {
+        if (raw == null || raw instanceof Map || raw instanceof List) {
+            return false;
+        }
+        Type type = detect(column, String.valueOf(raw));
+        if (type == null) {
+            return false;
+        }
+        if (findings.size() < MAX_FINDINGS) {
+            findings.add(new Finding(type, row, column));
+        }
+        return true;
     }
 
     private static Type detect(String column, String value) {

@@ -15,6 +15,7 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,6 +27,7 @@ class SandboxProfileSyncApiTest extends AbstractStorageIntegrationTest {
     @Autowired DataFixtures dataFx;
     @Autowired SandboxProfileRepository profiles;
     @Autowired com.agentstore.platform.data.DatasetRepository datasets;
+    @Autowired com.agentstore.platform.data.DatasetBindingRepository bindingRepository;
 
     String url(SandboxFixtures.Dev dev) {
         return "http://localhost:" + port + "/api/v1/agents/" + dev.agent().getId() + "/sandbox-profiles/sync";
@@ -34,6 +36,12 @@ class SandboxProfileSyncApiTest extends AbstractStorageIntegrationTest {
     @SuppressWarnings("unchecked")
     ResponseEntity<List> sync(SandboxFixtures.Dev dev, List<Map<String, Object>> entries) {
         return rest.exchange(url(dev), HttpMethod.POST, new HttpEntity<>(entries, fx.bearer(dev.org(), com.agentstore.platform.identity.UserRole.DEVELOPER)), List.class);
+    }
+
+    /** For a request expected to be rejected (4xx): a rejection's body is an error object, not a result array. */
+    @SuppressWarnings("rawtypes")
+    ResponseEntity<Map> syncExpectingRejection(SandboxFixtures.Dev dev, List<Map<String, Object>> entries) {
+        return rest.exchange(url(dev), HttpMethod.POST, new HttpEntity<>(entries, fx.bearer(dev.org(), com.agentstore.platform.identity.UserRole.DEVELOPER)), Map.class);
     }
 
     static String hash(String s) {
@@ -146,4 +154,79 @@ class SandboxProfileSyncApiTest extends AbstractStorageIntegrationTest {
         assertThat(((Map<String, Object>) response.getBody().get(0)).get("action")).isEqualTo("created");
         assertThat(profiles.findByAgentIdAndName(dev.agent().getId(), "p")).isPresent();
     }
+
+    @Test
+    void anEntryWithNoBindingsKeyAtAllDoesNotCrash() {
+        var dev = fx.developer("valid-tier-a.json");
+        Map<String, Object> withoutBindingsKey = new java.util.LinkedHashMap<>(Map.of("name", "p", "contentHash", hash("v1")));
+
+        var response = sync(dev, List.of(withoutBindingsKey));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Map<String, Object>) response.getBody().get(0)).get("action")).isEqualTo("created");
+    }
+
+    @Test
+    void aBlankNameIsRejectedWithA400NotAServerError() {
+        var dev = fx.developer("valid-tier-a.json");
+
+        var response = syncExpectingRejection(dev, List.of(entry("", hash("v1"))));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void aNonPositiveSpendCapIsRejectedWithA400() {
+        var dev = fx.developer("valid-tier-a.json");
+        Map<String, Object> withBadCap = entry("p", hash("v1"));
+        withBadCap.put("spendCap", -1);
+
+        var response = syncExpectingRejection(dev, List.of(withBadCap));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void llmModeReplayIsRejectedBecauseSyncHasNoReplayRunId() {
+        var dev = fx.developer("valid-tier-a.json");
+        Map<String, Object> withReplay = entry("p", hash("v1"));
+        withReplay.put("llmMode", "REPLAY");
+
+        var response = syncExpectingRejection(dev, List.of(withReplay));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void removingABindingFromTheYamlDeletesItOnTheNextSync() {
+        var dev = fx.developer("valid-tier-a.json");
+        var fixture = dataFx.upload(dev.org(), "sample-invoices.csv", "name,amount\nA,1\n");
+        fixture.setPurpose(com.agentstore.platform.data.DatasetPurpose.FIXTURE);
+        datasets.saveAndFlush(fixture);
+        Map<String, Object> withBinding = entry("p", hash("v1"));
+        withBinding.put("bindings", List.of(Map.of("resource", "bank_statement", "fixture", "sample-invoices.csv")));
+        sync(dev, List.of(withBinding));
+        UUID profileId = profiles.findByAgentIdAndName(dev.agent().getId(), "p").orElseThrow().getId();
+        assertThat(bindingRepository.findByOwnerTypeAndOwnerId(com.agentstore.platform.data.BindingOwnerType.SANDBOX_PROFILE, profileId)).hasSize(1);
+
+        sync(dev, List.of(entry("p", hash("v2"))));   // same name, no bindings this time
+
+        assertThat(bindingRepository.findByOwnerTypeAndOwnerId(com.agentstore.platform.data.BindingOwnerType.SANDBOX_PROFILE, profileId)).isEmpty();
+    }
+
+    @Test
+    void syncNeverOverwritesLlmMockOrReplayRunIdSinceItCannotExpressThem() {
+        var dev = fx.developer("valid-tier-a.json");
+        sync(dev, List.of(entry("p", hash("v1"))));
+        SandboxProfile profile = profiles.findByAgentIdAndName(dev.agent().getId(), "p").orElseThrow();
+        profile.setLlmMockJson("{\"foo\":1}");
+        profiles.saveAndFlush(profile);
+
+        sync(dev, List.of(entry("p", hash("v2"))));   // content changed, so this profile is overwritten
+
+        // JSONB round-trips through a canonical text form (Postgres may reformat whitespace), so compare loosely.
+        assertThat(profiles.findByAgentIdAndName(dev.agent().getId(), "p").orElseThrow().getLlmMockJson())
+                .isEqualToIgnoringWhitespace("{\"foo\":1}");
+    }
+
 }

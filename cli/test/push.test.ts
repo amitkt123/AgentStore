@@ -241,4 +241,27 @@ describe("push", () => {
 
     expect(server.requests.some((r) => r.path === `${BASE}/sandbox-profiles/sync`)).toBe(false);
   });
+
+  it("still reports success when the sync call itself fails, since the version was already pushed", async () => {
+    const { ctx } = await harness({
+      files: { "fixtures/profiles/p.yaml": "name: p\nbindings: []\n" },
+      sync: { status: 500, text: "boom" },
+    });
+
+    expect(await push(ctx, { wait: false, timeoutSeconds: 900 })).toBe(0);
+
+    expect(ctx.outLines.join("\n")).toContain("Pushed version");
+    expect(ctx.errLines.join("\n")).toContain("Profile sync failed");
+  });
+
+  it("still reports success when a fixtures/profiles/*.yaml file fails to parse", async () => {
+    const { ctx } = await harness({
+      files: { "fixtures/profiles/p.yaml": "name: [this is not valid yaml\n" },
+    });
+
+    expect(await push(ctx, { wait: false, timeoutSeconds: 900 })).toBe(0);
+
+    expect(ctx.outLines.join("\n")).toContain("Pushed version");
+    expect(ctx.errLines.join("\n")).toContain("Profile sync failed");
+  });
 });
