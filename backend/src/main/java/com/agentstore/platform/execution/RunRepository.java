@@ -28,6 +28,12 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
 
     long countByModeAndInitiatedByOrgIdAndStatusIn(RunMode mode, java.util.UUID orgId, Collection<RunStatus> statuses);
 
+    org.springframework.data.domain.Page<Run> findByModeAndInitiatedByOrgIdOrderByStartedAtDesc(RunMode mode,
+            java.util.UUID orgId, org.springframework.data.domain.Pageable pageable);
+
+    org.springframework.data.domain.Page<Run> findByModeAndInitiatedByOrgIdAndAgentVersionAgentIdOrderByStartedAtDesc(
+            RunMode mode, java.util.UUID orgId, java.util.UUID agentId, org.springframework.data.domain.Pageable pageable);
+
     @Query(value = "SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(completed_at, now()) - started_at))), 0) FROM run "
             + "WHERE mode = 'SANDBOX' AND initiated_by_org_id = :orgId AND started_at >= :since AND status <> 'PENDING_BUILD'",
             nativeQuery = true)

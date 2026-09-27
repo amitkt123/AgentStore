@@ -25,7 +25,14 @@ final class ApiKeyScope {
             new Rule(null, "/api/v1/agents/*/versions"),
             new Rule(null, "/api/v1/agents/*/versions/**"),
             new Rule(null, "/api/v1/agents/*/bundles/**"),
-            new Rule(null, "/api/v1/agents/*/builds/**"));
+            new Rule(null, "/api/v1/agents/*/builds/**"),
+            new Rule(null, "/api/v1/sandbox/**"),
+            new Rule(null, "/api/v1/agents/*/sandbox-profiles"),
+            new Rule(null, "/api/v1/agents/*/sandbox-profiles/**"),
+            new Rule(null, "/api/v1/sandbox-profiles/**"),
+            new Rule(null, "/api/v1/developer/fixtures"),
+            new Rule(null, "/api/v1/developer/fixtures/**"),
+            new Rule("GET", "/api/v1/developer/quota"));
 
     private ApiKeyScope() {
     }

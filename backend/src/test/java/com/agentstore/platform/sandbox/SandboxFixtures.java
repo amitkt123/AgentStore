@@ -1,5 +1,11 @@
 package com.agentstore.platform.sandbox;
 
+import com.agentstore.platform.build.AgentBundle;
+import com.agentstore.platform.build.AgentBundleRepository;
+import com.agentstore.platform.build.BuildStatus;
+import com.agentstore.platform.build.BundleStatus;
+import com.agentstore.platform.build.TemplateBuild;
+import com.agentstore.platform.build.TemplateBuildRepository;
 import com.agentstore.platform.catalog.Agent;
 import com.agentstore.platform.catalog.AgentRepository;
 import com.agentstore.platform.catalog.AgentVersion;
@@ -15,6 +21,8 @@ import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.OrgRepository;
 import com.agentstore.platform.identity.OrgType;
+import com.agentstore.platform.identity.User;
+import com.agentstore.platform.identity.UserRepository;
 import com.agentstore.platform.identity.UserRole;
 import com.agentstore.platform.manifest.ManifestParser;
 import org.springframework.http.HttpHeaders;
@@ -44,10 +52,14 @@ public class SandboxFixtures {
     private final JwtService jwt;
     private final JdbcTemplate jdbc;
     private final ManifestParser parser;
+    private final AgentBundleRepository bundles;
+    private final TemplateBuildRepository builds;
+    private final UserRepository users;
 
     public SandboxFixtures(OrgRepository orgs, AgentRepository agents, AgentVersionRepository versions,
                            SandboxProfileRepository profiles, RunRepository runs, JwtService jwt, JdbcTemplate jdbc,
-                           ManifestParser parser) {
+                           ManifestParser parser, AgentBundleRepository bundles, TemplateBuildRepository builds,
+                           UserRepository users) {
         this.orgs = orgs;
         this.agents = agents;
         this.versions = versions;
@@ -56,6 +68,9 @@ public class SandboxFixtures {
         this.jwt = jwt;
         this.jdbc = jdbc;
         this.parser = parser;
+        this.bundles = bundles;
+        this.builds = builds;
+        this.users = users;
     }
 
     /** A new DEVELOPER org with one agent and one DRAFT version (image "template-v1") of the given test manifest. */
@@ -75,6 +90,36 @@ public class SandboxFixtures {
                 Tier.TIER_A, "cl"));
     }
 
+    /** A version with no built image and no bundle: {@code VERSION_NOT_BUILT}. */
+    public AgentVersion versionWithNoImage(Agent agent, String number, String manifestFile) {
+        return versions.save(new AgentVersion(null, agent, number, readManifest(manifestFile), null, VersionStatus.DRAFT,
+                Tier.TIER_A, "cl"));
+    }
+
+    /**
+     * A version built by the platform from a bundle, whose image was built on {@code builtOnBackend} — for a backend
+     * other than the configured one ({@code e2b}), {@code RebuildService.needsRebuild} is true.
+     */
+    public AgentVersion versionNeedingRebuild(Agent agent, String number, String manifestFile, String builtOnBackend) {
+        AgentVersion version = versions.save(new AgentVersion(null, agent, number, readManifest(manifestFile), null,
+                VersionStatus.DRAFT, Tier.TIER_A, "cl"));
+        UUID uploaderId = users.save(new User(null, "builder-" + UUID.randomUUID() + "@example.com", null, "Builder")).getId();
+        UUID bundleId = UUID.randomUUID();
+        AgentBundle bundle = bundles.save(new AgentBundle(bundleId, agent, uploaderId,
+                "bundles/" + agent.getId() + "/" + bundleId + ".zip", "c".repeat(64), 100, BundleStatus.UPLOADED));
+        version.setManifestJson(readManifest(manifestFile));
+        version.setBundle(bundle);
+        version.setBuildStatus(BuildStatus.SUCCEEDED);
+        version.setImageRef("img-" + builtOnBackend);
+        version = versions.save(version);
+        TemplateBuild build = new TemplateBuild(version, bundle, builtOnBackend, "python-3.12", "agent/main.py");
+        build.setStatus(BuildStatus.SUCCEEDED);
+        build.setImageRef("img-" + builtOnBackend);
+        build.setFinishedAt(Instant.now());
+        builds.save(build);
+        return version;
+    }
+
     public HttpHeaders bearer(Org org, UserRole role) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(jwt.issue(UUID.randomUUID(), org.getId(), role));
@@ -88,8 +133,12 @@ public class SandboxFixtures {
 
     /** A sandbox run row straight in the database, as the service would leave it (no launch). */
     public Run sandboxRun(Dev dev, SandboxProfile profile, RunStatus status) {
-        BigDecimal cap = parser.parse(dev.version().getManifestJson()).costEnvelope().maxPerRun();
-        Run run = new Run(null, null, dev.version(), status, cap, BigDecimal.ZERO, "sbx-" + UUID.randomUUID(),
+        return sandboxRun(dev, dev.version(), profile, status);
+    }
+
+    public Run sandboxRun(Dev dev, AgentVersion version, SandboxProfile profile, RunStatus status) {
+        BigDecimal cap = parser.parse(version.getManifestJson()).costEnvelope().maxPerRun();
+        Run run = new Run(null, null, version, status, cap, BigDecimal.ZERO, "sbx-" + UUID.randomUUID(),
                 RunTokenService.hash("tok-" + UUID.randomUUID()));
         run.setMode(RunMode.SANDBOX);
         run.setInitiatedByOrgId(dev.org().getId());
