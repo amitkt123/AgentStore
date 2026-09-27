@@ -1,5 +1,7 @@
 package com.agentstore.platform.llm;
 
+import com.agentstore.platform.execution.RunLlmMode;
+import com.agentstore.platform.execution.RunMode;
 import com.agentstore.platform.manifest.LlmDecl;
 import com.agentstore.platform.manifest.LlmMode;
 import com.agentstore.platform.runtime.LlmBackend;
@@ -26,9 +28,13 @@ public class GatewayLlmBackend implements LlmBackend {
     private final LlmBudget budget;
     private final ProviderClient providers;
     private final LlmCallLog callLog;
+    private final MockResponder mock;
+    private final ReplayResponder replay;
+    private final LlmRecorder recorder;
 
     public GatewayLlmBackend(LlmRequestNormalizer normalizer, LlmModelRepository models, RunLlmContextLoader contexts,
-                             LlmKeyResolver keys, LlmBudget budget, ProviderClient providers, LlmCallLog callLog) {
+                             LlmKeyResolver keys, LlmBudget budget, ProviderClient providers, LlmCallLog callLog,
+                             MockResponder mock, ReplayResponder replay, LlmRecorder recorder) {
         this.normalizer = normalizer;
         this.models = models;
         this.contexts = contexts;
@@ -36,6 +42,9 @@ public class GatewayLlmBackend implements LlmBackend {
         this.budget = budget;
         this.providers = providers;
         this.callLog = callLog;
+        this.mock = mock;
+        this.replay = replay;
+        this.recorder = recorder;
     }
 
     @Override
@@ -52,7 +61,27 @@ public class GatewayLlmBackend implements LlmBackend {
         LlmRequestNormalizer.Normalized normalized = normalizer.normalize(rawRequest);
         LlmModel model = allowedModel(llm, normalized.request().model());
         RunLlmContext context = contexts.load(principal.runId());
+        if (context.llmMode() == RunLlmMode.MOCK) {
+            return serveMock(principal, context, model, normalized).toMap();
+        }
+        if (context.llmMode() == RunLlmMode.REPLAY) {
+            return replay.serve(principal, context.replayRunId(), model, normalized).toMap();
+        }
         return callProvider(principal, llm, context, model, normalized).toMap();
+    }
+
+    /** No key, no budget, no provider: a canned answer, recorded as a MOCK call with its canned token counts. */
+    private LlmResponse serveMock(RunPrincipal principal, RunLlmContext context, LlmModel model,
+                                  LlmRequestNormalizer.Normalized normalized) {
+        long started = System.nanoTime();
+        LlmResponse response = mock.respond(context.llmMockJson(), normalized.request(), normalized.hash());
+        LlmCall call = new LlmCall(UUID.randomUUID(), principal.runId(), model.getId(), LlmSource.MOCK,
+                LlmCallStatus.OK, normalized.hash());
+        call.setInputTokens(response.inputTokens());
+        call.setOutputTokens(response.outputTokens());
+        call.setLatencyMs(millisSince(started));
+        callLog.record(principal, call);
+        return response;
     }
 
     private LlmModel allowedModel(LlmDecl llm, String modelId) {
@@ -114,6 +143,9 @@ public class GatewayLlmBackend implements LlmBackend {
         call.setOutputTokens(response.outputTokens());
         call.setCost(LlmCost.of(source, model, response.inputTokens(), response.outputTokens()));
         call.setLatencyMs(millisSince(started));
+        if (principal.mode() == RunMode.SANDBOX) {
+            recorder.attach(call, request, response);   // production, trial and review runs never store prompts
+        }
         callLog.record(principal, call);
         return response;
     }
