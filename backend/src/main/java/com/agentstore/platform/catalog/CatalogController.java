@@ -8,7 +8,11 @@ import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.OrgRepository;
 import com.agentstore.platform.identity.UserRole;
+import com.agentstore.platform.manifest.ManifestApiException;
 import com.agentstore.platform.manifest.ManifestParser;
+import com.agentstore.platform.manifest.ManifestPatchRequest;
+import com.agentstore.platform.manifest.ManifestPatchResponse;
+import com.agentstore.platform.manifest.ManifestPatchService;
 import com.agentstore.platform.manifest.ManifestValidator;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -32,10 +36,12 @@ public class CatalogController {
     private final ManifestParser manifestParser;
     private final BuildSummaries buildSummaries;
     private final RunReportRepository runReportRepository;
+    private final ManifestPatchService manifestPatchService;
 
     public CatalogController(AgentRepository agentRepository, AgentVersionRepository agentVersionRepository,
                               OrgRepository orgRepository, ManifestValidator manifestValidator, ManifestParser manifestParser,
-                              BuildSummaries buildSummaries, RunReportRepository runReportRepository) {
+                              BuildSummaries buildSummaries, RunReportRepository runReportRepository,
+                              ManifestPatchService manifestPatchService) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.orgRepository = orgRepository;
@@ -43,6 +49,7 @@ public class CatalogController {
         this.manifestParser = manifestParser;
         this.buildSummaries = buildSummaries;
         this.runReportRepository = runReportRepository;
+        this.manifestPatchService = manifestPatchService;
     }
 
     @PostMapping
@@ -121,6 +128,24 @@ public class CatalogController {
             }
         });
         return new ReadinessResponse(blockers.isEmpty(), blockers);
+    }
+
+    @PostMapping("/{agentId}/versions/{versionId}/manifest/patches")
+    @PreAuthorize("hasRole('DEVELOPER')")
+    public ManifestPatchResponse patchManifest(@PathVariable UUID agentId, @PathVariable UUID versionId,
+                                               @Valid @RequestBody ManifestPatchRequest request) {
+        AgentVersion version = ownedVersion(agentId, versionId);
+        if (version.getStatus() != VersionStatus.DRAFT) {
+            throw new ManifestApiException(HttpStatus.CONFLICT, "VERSION_NOT_EDITABLE",
+                    "Only a DRAFT version's manifest can be patched");
+        }
+        String liveManifest = agentVersionRepository.findFirstByAgentIdAndStatusOrderByApprovedAtDesc(agentId, VersionStatus.LIVE)
+                .map(AgentVersion::getManifestJson).orElse(null);
+        var result = manifestPatchService.apply(version.getManifestJson(), request, liveManifest);
+        version.setManifestJson(result.manifestJson());
+        version.setManifestRevision(version.getManifestRevision() + 1);
+        agentVersionRepository.save(version);
+        return new ManifestPatchResponse(version.getManifestRevision(), result.diff());
     }
 
     /** Shared by {@link #readiness} and (Task 6) the manifest-patches endpoint: 404 if the version isn't this
