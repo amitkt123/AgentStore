@@ -24,7 +24,8 @@ public class Run {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(optional = false)
+    /** Null for a sandbox run: it has no buyer, so no connection (see {@code initiatedByOrgId}). */
+    @ManyToOne
     @JoinColumn(name = "connection_id")
     private Connection connection;
 
@@ -77,6 +78,17 @@ public class Run {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "llm_mock_json", columnDefinition = "jsonb")
     private String llmMockJson;
+
+    /** The developer org that started a SANDBOX run; null for every other mode. */
+    private UUID initiatedByOrgId;
+
+    private UUID sandboxProfileId;
+
+    /** What a SANDBOX run's usage reports would have cost after the cap. No money moves. */
+    private BigDecimal simulatedCharged = BigDecimal.ZERO;
+
+    /** The un-clipped amount those usage reports asked for. */
+    private BigDecimal requestedCharge = BigDecimal.ZERO;
 
     public Run(UUID id, Connection connection, AgentVersion agentVersion, RunStatus status, BigDecimal costCap,
                BigDecimal totalCharged, String sandboxId, String callbackTokenHash) {
