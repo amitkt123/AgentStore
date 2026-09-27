@@ -1,6 +1,9 @@
 package com.agentstore.platform.catalog;
 
+import com.agentstore.platform.build.BuildStatus;
 import com.agentstore.platform.build.BuildSummaries;
+import com.agentstore.platform.execution.RunReportRepository;
+import com.agentstore.platform.execution.RunReportResult;
 import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.OrgRepository;
@@ -14,6 +17,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -26,16 +31,18 @@ public class CatalogController {
     private final ManifestValidator manifestValidator;
     private final ManifestParser manifestParser;
     private final BuildSummaries buildSummaries;
+    private final RunReportRepository runReportRepository;
 
     public CatalogController(AgentRepository agentRepository, AgentVersionRepository agentVersionRepository,
                               OrgRepository orgRepository, ManifestValidator manifestValidator, ManifestParser manifestParser,
-                              BuildSummaries buildSummaries) {
+                              BuildSummaries buildSummaries, RunReportRepository runReportRepository) {
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.orgRepository = orgRepository;
         this.manifestValidator = manifestValidator;
         this.manifestParser = manifestParser;
         this.buildSummaries = buildSummaries;
+        this.runReportRepository = runReportRepository;
     }
 
     @PostMapping
@@ -90,6 +97,44 @@ public class CatalogController {
         var manifest = manifestParser.parse(version.getManifestJson());
         var build = (isOwningDeveloper || isAdmin) ? buildSummaries.latest(version).orElse(null) : null;
         return AgentVersionDetailResponse.from(version, manifest, build);
+    }
+
+    @GetMapping("/{agentId}/versions/{versionId}/readiness")
+    @PreAuthorize("hasRole('DEVELOPER')")
+    public ReadinessResponse readiness(@PathVariable UUID agentId, @PathVariable UUID versionId) {
+        AgentVersion version = ownedVersion(agentId, versionId);
+        List<ReadinessResponse.Blocker> blockers = new ArrayList<>();
+        if (version.getBuildStatus() != BuildStatus.SUCCEEDED) {
+            blockers.add(new ReadinessResponse.Blocker("BUILD_NOT_READY",
+                    "This version has no successful build yet", null));
+        }
+        runReportRepository.findLatestForVersion(versionId).ifPresent(report -> {
+            UUID runId = report.getRunId();
+            if (report.getResult() == RunReportResult.ISSUES) {
+                for (int i = 0; i < report.getIssueCount(); i++) {
+                    blockers.add(new ReadinessResponse.Blocker("UNDECLARED_ACCESS",
+                            "The last sandbox run attempted access outside its declared manifest", runId));
+                }
+            } else if (report.getResult() == RunReportResult.OVER_COST_LIMIT) {
+                blockers.add(new ReadinessResponse.Blocker("COST_ENVELOPE_EXCEEDED",
+                        "The last sandbox run asked for more than its cost envelope allows", runId));
+            }
+        });
+        return new ReadinessResponse(blockers.isEmpty(), blockers);
+    }
+
+    /** Shared by {@link #readiness} and (Task 6) the manifest-patches endpoint: 404 if the version isn't this
+     * agent's, 403 if the agent isn't the caller's (spec §6's rule, applied identically to readiness). */
+    private AgentVersion ownedVersion(UUID agentId, UUID versionId) {
+        AgentVersion version = agentVersionRepository.findById(versionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found"));
+        if (!version.getAgent().getId().equals(agentId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Version not found for this agent");
+        }
+        if (!version.getAgent().getDeveloperOrg().getId().equals(currentOrgId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Agent not owned by caller's org");
+        }
+        return version;
     }
 
     private UUID currentOrgId() {
