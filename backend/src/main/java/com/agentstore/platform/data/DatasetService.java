@@ -122,6 +122,11 @@ public class DatasetService {
                 dataset.setRecordsSizeBytes(recordsSize);
                 dataset.setRowCount(normalized == null ? null : normalized.rowCount());
                 dataset.setColumns(normalized == null ? List.of() : normalized.columns());
+                if (purpose == DatasetPurpose.FIXTURE && normalized != null) {
+                    try (var rows = Jsonl.readRows(Files.newInputStream(records))) {
+                        dataset.setPiiScan(PiiScanner.scan(rows));
+                    }
+                }
                 long incoming = size + recordsSize;
                 return tx.execute(status -> {
                     // Locked first, whichever quota applies, so two uploads from the same org cannot both slip under it.

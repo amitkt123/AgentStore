@@ -1,7 +1,9 @@
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main } from "../src/cli.js";
 import { validateCommand } from "../src/commands/validate.js";
-import { makeContext, writeFiles } from "./helpers.js";
+import { AGENT_ID, makeContext, startServer, writeFiles } from "./helpers.js";
 
 describe("main", () => {
   it("prints usage and exits 2 when no command is given", async () => {
@@ -82,5 +84,33 @@ describe("push command", () => {
     const ctx = makeContext();
     expect(await main(["push"], ctx)).toBe(2);
     expect(ctx.errLines.join("\n")).toContain("agentstore init");
+  });
+});
+
+describe("fixtures command", () => {
+  it("dispatches fixtures push and fixtures list", async () => {
+    const server = await startServer([
+      { method: "POST", path: "/api/v1/developer/fixtures", reply: { json: { id: "f1", displayName: "x.csv", format: "CSV", rowCount: 1, piiScan: null } } },
+      { method: "GET", path: "/api/v1/developer/fixtures", reply: { json: [] } },
+    ]);
+    const ctx = makeContext({ env: { AGENTSTORE_API_KEY: "ask_live_test", AGENTSTORE_API_URL: server.url } });
+    writeFiles(ctx.cwd, { "agentstore.yaml": `agentId: ${AGENT_ID}\n` });
+    const filePath = join(ctx.cwd, "x.csv");
+    writeFileSync(filePath, "a\n1\n");
+
+    expect(await main(["fixtures", "push", filePath], ctx)).toBe(0);
+    expect(await main(["fixtures", "list"], ctx)).toBe(0);
+  });
+});
+
+describe("profile command", () => {
+  it("dispatches profile list and profile pull", async () => {
+    const base = `/api/v1/agents/${AGENT_ID}/sandbox-profiles`;
+    const server = await startServer([{ method: "GET", path: base, reply: { json: [] } }]);
+    const ctx = makeContext({ env: { AGENTSTORE_API_KEY: "ask_live_test", AGENTSTORE_API_URL: server.url } });
+    writeFiles(ctx.cwd, { "agentstore.yaml": `agentId: ${AGENT_ID}\n` });
+
+    expect(await main(["profile", "list"], ctx)).toBe(0);
+    expect(await main(["profile", "pull"], ctx)).toBe(0);
   });
 });

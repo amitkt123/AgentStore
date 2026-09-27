@@ -68,17 +68,28 @@ public class SandboxBindingService {
             binding.setBoundAt(Instant.now());
         }
         bindings.saveAndFlush(binding);
+        clearAttestation(profile);
         return new BindingService.BindingResponse(binding.getResourceName(), dataset.getId(), dataset.getDisplayName(),
                 dataset.getFormat(), dataset.getRowCount(), binding.getBoundAt());
     }
 
     @Transactional
     public void unbind(UUID orgId, UUID profileId, String resource) {
-        ownedProfile(orgId, profileId);
+        SandboxProfile profile = ownedProfile(orgId, profileId);
         DatasetBinding binding = bindings.findByOwnerTypeAndOwnerIdAndResourceName(BindingOwnerType.SANDBOX_PROFILE,
                 profileId, resource).orElseThrow(() -> new DataApiException(HttpStatus.NOT_FOUND, "NOT_FOUND",
                 "Nothing is bound to '" + resource + "'"));
         bindings.delete(binding);
+        clearAttestation(profile);
+    }
+
+    private void clearAttestation(SandboxProfile profile) {
+        if (profile.isTrialEnabled() || profile.getNoRealDataAttestedBy() != null) {
+            profile.setTrialEnabled(false);
+            profile.setNoRealDataAttestedBy(null);
+            profile.setNoRealDataAttestedAt(null);
+            profiles.save(profile);
+        }
     }
 
     @Transactional(readOnly = true)

@@ -35,6 +35,17 @@ public class SandboxApiException extends RuntimeException {
         return new SandboxApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", message);
     }
 
+    public static SandboxApiException attestationRequired() {
+        return new SandboxApiException(HttpStatus.BAD_REQUEST, "ATTESTATION_REQUIRED",
+                "Setting trialEnabled requires attest: true in the same request");
+    }
+
+    public static SandboxApiException piiFound(java.util.List<String> resources) {
+        return new SandboxApiException(HttpStatus.CONFLICT, "PII_FOUND",
+                "One or more files bound to this profile may contain real customer data",
+                java.util.Map.of("resources", resources));
+    }
+
     public HttpStatus status() {
         return status;
     }

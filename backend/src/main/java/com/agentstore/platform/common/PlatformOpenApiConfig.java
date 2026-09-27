@@ -67,7 +67,7 @@ class PlatformOpenApiConfig {
         SpringDocConfigProperties platformProperties = new SpringDocConfigProperties();
         platformProperties.setApiDocs(sharedProperties.getApiDocs());
         platformProperties.setPathsToMatch(List.of("/api/v1/runs/*/flow", "/api/v1/agents/*/versions/*/readiness",
-                "/api/v1/agents/*/versions/*/manifest/patches"));
+                "/api/v1/agents/*/versions/*/manifest/patches", "/api/v1/agents/*/sandbox-profiles/sync"));
         // A fixed relative server, matching RuntimeOpenApiConfig's runtimeOpenApi(): otherwise the URL is derived
         // from the request that happens to build the document, and the committed contract flaps with the port.
         OpenAPI skeleton = new OpenAPI().servers(List.of(new Server().url("/")));

@@ -41,12 +41,13 @@ class PlatformContractTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void theContractDescribesExactlyTheThreeNewEndpoints() throws Exception {
+    void theContractDescribesExactlyTheFourPlatformEndpoints() throws Exception {
         JsonNode generated = new ObjectMapper().readTree(
                 rest.getForObject("http://localhost:" + port + "/v3/api-docs/platform", String.class));
 
         assertThat(generated.get("paths").fieldNames()).toIterable().containsExactlyInAnyOrder(
                 "/api/v1/runs/{runId}/flow", "/api/v1/agents/{agentId}/versions/{versionId}/readiness",
-                "/api/v1/agents/{agentId}/versions/{versionId}/manifest/patches");
+                "/api/v1/agents/{agentId}/versions/{versionId}/manifest/patches",
+                "/api/v1/agents/{agentId}/sandbox-profiles/sync");
     }
 }

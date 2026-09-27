@@ -2,6 +2,7 @@ import { ApiClient } from "../api.js";
 import { requireCredentials } from "../config.js";
 import type { Context } from "../context.js";
 import { CliError } from "../errors.js";
+import { readProfileFiles } from "../profiles.js";
 import { readProject } from "../project.js";
 import { validateProject } from "../validate.js";
 
@@ -31,6 +32,12 @@ interface BuildResponse {
   logUrl: string | null;
 }
 
+interface SyncResult {
+  name: string;
+  action: string;
+  unresolvedFixtures: string[];
+}
+
 export async function push(ctx: Context, opts: PushOptions): Promise<number> {
   const project = readProject(ctx.cwd);
   const credentials = requireCredentials(ctx);
@@ -51,10 +58,32 @@ export async function push(ctx: Context, opts: PushOptions): Promise<number> {
   const finalized = await api.post<FinalizeResponse>(`${base}/bundles/${upload.bundleId}/finalize`, { sha256: bundle.sha256 });
   ctx.out(`Pushed version ${finalized.versionNumber} (build ${finalized.buildId}, ${finalized.buildStatus}).`);
 
+  // The version is already pushed at this point; a sync problem (a bad request, an unreachable server, a
+  // malformed fixtures/profiles/*.yaml file) is reported as a warning, never as a reason to fail the push.
+  try {
+    await syncProfiles(ctx, api, base);
+  } catch (e) {
+    ctx.err(`Profile sync failed: ${(e as Error).message}`);
+  }
+
   if (!opts.wait) {
     return 0;
   }
   return await waitForBuild(ctx, api, `${base}/builds/${finalized.buildId}`, opts.timeoutSeconds);
+}
+
+async function syncProfiles(ctx: Context, api: ApiClient, base: string): Promise<void> {
+  const entries = readProfileFiles(ctx.cwd);
+  if (entries.length === 0) {
+    return;
+  }
+  const results = await api.post<SyncResult[]>(`${base}/sandbox-profiles/sync`, entries);
+  for (const result of results) {
+    ctx.out(`Profile "${result.name}": ${result.action}`);
+    for (const fixture of result.unresolvedFixtures) {
+      ctx.err(`  Warning: fixture "${fixture}" not found for profile "${result.name}"; that binding was skipped.`);
+    }
+  }
 }
 
 /**

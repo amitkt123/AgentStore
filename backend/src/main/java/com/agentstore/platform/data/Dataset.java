@@ -52,6 +52,11 @@ public class Dataset {
     @Column(name = "columns", columnDefinition = "jsonb")
     private String columnsJson = "[]";
 
+    /** {status: 'CLEAN'|'FOUND', findingCount, findings: [...]}, null until scanned (never scanned for non-FIXTURE purposes or PDF). */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "pii_scan", columnDefinition = "jsonb")
+    private String piiScanJson;
+
     private Instant createdAt;
     private Instant deletedAt;
     private Instant purgeAfter;
@@ -76,5 +81,30 @@ public class Dataset {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    public PiiScanner.Result piiScan() {
+        if (piiScanJson == null) {
+            return null;
+        }
+        try {
+            return Jsonl.MAPPER.readValue(piiScanJson, PiiScanner.Result.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public void setPiiScan(PiiScanner.Result result) {
+        try {
+            this.piiScanJson = result == null ? null : Jsonl.MAPPER.writeValueAsString(result);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** False for a clean-looking dataset that was simply never scanned (a PDF, or a purpose other than FIXTURE). */
+    public boolean piiClean() {
+        PiiScanner.Result result = piiScan();
+        return result != null && PiiScanner.Result.CLEAN.equals(result.status());
     }
 }

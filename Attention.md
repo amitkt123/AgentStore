@@ -123,8 +123,8 @@ by `contracts/runtime-v1.yaml` as the API contract of record.
   play, and anything explicitly out of scope right now. Delete stale entries —
   this block should always reflect "right now," not history.
 -->
-- Current workstream: (fill in, e.g. "WS6b — sandbox replay follow-ups")
-- Active files/packages: (fill in)
-- Out of scope for now: (fill in)
+- Current workstream: WS6c — PII scan, trial profiles, REPO sync, CLI profile/fixture commands (merged)
+- Active files/packages: backend `data`/`sandbox` packages (PiiScanner, ProfileStatusService, SandboxProfileSyncService), `cli/src/commands/fixtures.ts`, `cli/src/commands/profile.ts`, `cli/src/profiles.ts`
+- Out of scope for now: Portal UI (FE-3), a CLI verb to flip trialEnabled directly, WS7 developer-verification gating, WS8 eval runs
 </active_context>
 ```

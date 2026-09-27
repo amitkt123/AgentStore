@@ -3,6 +3,7 @@ package com.agentstore.platform.sandbox;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface SandboxProfileRepository extends JpaRepository<SandboxProfile, UUID> {
@@ -10,4 +11,6 @@ public interface SandboxProfileRepository extends JpaRepository<SandboxProfile, 
     List<SandboxProfile> findByAgentIdAndInlineFalseOrderByNameAsc(UUID agentId);
 
     boolean existsByAgentIdAndName(UUID agentId, String name);
+
+    Optional<SandboxProfile> findByAgentIdAndName(UUID agentId, String name);
 }

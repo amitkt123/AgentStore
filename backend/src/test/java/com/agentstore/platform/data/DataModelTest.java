@@ -75,4 +75,15 @@ class DataModelTest extends AbstractIntegrationTest {
         assertThat(bindingRepository.existsByDatasetId(a.getId())).isTrue();
         assertThat(bindingRepository.findByDatasetIdIn(List.of(a.getId(), b.getId()))).hasSize(1);
     }
+
+    @Test
+    void piiScanJsonRoundTripsAndDefaultsToNull() {
+        Org org = orgRepository.save(new Org(null, "Acme " + UUID.randomUUID(), OrgType.BUYER));
+        Dataset saved = dataset(org.getId());
+        assertThat(saved.getPiiScanJson()).isNull();
+
+        saved.setPiiScanJson("{\"status\":\"CLEAN\",\"findingCount\":0,\"findings\":[]}");
+        Dataset reloaded = datasetRepository.saveAndFlush(saved);
+        assertThat(reloaded.getPiiScanJson()).contains("CLEAN");
+    }
 }

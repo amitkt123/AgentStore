@@ -152,6 +152,10 @@ public class SandboxFixtures {
         jdbc.update("UPDATE org SET developer_verified_at = now() WHERE id = ?", org.getId());
     }
 
+    public AgentVersionRepository versions() {
+        return versions;
+    }
+
     public static String readManifest(String name) {
         try {
             return Files.readString(Path.of("src/test/resources/manifest/" + name));

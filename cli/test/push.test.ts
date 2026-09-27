@@ -24,6 +24,7 @@ interface Options {
   finalize?: Reply;
   apiUrlSuffix?: string;
   files?: Record<string, string>;
+  sync?: Reply;
 }
 
 async function harness(options: Options = {}) {
@@ -36,6 +37,7 @@ async function harness(options: Options = {}) {
     { method: "POST", path: `${BASE}/bundles/uploads`, reply: () => ({ status: 201, json: { bundleId: BUNDLE_ID, uploadUrl: `${base}/upload/${BUNDLE_ID}?${SECRET}`, expiresAt: "2030-01-01T00:00:00Z" } }) },
     { method: "PUT", path: /^\/upload\//, reply: () => ({ status: options.putStatus ?? 200 }) },
     { method: "POST", path: `${BASE}/bundles/${BUNDLE_ID}/finalize`, reply: options.finalize ?? { json: { bundleId: BUNDLE_ID, versionId: "v1", versionNumber: "1.0.0", buildId: BUILD_ID, buildStatus: "QUEUED" } } },
+    { method: "POST", path: `${BASE}/sandbox-profiles/sync`, reply: options.sync ?? { json: [] } },
     { method: "GET", path: `${BASE}/builds/${BUILD_ID}`, reply: (): Reply => {
       const step = builds[Math.min(buildCall++, builds.length - 1)];
       return { json: { id: BUILD_ID, status: step.status, failureCode: step.failureCode ?? null, failureReason: step.failureReason ?? null, logUrl: step.logUrl ? `${base}/log?${SECRET}` : null } };
@@ -202,5 +204,64 @@ describe("push", () => {
     expect(error.message).toContain("Could not reach http://127.0.0.1:1");
     expect(error.message).not.toContain("\n");
     expect(error.exitCode).toBe(2);
+  });
+
+  it("syncs fixtures/profiles/*.yaml after a successful finalize", async () => {
+    const { server, ctx } = await harness({
+      files: { "fixtures/profiles/happy-path.yaml": "name: happy-path\nbindings: []\n" },
+      sync: { json: [{ name: "happy-path", action: "created", unresolvedFixtures: [] }] },
+    });
+
+    expect(await push(ctx, { wait: false, timeoutSeconds: 900 })).toBe(0);
+
+    const syncRequest = server.requests.find((r) => r.path === `${BASE}/sandbox-profiles/sync`);
+    expect(syncRequest).toBeDefined();
+    const body = JSON.parse(syncRequest!.body.toString());
+    expect(body).toHaveLength(1);
+    expect(body[0].name).toBe("happy-path");
+    expect(typeof body[0].contentHash).toBe("string");
+    expect(ctx.outLines.join("\n")).toContain('Profile "happy-path": created');
+  });
+
+  it("prints a warning for each unresolved fixture without failing the push", async () => {
+    const { ctx } = await harness({
+      files: { "fixtures/profiles/p.yaml": "name: p\nbindings:\n  - resource: invoices\n    fixture: missing.csv\n" },
+      sync: { json: [{ name: "p", action: "created", unresolvedFixtures: ["missing.csv"] }] },
+    });
+
+    expect(await push(ctx, { wait: false, timeoutSeconds: 900 })).toBe(0);
+
+    expect(ctx.errLines.join("\n")).toContain("missing.csv");
+  });
+
+  it("does not call sync when there is no fixtures/profiles directory", async () => {
+    const { server, ctx } = await harness();
+
+    await push(ctx, { wait: false, timeoutSeconds: 900 });
+
+    expect(server.requests.some((r) => r.path === `${BASE}/sandbox-profiles/sync`)).toBe(false);
+  });
+
+  it("still reports success when the sync call itself fails, since the version was already pushed", async () => {
+    const { ctx } = await harness({
+      files: { "fixtures/profiles/p.yaml": "name: p\nbindings: []\n" },
+      sync: { status: 500, text: "boom" },
+    });
+
+    expect(await push(ctx, { wait: false, timeoutSeconds: 900 })).toBe(0);
+
+    expect(ctx.outLines.join("\n")).toContain("Pushed version");
+    expect(ctx.errLines.join("\n")).toContain("Profile sync failed");
+  });
+
+  it("still reports success when a fixtures/profiles/*.yaml file fails to parse", async () => {
+    const { ctx } = await harness({
+      files: { "fixtures/profiles/p.yaml": "name: [this is not valid yaml\n" },
+    });
+
+    expect(await push(ctx, { wait: false, timeoutSeconds: 900 })).toBe(0);
+
+    expect(ctx.outLines.join("\n")).toContain("Pushed version");
+    expect(ctx.errLines.join("\n")).toContain("Profile sync failed");
   });
 });

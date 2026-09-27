@@ -14,9 +14,11 @@ import java.util.UUID;
 public class SandboxProfileController {
 
     private final SandboxProfileService service;
+    private final SandboxProfileSyncService syncService;
 
-    public SandboxProfileController(SandboxProfileService service) {
+    public SandboxProfileController(SandboxProfileService service, SandboxProfileSyncService syncService) {
         this.service = service;
+        this.syncService = syncService;
     }
 
     @PostMapping
@@ -37,7 +39,14 @@ public class SandboxProfileController {
 
     @PutMapping("/{profileId}")
     public ProfileView update(@PathVariable UUID agentId, @PathVariable UUID profileId, @RequestBody ProfileInput body) {
-        return service.view(service.update(Caller.current().orgId(), agentId, profileId, body));
+        var caller = Caller.current();
+        return service.view(service.update(caller.orgId(), caller.userId(), agentId, profileId, body));
+    }
+
+    @PostMapping("/sync")
+    public List<SandboxProfileSyncResult> sync(@PathVariable UUID agentId,
+                                                @RequestBody List<SandboxProfileSyncRequest> body) {
+        return syncService.sync(Caller.current().orgId(), agentId, body);
     }
 
     @DeleteMapping("/{profileId}")
