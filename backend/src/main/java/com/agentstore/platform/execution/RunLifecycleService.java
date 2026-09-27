@@ -269,11 +269,16 @@ public class RunLifecycleService {
         var manifest = manifestParser.parse(run.getAgentVersion().getManifestJson());
         BigDecimal unitCost = manifest.costEnvelope().unitPrice();
         BigDecimal requested = quantity.multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal remaining = run.getCostCap().subtract(run.getTotalCharged()).max(BigDecimal.ZERO);
+        boolean sandbox = run.getConnection() == null;   // no buyer: nothing is ledgered, only simulated
+        BigDecimal spent = sandbox ? run.getSimulatedCharged() : run.getTotalCharged();
+        BigDecimal remaining = run.getCostCap().subtract(spent).max(BigDecimal.ZERO);
         BigDecimal charged = requested.min(remaining);
 
         step(run, stepKind, source, detail);
-        if (charged.signum() > 0) {
+        if (sandbox) {
+            run.setSimulatedCharged(run.getSimulatedCharged().add(charged));
+            run.setRequestedCharge(run.getRequestedCharge().add(requested));
+        } else if (charged.signum() > 0) {
             UUID buyerOrgId = run.getConnection().getBuyerOrg().getId();
             UsageEvent usageEvent = usageEventRepository.save(new UsageEvent(null, run.getId(), buyerOrgId,
                     quantity, unitCost, charged));
@@ -293,8 +298,8 @@ public class RunLifecycleService {
         } else {
             runRepository.save(run);
         }
-        return new UsageOutcome(charged, run.getTotalCharged(),
-                run.getCostCap().subtract(run.getTotalCharged()).max(BigDecimal.ZERO), capReached);
+        BigDecimal total = sandbox ? run.getSimulatedCharged() : run.getTotalCharged();
+        return new UsageOutcome(charged, total, run.getCostCap().subtract(total).max(BigDecimal.ZERO), capReached);
     }
 
     private BigDecimal parseQuantity(Object raw) {
@@ -310,7 +315,7 @@ public class RunLifecycleService {
     }
 
     private void finish(Run run, RunStatus status) {
-        if (run.getReservedAmount().signum() > 0) {
+        if (run.getConnection() != null && run.getReservedAmount().signum() > 0) {
             walletReservationService.release(run.getConnection().getBuyerOrg().getId(), run.getReservedAmount());
             run.setReservedAmount(BigDecimal.ZERO);
         }

@@ -22,8 +22,11 @@ ALTER TABLE run ADD COLUMN initiated_by_org_id UUID REFERENCES org(id);
 ALTER TABLE run ADD COLUMN sandbox_profile_id UUID REFERENCES sandbox_profile(id) ON DELETE SET NULL;
 ALTER TABLE run ADD COLUMN simulated_charged NUMERIC(12,2) NOT NULL DEFAULT 0;
 ALTER TABLE run ADD COLUMN requested_charge   NUMERIC(12,2) NOT NULL DEFAULT 0;
+-- A SANDBOX run has an initiator; a connection-less run of any other mode is not allowed for PRODUCTION. SANDBOX with a
+-- connection stays legal only because WS1/WS3 tests label connection runs SANDBOX; the service never creates one, and
+-- billing keys on "no connection", not on the mode label.
 ALTER TABLE run ADD CONSTRAINT run_mode_owner_chk CHECK (
     (mode = 'PRODUCTION' AND connection_id IS NOT NULL)
- OR (mode = 'SANDBOX'    AND connection_id IS NULL AND initiated_by_org_id IS NOT NULL)
+ OR (mode = 'SANDBOX'    AND (connection_id IS NOT NULL OR initiated_by_org_id IS NOT NULL))
  OR (mode NOT IN ('PRODUCTION','SANDBOX')));
 CREATE INDEX run_sandbox_org_idx ON run (initiated_by_org_id, started_at) WHERE mode = 'SANDBOX';

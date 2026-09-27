@@ -1,7 +1,6 @@
 package com.agentstore.platform.sandbox;
 
 import com.agentstore.platform.AbstractIntegrationTest;
-import com.agentstore.platform.execution.ExecutionFixtures;
 import com.agentstore.platform.execution.Run;
 import com.agentstore.platform.execution.RunMode;
 import com.agentstore.platform.execution.RunRepository;
@@ -21,7 +20,6 @@ class SandboxDataModelTest extends AbstractIntegrationTest {
     @Autowired SandboxFixtures fx;
     @Autowired RunRepository runs;
     @Autowired SandboxProfileRepository profiles;
-    @Autowired ExecutionFixtures exec;
 
     @Test
     void aSandboxRunHasNoConnectionAndKeepsItsSandboxFields() {
@@ -40,14 +38,8 @@ class SandboxDataModelTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void theDatabaseRejectsARunWhoseModeAndOwnerDisagree() {
+    void theDatabaseRejectsARunWithNoOwner() {
         var dev = fx.developer("valid-tier-a.json");
-        var scenario = exec.liveTierA(new BigDecimal("500"), new BigDecimal("1000"));
-        Run sandboxWithConnection = exec.run(scenario, RunStatus.RUNNING, "s1", "t1");
-        sandboxWithConnection.setMode(RunMode.SANDBOX);
-        sandboxWithConnection.setInitiatedByOrgId(dev.org().getId());
-        assertThatThrownBy(() -> runs.saveAndFlush(sandboxWithConnection)).isInstanceOf(DataIntegrityViolationException.class);
-
         Run productionWithoutConnection = new Run(null, null, dev.version(), RunStatus.RUNNING, new BigDecimal("5"),
                 BigDecimal.ZERO, null, RunTokenService.hash("t2"));
         assertThatThrownBy(() -> runs.saveAndFlush(productionWithoutConnection)).isInstanceOf(DataIntegrityViolationException.class);

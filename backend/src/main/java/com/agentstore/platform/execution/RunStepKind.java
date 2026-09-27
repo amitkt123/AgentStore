@@ -7,10 +7,11 @@ package com.agentstore.platform.execution;
  */
 public enum RunStepKind {
     READ, WRITE, GATE, COST, COMPLETE, FAILED, TIMEOUT, COST_CAP_REACHED,
-    DATA_READ, DATA_WRITE, WRITE_STAGED, GATE_REQUESTED, GATE_DECIDED, LLM_CALL, USAGE, SCOPE_VIOLATION, AGENT_LOG;
+    DATA_READ, DATA_WRITE, WRITE_STAGED, GATE_REQUESTED, GATE_DECIDED, LLM_CALL, USAGE, SCOPE_VIOLATION, AGENT_LOG,
+    CANCELLED;
 
     /** Who normally records this kind; callers that know better pass the source explicitly. */
     public RunStepSource defaultSource() {
-        return this == TIMEOUT || this == COST_CAP_REACHED ? RunStepSource.PLATFORM : RunStepSource.AGENT;
+        return this == TIMEOUT || this == COST_CAP_REACHED || this == CANCELLED ? RunStepSource.PLATFORM : RunStepSource.AGENT;
     }
 }
