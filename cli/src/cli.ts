@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import { fixturesList, fixturesPush } from "./commands/fixtures.js";
 import { init } from "./commands/init.js";
 import { login } from "./commands/login.js";
 import { DEFAULT_TIMEOUT_SECONDS, push } from "./commands/push.js";
@@ -18,6 +19,9 @@ Commands:
   sandbox run [--version V] [--profile NAME] [--follow]
                                         Run a built version in the sandbox (no buyer, no money)
   sandbox logs RUN_ID                   Show what a sandbox run did
+  fixtures push FILE [--display-name N] [--source-label L]
+                                        Upload a local fixture file
+  fixtures list                        List the org's fixtures with PII scan status
 `;
 
 type Values = Record<string, string | boolean | undefined>;
@@ -93,6 +97,36 @@ export async function main(argv: string[], ctx: Context): Promise<number> {
             return 2;
           default:
             ctx.err(`Unknown sandbox command "${sub}"\n\n${USAGE}`);
+            return 2;
+        }
+      }
+      case "fixtures": {
+        const [sub, ...rest] = args;
+        switch (sub) {
+          case "push": {
+            const { values, positionals } = parseArgs({
+              args: rest,
+              options: { "display-name": { type: "string" }, "source-label": { type: "string" } },
+              strict: true,
+              allowPositionals: true,
+            });
+            if (positionals.length !== 1) {
+              throw new CliError(`Usage: agentstore fixtures push FILE [--display-name N] [--source-label L]\n\n${USAGE}`);
+            }
+            return await fixturesPush(ctx, {
+              file: positionals[0],
+              displayName: str(values as Values, "display-name"),
+              sourceLabel: str(values as Values, "source-label"),
+            });
+          }
+          case "list":
+            parse(rest, {});
+            return await fixturesList(ctx);
+          case undefined:
+            ctx.err(`Usage: agentstore fixtures <push|list> [options]\n\n${USAGE}`);
+            return 2;
+          default:
+            ctx.err(`Unknown fixtures command "${sub}"\n\n${USAGE}`);
             return 2;
         }
       }
