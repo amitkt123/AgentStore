@@ -84,6 +84,18 @@ class SandboxFixtureApiTest extends AbstractStorageIntegrationTest {
     }
 
     @Test
+    void theResponseIncludesThePiiScanResult() {
+        var dev = fx.developer("valid-tier-a.json");
+        String withEmail = "name,email\nA,person@example.com\n";
+
+        var response = upload(dev.org(), "leak.csv", withEmail.getBytes(), "leak");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> piiScan = (Map<String, Object>) response.getBody().get("piiScan");
+        assertThat(piiScan.get("status")).isEqualTo("FOUND");
+    }
+
+    @Test
     void anUnsupportedFormatIs415AndStoresNothing() {
         var dev = fx.developer("valid-tier-a.json");
         long before = datasets.count();

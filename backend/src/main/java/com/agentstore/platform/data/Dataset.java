@@ -82,4 +82,29 @@ public class Dataset {
             throw new IllegalStateException(e);
         }
     }
+
+    public PiiScanner.Result piiScan() {
+        if (piiScanJson == null) {
+            return null;
+        }
+        try {
+            return Jsonl.MAPPER.readValue(piiScanJson, PiiScanner.Result.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public void setPiiScan(PiiScanner.Result result) {
+        try {
+            this.piiScanJson = result == null ? null : Jsonl.MAPPER.writeValueAsString(result);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** False for a clean-looking dataset that was simply never scanned (a PDF, or a purpose other than FIXTURE). */
+    public boolean piiClean() {
+        PiiScanner.Result result = piiScan();
+        return result != null && PiiScanner.Result.CLEAN.equals(result.status());
+    }
 }
