@@ -22,6 +22,13 @@ public record RunPrincipal(UUID runId, UUID orgId, RunMode mode, Manifest manife
      */
     public static RunPrincipal forRun(Run run, ManifestParser parser) {
         Manifest manifest = parser.parse(run.getAgentVersion().getManifestJson());
+        if (run.getConnection() == null) {
+            // A sandbox run has no buyer to grant scopes: the developer gets everything the manifest declares, so an
+            // undeclared call is the only violation.
+            Set<String> all = manifest.scopes().stream().map(s -> scopeKey(s.type(), s.resource()))
+                    .collect(Collectors.toSet());
+            return new RunPrincipal(run.getId(), run.getInitiatedByOrgId(), run.getMode(), manifest, all);
+        }
         Set<String> buyerGranted = new HashSet<>(run.getConnection().getGrantedScopes());
         Set<String> granted = manifest.scopes().stream()
                 .filter(s -> buyerGranted.contains(s.resource()))

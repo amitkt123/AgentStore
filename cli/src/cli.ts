@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 import { init } from "./commands/init.js";
 import { login } from "./commands/login.js";
 import { DEFAULT_TIMEOUT_SECONDS, push } from "./commands/push.js";
+import { sandboxLogs, sandboxRun } from "./commands/sandbox.js";
 import { validateCommand } from "./commands/validate.js";
 import type { Context } from "./context.js";
 import { CliError } from "./errors.js";
@@ -14,6 +15,9 @@ Commands:
                                         Create an agent and scaffold a project in an empty directory
   validate                              Check the project the way the backend will
   push [--wait] [--timeout SECONDS]     Upload the project and start a build
+  sandbox run [--version V] [--profile NAME] [--follow]
+                                        Run a built version in the sandbox (no buyer, no money)
+  sandbox logs RUN_ID                   Show what a sandbox run did
 `;
 
 type Values = Record<string, string | boolean | undefined>;
@@ -66,6 +70,31 @@ export async function main(argv: string[], ctx: Context): Promise<number> {
           throw new CliError(`--timeout must be a whole number of seconds, got "${raw}".\n\n${USAGE}`);
         }
         return await push(ctx, { wait: flag(values, "wait"), timeoutSeconds });
+      }
+      case "sandbox": {
+        const [sub, ...rest] = args;
+        switch (sub) {
+          case "run": {
+            const values = parse(rest, {
+              version: { type: "string" }, profile: { type: "string" }, follow: { type: "boolean" },
+            });
+            return await sandboxRun(ctx, { version: str(values, "version"), profile: str(values, "profile"), follow: flag(values, "follow") });
+          }
+          case "logs": {
+            const { values, positionals } = parseArgs({ args: rest, options: {}, strict: true, allowPositionals: true });
+            void values;
+            if (positionals.length !== 1) {
+              throw new CliError(`Usage: agentstore sandbox logs RUN_ID\n\n${USAGE}`);
+            }
+            return await sandboxLogs(ctx, positionals[0]);
+          }
+          case undefined:
+            ctx.err(`Usage: agentstore sandbox <run|logs> [options]\n\n${USAGE}`);
+            return 2;
+          default:
+            ctx.err(`Unknown sandbox command "${sub}"\n\n${USAGE}`);
+            return 2;
+        }
       }
       case "help":
       case "--help":

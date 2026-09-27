@@ -27,7 +27,7 @@ import java.util.UUID;
 public class RunController {
 
     /** Matches the sandbox runner's default max-lifetime (PT10M), so a run hits its own TIMED_OUT first. */
-    static final int SANDBOX_TIMEOUT_SECONDS = 600;
+    public static final int SANDBOX_TIMEOUT_SECONDS = 600;
     static final int SANDBOX_CPU = 1;
     static final int SANDBOX_MEMORY_MB = 1024;
 
@@ -60,7 +60,7 @@ public class RunController {
     }
 
     /** How long a run may wait for its agent to be rebuilt before the reaper times it out. */
-    static final Duration PENDING_BUILD_TIMEOUT = Duration.ofMinutes(25);
+    public static final Duration PENDING_BUILD_TIMEOUT = Duration.ofMinutes(25);
 
     @PostMapping
     @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
@@ -156,6 +156,9 @@ public class RunController {
     private void requireOwnedByCaller(UUID runId) {
         Run run = runRepository.findById(runId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found"));
+        if (run.getConnection() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found");   // a sandbox run is not a buyer's
+        }
         var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (!run.getConnection().getBuyerOrg().getId().equals(claims.orgId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Run not owned by caller's org");

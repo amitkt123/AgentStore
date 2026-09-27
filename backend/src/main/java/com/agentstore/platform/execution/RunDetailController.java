@@ -28,6 +28,9 @@ public class RunDetailController {
         Run run = runRepository.findById(runId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found"));
 
+        if (run.getConnection() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found");   // a sandbox run is not a buyer's
+        }
         var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         boolean owns = run.getConnection().getBuyerOrg().getId().equals(claims.orgId());
         if (!owns && claims.role() != UserRole.ADMIN) {

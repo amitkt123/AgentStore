@@ -2,6 +2,7 @@ package com.agentstore.platform.data;
 
 import com.agentstore.platform.execution.Run;
 import com.agentstore.platform.execution.RunRepository;
+import com.agentstore.platform.identity.UserRole;
 import com.agentstore.platform.storage.ObjectStorage;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,7 +22,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/runs/{runId}/outputs")
-@PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+@PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER','DEVELOPER')")
 public class OutputsController {
 
     static final int MAX_PREVIEW = 50;
@@ -113,7 +114,14 @@ public class OutputsController {
     private void requireOwnRun(UUID runId) {
         Run run = runs.findById(runId)
                 .orElseThrow(() -> new DataApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Run not found"));
-        if (!run.getConnection().getBuyerOrg().getId().equals(Caller.current().orgId())) {
+        var caller = Caller.current();
+        if (run.getConnection() == null) {   // a sandbox run: only the developer org that started it
+            if (caller.role() != UserRole.DEVELOPER || !caller.orgId().equals(run.getInitiatedByOrgId())) {
+                throw new DataApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Run not found");
+            }
+            return;
+        }
+        if (caller.role() == UserRole.DEVELOPER || !run.getConnection().getBuyerOrg().getId().equals(caller.orgId())) {
             throw new DataApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Run not owned by caller's org");
         }
     }

@@ -64,8 +64,15 @@ public class DatasetService {
      * Streams the upload to a temp file (hashing as it goes), normalizes it, writes the blobs, then registers the row
      * under the org's row lock so two uploads cannot both slip under the quota. Blobs are removed if registering fails.
      */
+    /** {@code purpose} defaults to BUYER_DATA under the workspace storage limit; a sandbox fixture passes FIXTURE and its own quota check. */
     public Dataset upload(UUID orgId, UUID userId, String filename, InputStream content, String displayName,
                           String sourceLabel) {
+        return upload(orgId, userId, filename, content, displayName, sourceLabel, DatasetPurpose.BUYER_DATA, null);
+    }
+
+    /** {@code quota}, when given, replaces the workspace storage-limit check (the sandbox fixture quota). */
+    public Dataset upload(UUID orgId, UUID userId, String filename, InputStream content, String displayName,
+                          String sourceLabel, DatasetPurpose purpose, UploadQuota quota) {
         if (displayName == null || displayName.isBlank()) {
             throw new DataApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "displayName must not be blank");
         }
@@ -103,7 +110,7 @@ public class DatasetService {
             try {
                 Dataset dataset = new Dataset();
                 dataset.setOwnerOrgId(orgId);
-                dataset.setPurpose(DatasetPurpose.BUYER_DATA);
+                dataset.setPurpose(purpose);
                 dataset.setDisplayName(displayName.strip());
                 dataset.setSourceLabel(sourceLabel == null || sourceLabel.isBlank() ? null : sourceLabel.strip());
                 dataset.setUploadedByUserId(userId);
@@ -117,8 +124,11 @@ public class DatasetService {
                 dataset.setColumns(normalized == null ? List.of() : normalized.columns());
                 long incoming = size + recordsSize;
                 return tx.execute(status -> {
+                    // Locked first, whichever quota applies, so two uploads from the same org cannot both slip under it.
                     Org org = orgs.findByIdForUpdate(orgId).orElseThrow();
-                    if (datasets.usedBytes(orgId) + incoming > org.getStorageLimitBytes()) {
+                    if (quota != null) {
+                        quota.check(orgId, incoming);
+                    } else if (datasets.usedBytes(orgId) + incoming > org.getStorageLimitBytes()) {
                         throw new DataApiException(HttpStatus.PAYLOAD_TOO_LARGE, "QUOTA_EXCEEDED",
                                 "This upload would take the workspace over its storage limit");
                     }
@@ -139,8 +149,16 @@ public class DatasetService {
     }
 
     public List<DatasetResponse> list(UUID orgId, boolean withUsage) {
-        List<Dataset> rows = datasets.findByOwnerOrgIdAndPurposeAndDeletedAtIsNullOrderByCreatedAtDesc(orgId,
-                DatasetPurpose.BUYER_DATA);
+        return list(orgId, DatasetPurpose.BUYER_DATA, withUsage);
+    }
+
+    /** A developer's uploaded fixtures: same ingestion path, purpose FIXTURE, never usage-annotated. */
+    public List<DatasetResponse> listFixtures(UUID orgId) {
+        return list(orgId, DatasetPurpose.FIXTURE, false);
+    }
+
+    private List<DatasetResponse> list(UUID orgId, DatasetPurpose purpose, boolean withUsage) {
+        List<Dataset> rows = datasets.findByOwnerOrgIdAndPurposeAndDeletedAtIsNullOrderByCreatedAtDesc(orgId, purpose);
         Map<UUID, List<DatasetResponse.Usage>> usage = withUsage ? usageByDataset(rows) : Map.of();
         Map<UUID, String> uploaders = new HashMap<>();
         return rows.stream().map(d -> DatasetResponse.from(d,
@@ -168,8 +186,19 @@ public class DatasetService {
      */
     @Transactional
     public void delete(UUID orgId, UUID datasetId) {
+        delete(orgId, datasetId, d -> true);
+    }
+
+    /** As {@link #delete(UUID, UUID)}, but only for a fixture (the developer-fixtures endpoint's own dataset). */
+    @Transactional
+    public void deleteFixture(UUID orgId, UUID datasetId) {
+        delete(orgId, datasetId, d -> d.getPurpose() == DatasetPurpose.FIXTURE);
+    }
+
+    private void delete(UUID orgId, UUID datasetId, java.util.function.Predicate<Dataset> purposeCheck) {
         Dataset dataset = datasets.findByIdForUpdate(datasetId)
-                .filter(d -> d.getOwnerOrgId().equals(orgId) && d.getDeletedAt() == null && d.getPurgedAt() == null)
+                .filter(d -> d.getOwnerOrgId().equals(orgId) && d.getDeletedAt() == null && d.getPurgedAt() == null
+                        && purposeCheck.test(d))
                 .orElseThrow(() -> new DataApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Dataset not found"));
         if (pins.pinnedByOpenRun(datasetId)) {
             throw new DataApiException(HttpStatus.CONFLICT, "DATASET_IN_USE",
@@ -179,6 +208,11 @@ public class DatasetService {
         Instant now = Instant.now();
         dataset.setDeletedAt(now);
         dataset.setPurgeAfter(now);
+    }
+
+    /** Lets a caller (the sandbox fixture quota) replace the workspace storage-limit check. */
+    public interface UploadQuota {
+        void check(UUID orgId, long incomingBytes);
     }
 
     public StorageResponse storage(UUID orgId) {

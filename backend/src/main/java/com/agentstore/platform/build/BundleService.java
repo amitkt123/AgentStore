@@ -6,6 +6,7 @@ import com.agentstore.platform.manifest.BundleManifestRules;
 import com.agentstore.platform.manifest.Manifest;
 import com.agentstore.platform.manifest.ManifestParser;
 import com.agentstore.platform.manifest.ManifestValidator;
+import com.agentstore.platform.sandbox.SandboxQuotaService;
 import com.agentstore.platform.storage.ObjectStorage;
 import com.agentstore.platform.storage.StorageException;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,12 +45,13 @@ public class BundleService {
     private final ManifestParser parser;
     private final TransactionTemplate tx;
     private final String backend;
+    private final SandboxQuotaService quota;
 
     public BundleService(AgentRepository agentRepository, AgentBundleRepository bundleRepository,
                          AgentVersionRepository versionRepository, TemplateBuildRepository buildRepository,
                          ObjectStorage storage, BundleInspector inspector, ManifestValidator validator,
                          ManifestParser parser, PlatformTransactionManager transactionManager,
-                         @Value("${agentstore.runner.backend:e2b}") String backend) {
+                         @Value("${agentstore.runner.backend:e2b}") String backend, SandboxQuotaService quota) {
         this.agentRepository = agentRepository;
         this.bundleRepository = bundleRepository;
         this.versionRepository = versionRepository;
@@ -60,6 +62,7 @@ public class BundleService {
         this.parser = parser;
         this.tx = new TransactionTemplate(transactionManager);
         this.backend = backend;
+        this.quota = quota;
     }
 
     public BundleUploadResponse createUpload(UUID agentId, String sha256, long sizeBytes, JwtService.Claims caller) {
@@ -145,6 +148,7 @@ public class BundleService {
         if (bundle.getStatus() == BundleStatus.UPLOADED) {
             return existingResult(bundle);   // a concurrent finalize won the race
         }
+        quota.checkBuild(bundle.getAgent().getDeveloperOrg().getId());
         if (bundle.getStatus() != BundleStatus.UPLOADING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This bundle was rejected; upload a new one");
         }

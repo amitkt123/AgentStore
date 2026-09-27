@@ -8,6 +8,8 @@ import com.agentstore.platform.manifest.LlmMode;
 import com.agentstore.platform.manifest.LlmVendor;
 import com.agentstore.platform.manifest.Manifest;
 import com.agentstore.platform.manifest.ManifestParser;
+import com.agentstore.platform.sandbox.FakeSecrets;
+import com.agentstore.platform.sandbox.SandboxProfileRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,8 @@ public class RunLauncher {
     private final RunTokenService runTokenService;
     private final RunLifecycleService runLifecycleService;
     private final ByokKeyService byokKeys;
+    private final FakeSecrets fakeSecrets;
+    private final SandboxProfileRepository sandboxProfiles;
     private final String callbackBaseUrl;
     /** For versions without a manifest runtime (hand-supplied images). */
     private final String fallbackCommand;
@@ -43,6 +47,7 @@ public class RunLauncher {
     public RunLauncher(RunRepository runRepository, SecretRepository secretRepository, SecretService secretService,
                        ManifestParser manifestParser, SandboxProvider sandboxProvider, RunTokenService runTokenService,
                        RunLifecycleService runLifecycleService, ByokKeyService byokKeys,
+                       FakeSecrets fakeSecrets, SandboxProfileRepository sandboxProfiles,
                        @Value("${agentstore.callback.base-url}") String callbackBaseUrl,
                        @Value("${agentstore.runs.agent-command:/workspace/app/agentstore-entrypoint}") String fallbackCommand,
                        @Value("${agentstore.runtime.legacy-callback.enabled:true}") boolean legacyCallback) {
@@ -54,6 +59,8 @@ public class RunLauncher {
         this.runTokenService = runTokenService;
         this.runLifecycleService = runLifecycleService;
         this.byokKeys = byokKeys;
+        this.fakeSecrets = fakeSecrets;
+        this.sandboxProfiles = sandboxProfiles;
         this.callbackBaseUrl = callbackBaseUrl;
         this.fallbackCommand = fallbackCommand;
         this.legacyCallback = legacyCallback;
@@ -87,15 +94,25 @@ public class RunLauncher {
                 envVars.put("AGENT_CALLBACK_URL", callbackBaseUrl + "/internal/agent-callback/runs/" + runId);
                 envVars.put("AGENT_CALLBACK_TOKEN", rawToken);
             }
-            for (Secret secret : secretRepository.findByConnectionId(connection.getId())) {
-                envVars.put("AGENT_SECRET_" + secret.getName(), secretService.reveal(connection.getId(), secret.getName()));
+            Map<String, String> fake = Map.of();
+            if (connection != null) {
+                for (Secret secret : secretRepository.findByConnectionId(connection.getId())) {
+                    envVars.put("AGENT_SECRET_" + secret.getName(), secretService.reveal(connection.getId(), secret.getName()));
+                }
+            } else if (run.getSandboxProfileId() != null) {
+                // A sandbox run has no buyer secrets: it gets the profile's fake ones.
+                fake = sandboxProfiles.findById(run.getSandboxProfileId()).map(fakeSecrets::reveal).orElse(Map.of());
+                fake.forEach((name, value) -> envVars.put("AGENT_SECRET_" + name, value));
             }
             // After the buyer's secrets, so a connection secret of the same name can never replace the developer's key.
+            // A sandbox profile may deliberately supply its own value for that name, and then no real key is needed.
             if (manifest.llm() != null && manifest.llm().mode() == LlmMode.BYOK_DIRECT) {
                 LlmVendor vendor = manifest.llm().provider();
-                UUID developerOrgId = version.getAgent().getDeveloperOrg().getId();
-                envVars.put("AGENT_SECRET_" + vendor.name() + "_API_KEY", byokKeys.reveal(developerOrgId, vendor)
-                        .orElseThrow(() -> new LlmKeyMissingException(vendor)));
+                if (connection != null || !fake.containsKey(vendor.name() + "_API_KEY")) {
+                    UUID developerOrgId = version.getAgent().getDeveloperOrg().getId();
+                    envVars.put("AGENT_SECRET_" + vendor.name() + "_API_KEY", byokKeys.reveal(developerOrgId, vendor)
+                            .orElseThrow(() -> new LlmKeyMissingException(vendor)));
+                }
             }
 
             allowOut = new ArrayList<>();

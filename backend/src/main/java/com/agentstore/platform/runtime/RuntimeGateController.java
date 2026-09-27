@@ -2,7 +2,9 @@ package com.agentstore.platform.runtime;
 
 import com.agentstore.platform.execution.GateRequest;
 import com.agentstore.platform.execution.GateService;
+import com.agentstore.platform.execution.RunMode;
 import com.agentstore.platform.manifest.ApprovalGateDecl;
+import com.agentstore.platform.sandbox.SandboxGatePolicy;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
@@ -22,11 +24,14 @@ public class RuntimeGateController {
     private final ScopeGuard scopeGuard;
     private final GateService gateService;
     private final ObjectMapper objectMapper;
+    private final SandboxGatePolicy sandboxGatePolicy;
 
-    public RuntimeGateController(ScopeGuard scopeGuard, GateService gateService, ObjectMapper objectMapper) {
+    public RuntimeGateController(ScopeGuard scopeGuard, GateService gateService, ObjectMapper objectMapper,
+                                 SandboxGatePolicy sandboxGatePolicy) {
         this.scopeGuard = scopeGuard;
         this.gateService = gateService;
         this.objectMapper = objectMapper;
+        this.sandboxGatePolicy = sandboxGatePolicy;
     }
 
     @PostMapping
@@ -38,6 +43,9 @@ public class RuntimeGateController {
         GateRequest gate = gateService.open(principal.runId(), declared.trigger(), declared.timeoutMinutes(),
                 request.summary(), objectMapper.writeValueAsString(request.payload()),
                 objectMapper.writeValueAsString(affects));
+        if (principal.mode() == RunMode.SANDBOX) {
+            gate = sandboxGatePolicy.apply(principal.runId(), gate);
+        }
         return new GateCreatedResponse(gate.getId(), gate.getStatus(), gate.getExpiresAt());
     }
 
