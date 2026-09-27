@@ -47,15 +47,32 @@ public class BindingResolver {
     @Transactional(readOnly = true)
     public List<ResolvedPin> resolve(Connection connection, Manifest manifest, RunMode mode) {
         Set<String> granted = new HashSet<>(connection.getGrantedScopes());
-        Map<String, DatasetBinding> bound = new HashMap<>();
-        for (DatasetBinding binding : bindings.findByOwnerTypeAndOwnerId(BindingOwnerType.CONNECTION, connection.getId())) {
-            bound.put(binding.getResourceName(), binding);
-        }
         Set<String> resources = new LinkedHashSet<>();
         for (Scope scope : manifest.scopes()) {
             if (scope.type() == ScopeType.READ && granted.contains(scope.resource())) {
                 resources.add(scope.resource());
             }
+        }
+        return resolveResources(BindingOwnerType.CONNECTION, connection.getId(), resources, manifest, mode);
+    }
+
+    /** As {@link #resolve}, but for a sandbox profile: every declared READ resource, not just granted ones. */
+    @Transactional(readOnly = true)
+    public List<ResolvedPin> resolveForProfile(UUID profileId, Manifest manifest, RunMode mode) {
+        Set<String> resources = new LinkedHashSet<>();
+        for (Scope scope : manifest.scopes()) {
+            if (scope.type() == ScopeType.READ) {
+                resources.add(scope.resource());
+            }
+        }
+        return resolveResources(BindingOwnerType.SANDBOX_PROFILE, profileId, resources, manifest, mode);
+    }
+
+    private List<ResolvedPin> resolveResources(BindingOwnerType ownerType, UUID ownerId, Set<String> resources,
+                                               Manifest manifest, RunMode mode) {
+        Map<String, DatasetBinding> bound = new HashMap<>();
+        for (DatasetBinding binding : bindings.findByOwnerTypeAndOwnerId(ownerType, ownerId)) {
+            bound.put(binding.getResourceName(), binding);
         }
         List<ResolvedPin> resolved = new ArrayList<>();
         List<String> missing = new ArrayList<>();

@@ -19,6 +19,8 @@ public interface AgentVersionRepository extends JpaRepository<AgentVersion, UUID
 
     Optional<AgentVersion> findByBundleId(UUID bundleId);
 
+    Optional<AgentVersion> findFirstByAgentIdOrderByCreatedAtDesc(UUID agentId);
+
     /** Scalar on purpose: lets a caller lock the agent before it loads (and caches) the version. */
     @Query("select v.agent.id from AgentVersion v where v.id = :id")
     Optional<UUID> findAgentIdById(@Param("id") UUID id);

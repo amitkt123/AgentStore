@@ -15,7 +15,7 @@ public record DatasetResponse(UUID id, String displayName, String sourceLabel, D
     public record Usage(UUID connectionId, String resource, String agent, String version, String access) {
     }
 
-    static DatasetResponse from(Dataset d, String uploadedBy, List<Usage> usage) {
+    public static DatasetResponse from(Dataset d, String uploadedBy, List<Usage> usage) {
         return new DatasetResponse(d.getId(), d.getDisplayName(), d.getSourceLabel(), d.getFormat(), d.getRowCount(),
                 d.getSizeBytes(), d.columns(), d.getSha256(), uploadedBy, d.getCreatedAt(), usage);
     }
