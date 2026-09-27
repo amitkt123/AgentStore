@@ -101,7 +101,8 @@ public class RunFlowService {
         if (steps == null) {
             return FlowBlock.declared(block, terminal ? BlockState.SKIPPED : BlockState.IDLE, null, null);
         }
-        return FlowBlock.declared(block, BlockState.DONE, metrics(block, steps), null);
+        boolean violated = steps.stream().anyMatch(s -> s.getKind() == RunStepKind.SCOPE_VIOLATION);
+        return FlowBlock.declared(block, violated ? BlockState.FAILED : BlockState.DONE, metrics(block, steps), null);
     }
 
     private FlowBlock undeclaredBlock(String block, List<RunStep> steps) {

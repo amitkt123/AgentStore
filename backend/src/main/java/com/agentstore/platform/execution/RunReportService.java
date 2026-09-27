@@ -65,7 +65,6 @@ public class RunReportService {
         long violations = steps.stream().filter(s -> s.getKind() == RunStepKind.SCOPE_VIOLATION).count();
 
         RunReportResult result;
-        int issueCount = 0;
         if (timedOut) {
             result = RunReportResult.TIMED_OUT;
         } else if (overCost) {
@@ -74,10 +73,12 @@ public class RunReportService {
             result = RunReportResult.FAILED;
         } else if (violations > 0) {
             result = RunReportResult.ISSUES;
-            issueCount = (int) violations;
         } else {
             result = RunReportResult.CLEAN;
         }
+        // Recorded regardless of result: a run that also violated scopes before timing out, hitting its cost cap,
+        // or otherwise failing must not lose that count — readiness surfaces UNDECLARED_ACCESS from it either way.
+        int issueCount = (int) violations;
 
         Map<String, Object> report = new LinkedHashMap<>();
         report.put("result", result.name());

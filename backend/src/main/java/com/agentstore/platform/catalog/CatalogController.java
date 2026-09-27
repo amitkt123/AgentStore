@@ -117,12 +117,13 @@ public class CatalogController {
         }
         runReportRepository.findLatestForVersion(versionId).ifPresent(report -> {
             UUID runId = report.getRunId();
-            if (report.getResult() == RunReportResult.ISSUES) {
-                for (int i = 0; i < report.getIssueCount(); i++) {
-                    blockers.add(new ReadinessResponse.Blocker("UNDECLARED_ACCESS",
-                            "The last sandbox run attempted access outside its declared manifest", runId));
-                }
-            } else if (report.getResult() == RunReportResult.OVER_COST_LIMIT) {
+            // issueCount is checked directly, not gated on result == ISSUES: a run that had violations and then
+            // timed out or otherwise failed still carries that issue count and must still block readiness.
+            for (int i = 0; i < report.getIssueCount(); i++) {
+                blockers.add(new ReadinessResponse.Blocker("UNDECLARED_ACCESS",
+                        "The last sandbox run attempted access outside its declared manifest", runId));
+            }
+            if (report.getResult() == RunReportResult.OVER_COST_LIMIT) {
                 blockers.add(new ReadinessResponse.Blocker("COST_ENVELOPE_EXCEEDED",
                         "The last sandbox run asked for more than its cost envelope allows", runId));
             }
