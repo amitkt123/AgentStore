@@ -37,14 +37,16 @@ public class SandboxProfileService {
     private final FakeSecrets fakeSecrets;
     private final DatasetBindingRepository bindings;
     private final DatasetRepository datasets;
+    private final ReplaySource replaySource;
 
     public SandboxProfileService(SandboxProfileRepository profiles, AgentRepository agents, FakeSecrets fakeSecrets,
-                                 DatasetBindingRepository bindings, DatasetRepository datasets) {
+                                 DatasetBindingRepository bindings, DatasetRepository datasets, ReplaySource replaySource) {
         this.profiles = profiles;
         this.agents = agents;
         this.fakeSecrets = fakeSecrets;
         this.bindings = bindings;
         this.datasets = datasets;
+        this.replaySource = replaySource;
     }
 
     @Transactional
@@ -58,7 +60,7 @@ public class SandboxProfileService {
             throw nameTaken();
         }
         SandboxProfile profile = new SandboxProfile(agent.getId(), name);
-        apply(profile, in, true);
+        apply(orgId, agent.getId(), profile, in, true);
         return save(profile);
     }
 
@@ -68,7 +70,7 @@ public class SandboxProfileService {
         Agent agent = ownedAgent(orgId, agentId);
         SandboxProfile profile = new SandboxProfile(agent.getId(), "inline-" + UUID.randomUUID().toString().substring(0, 8));
         profile.setInline(true);
-        apply(profile, in, true);
+        apply(orgId, agent.getId(), profile, in, true);
         return save(profile);
     }
 
@@ -84,7 +86,7 @@ public class SandboxProfileService {
             throw nameTaken();
         }
         profile.setName(name);
-        apply(profile, in, in.fakeSecrets() != null);
+        apply(orgId, agentId, profile, in, in.fakeSecrets() != null);
         return save(profile);
     }
 
@@ -130,7 +132,7 @@ public class SandboxProfileService {
                 .orElseThrow(() -> SandboxApiException.notFound("Profile"));
     }
 
-    private void apply(SandboxProfile profile, ProfileInput in, boolean replaceSecrets) {
+    private void apply(UUID orgId, UUID agentId, SandboxProfile profile, ProfileInput in, boolean replaceSecrets) {
         JsonNode input = in.input();
         if (input != null && !input.isNull()) {
             if (!input.isObject()) {
@@ -142,8 +144,13 @@ public class SandboxProfileService {
         }
         profile.setInputJson(input == null || input.isNull() ? "{}" : input.toString());
         profile.setGatePolicy((in.gatePolicy() == null ? GatePolicy.manual() : in.gatePolicy()).toJson());
-        if (in.llmMode() == RunLlmMode.REPLAY && in.replayRunId() == null) {
-            throw SandboxApiException.invalid("llmMode REPLAY needs a replayRunId");
+        if (in.llmMode() == RunLlmMode.REPLAY) {
+            if (in.replayRunId() == null) {
+                throw SandboxApiException.invalid("llmMode REPLAY needs a replayRunId");
+            }
+            // Validated at save time, not only when a run starts: a saved profile's replayRunId is otherwise a live
+            // oracle for "does this run id exist, and whose is it" (spec's WS3-deferred ownership check, spec §3.1 step 5).
+            replaySource.check(orgId, agentId, in.replayRunId());
         }
         profile.setLlmMode(in.llmMode());
         profile.setReplayRunId(in.llmMode() == RunLlmMode.REPLAY ? in.replayRunId() : null);
@@ -183,7 +190,14 @@ public class SandboxProfileService {
         try {
             return profiles.saveAndFlush(profile);
         } catch (DataIntegrityViolationException e) {
-            throw nameTaken();
+            // Only the (agent_id, name) uniqueness collapses to this reading; anything else (e.g. a stale FK on
+            // replay_run_id slipping past the check above) is a genuine bug and should surface as a 500, not a
+            // misleading "name taken".
+            String message = String.valueOf(e.getMostSpecificCause() == null ? e.getMessage() : e.getMostSpecificCause().getMessage());
+            if (message.contains("agent_id_name")) {
+                throw nameTaken();
+            }
+            throw e;
         }
     }
 

@@ -79,6 +79,49 @@ class SandboxProfileApiTest extends AbstractStorageIntegrationTest {
     }
 
     @Test
+    void aReplaySourceThatDoesNotExistIs403NotAMisleadingNameConflict() {
+        var dev = fx.developer("valid-tier-a.json");
+        Map<String, Object> withRandomSource = body("r1");
+        withRandomSource.put("llmMode", "REPLAY");
+        withRandomSource.put("replayRunId", UUID.randomUUID());
+
+        var response = call(HttpMethod.POST, base(dev), withRandomSource, dev.org(), UserRole.DEVELOPER);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody().get("code")).isEqualTo("REPLAY_SOURCE_INVALID");
+        assertThat(profiles.findByAgentIdAndInlineFalseOrderByNameAsc(dev.agent().getId())).isEmpty();
+    }
+
+    @Test
+    void aReplaySourceOwnedByAnotherOrgIs403() {
+        var dev = fx.developer("valid-tier-a.json");
+        var other = fx.developer("valid-tier-a.json");
+        var foreignRun = fx.sandboxRun(other, fx.profile(other, "p"), com.agentstore.platform.execution.RunStatus.RUNNING);
+        Map<String, Object> withForeignSource = body("r2");
+        withForeignSource.put("llmMode", "REPLAY");
+        withForeignSource.put("replayRunId", foreignRun.getId());
+
+        var response = call(HttpMethod.POST, base(dev), withForeignSource, dev.org(), UserRole.DEVELOPER);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody().get("code")).isEqualTo("REPLAY_SOURCE_INVALID");
+    }
+
+    @Test
+    void aReplaySourceOfTheSameOrgWithNoRecordingIs422() {
+        var dev = fx.developer("valid-tier-a.json");
+        var ownRun = fx.sandboxRun(dev, fx.profile(dev, "source"), com.agentstore.platform.execution.RunStatus.RUNNING);
+        Map<String, Object> withBareSource = body("r3");
+        withBareSource.put("llmMode", "REPLAY");
+        withBareSource.put("replayRunId", ownRun.getId());
+
+        var response = call(HttpMethod.POST, base(dev), withBareSource, dev.org(), UserRole.DEVELOPER);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(response.getBody().get("code")).isEqualTo("REPLAY_SOURCE_INVALID");
+    }
+
+    @Test
     void invalidProfilesAre400() {
         var dev = fx.developer("valid-tier-a.json");
         Map<String, Object> replayWithoutSource = body("r");

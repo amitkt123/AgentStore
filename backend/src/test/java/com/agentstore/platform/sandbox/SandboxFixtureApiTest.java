@@ -108,6 +108,41 @@ class SandboxFixtureApiTest extends AbstractStorageIntegrationTest {
     }
 
     @Test
+    void concurrentUploadsOnlyOneFitsUnderALimitThatFitsExactlyOne() throws Exception {
+        var dev = fx.developer("valid-tier-a.json");
+        // A PDF (unlike CSV/JSON) is never normalized into a records copy, so its stored size is exactly its byte
+        // length: pad to 375 bytes, comfortably under the class-level 600-byte limit alone, over it for any two.
+        byte[] file = ("%PDF-1.4\n" + "x".repeat(366)).getBytes();
+        int attempts = 4;
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(attempts);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var succeeded = new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            var tasks = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+            for (int i = 0; i < attempts; i++) {
+                int idx = i;
+                tasks.add(pool.submit(() -> {
+                    try {
+                        start.await();
+                        if (upload(dev.org(), "race" + idx + ".pdf", file, "race" + idx).getStatusCode() == HttpStatus.OK) {
+                            succeeded.incrementAndGet();
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }));
+            }
+            start.countDown();
+            for (var task : tasks) {
+                task.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdown();
+        }
+        assertThat(succeeded.get()).as("only one fixture fits under the limit; the org row lock must serialize the rest").isEqualTo(1);
+    }
+
+    @Test
     void listingIsPerDeveloperOrgAndBuyersAreForbidden() {
         var dev = fx.developer("valid-tier-a.json");
         var other = fx.developer("valid-tier-a.json");

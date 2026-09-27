@@ -2,6 +2,8 @@ package com.agentstore.platform.sandbox;
 
 import com.agentstore.platform.AbstractIntegrationTest;
 import com.agentstore.platform.execution.Run;
+import com.agentstore.platform.execution.RunLifecycleService;
+import com.agentstore.platform.execution.RunRepository;
 import com.agentstore.platform.execution.RunStatus;
 import com.agentstore.platform.identity.OrgRepository;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,8 @@ class SandboxQuotaServiceTest extends AbstractIntegrationTest {
     @Autowired SandboxQuotaProperties props;
     @Autowired JdbcTemplate jdbc;
     @Autowired OrgRepository orgs;
+    @Autowired RunLifecycleService lifecycle;
+    @Autowired RunRepository runs;
 
     void setRunSeconds(Run run, Instant startedAt, Instant completedAt) {
         jdbc.update("UPDATE run SET started_at = ?, completed_at = ? WHERE id = ?",
@@ -107,6 +111,23 @@ class SandboxQuotaServiceTest extends AbstractIntegrationTest {
         setRunSeconds(pendingBuild, monthStart.plusSeconds(1), monthStart.plusSeconds(1 + props.verified().runSeconds() * 2));
 
         quota.checkStart(dev.org().getId());   // does not throw: PENDING_BUILD seconds are excluded from the sum
+    }
+
+    @Test
+    void aRunsBuildWaitDoesNotCountOnceItIsPromotedAndLaterFinishes() {
+        var dev = fx.developer("valid-tier-a.json");
+        Run pendingBuild = fx.sandboxRun(dev, fx.profile(dev, "waited"), RunStatus.PENDING_BUILD);
+        Instant longAgo = Instant.now().minusSeconds(props.unverified().runSeconds() * 2);
+        setRunSeconds(pendingBuild, longAgo, null);   // the run waited for a rebuild for a very long time
+
+        lifecycle.promotePendingBuild(pendingBuild.getId(), Instant.now().plusSeconds(600));
+
+        Run promoted = runs.findById(pendingBuild.getId()).orElseThrow();
+        assertThat(promoted.getStartedAt()).as("the wait must not be backdated into the run's billed time")
+                .isAfter(Instant.now().minusSeconds(30));
+        // finish the run now, as if it ran briefly after promotion, and confirm the old wait was never counted
+        jdbc.update("UPDATE run SET status = 'COMPLETED', completed_at = now() WHERE id = ?", pendingBuild.getId());
+        quota.checkStart(dev.org().getId());   // does not throw: run-seconds stayed near zero, not ~2x the monthly limit
     }
 
     @Test

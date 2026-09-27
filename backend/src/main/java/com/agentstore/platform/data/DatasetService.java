@@ -124,14 +124,13 @@ public class DatasetService {
                 dataset.setColumns(normalized == null ? List.of() : normalized.columns());
                 long incoming = size + recordsSize;
                 return tx.execute(status -> {
+                    // Locked first, whichever quota applies, so two uploads from the same org cannot both slip under it.
+                    Org org = orgs.findByIdForUpdate(orgId).orElseThrow();
                     if (quota != null) {
                         quota.check(orgId, incoming);
-                    } else {
-                        Org org = orgs.findByIdForUpdate(orgId).orElseThrow();
-                        if (datasets.usedBytes(orgId) + incoming > org.getStorageLimitBytes()) {
-                            throw new DataApiException(HttpStatus.PAYLOAD_TOO_LARGE, "QUOTA_EXCEEDED",
-                                    "This upload would take the workspace over its storage limit");
-                        }
+                    } else if (datasets.usedBytes(orgId) + incoming > org.getStorageLimitBytes()) {
+                        throw new DataApiException(HttpStatus.PAYLOAD_TOO_LARGE, "QUOTA_EXCEEDED",
+                                "This upload would take the workspace over its storage limit");
                     }
                     return datasets.save(dataset);
                 });

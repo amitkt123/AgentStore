@@ -90,6 +90,9 @@ public class RunLifecycleService {
         }
         run.setStatus(RunStatus.PENDING);
         run.setDeadlineAt(deadline);
+        // The wait for a rebuild is not billed run time (a sandbox run's run-seconds quota excludes PENDING_BUILD only
+        // while it stays in that status; once promoted, its elapsed time would otherwise include the whole wait).
+        run.setStartedAt(Instant.now());
         runRepository.save(run);
         return true;
     }

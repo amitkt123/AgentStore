@@ -18,9 +18,6 @@ import com.agentstore.platform.execution.RunStatus;
 import com.agentstore.platform.execution.RunStepKind;
 import com.agentstore.platform.execution.RunTokenService;
 import com.agentstore.platform.identity.OrgRepository;
-import com.agentstore.platform.llm.LlmCallRepository;
-import com.agentstore.platform.llm.LlmCallStatus;
-import com.agentstore.platform.llm.LlmSource;
 import com.agentstore.platform.manifest.Manifest;
 import com.agentstore.platform.manifest.ManifestParser;
 import org.springframework.http.HttpStatus;
@@ -48,7 +45,7 @@ public class SandboxRunService {
     private final SandboxProfileService profileService;
     private final SandboxBindingService sandboxBindings;
     private final RunRepository runs;
-    private final LlmCallRepository llmCalls;
+    private final ReplaySource replaySource;
     private final OrgRepository orgs;
     private final SandboxQuotaService quota;
     private final BindingResolver resolver;
@@ -62,7 +59,7 @@ public class SandboxRunService {
 
     public SandboxRunService(AgentVersionRepository versions, SandboxProfileRepository profiles,
                              SandboxProfileService profileService, SandboxBindingService sandboxBindings,
-                             RunRepository runs, LlmCallRepository llmCalls, OrgRepository orgs,
+                             RunRepository runs, ReplaySource replaySource, OrgRepository orgs,
                              SandboxQuotaService quota, BindingResolver resolver, ManifestParser parser,
                              RebuildService rebuild, PendingBuildRuns pendingBuildRuns, RunLauncher launcher,
                              RunLifecycleService lifecycle, RunTokenService tokens,
@@ -72,7 +69,7 @@ public class SandboxRunService {
         this.profileService = profileService;
         this.sandboxBindings = sandboxBindings;
         this.runs = runs;
-        this.llmCalls = llmCalls;
+        this.replaySource = replaySource;
         this.orgs = orgs;
         this.quota = quota;
         this.resolver = resolver;
@@ -163,7 +160,7 @@ public class SandboxRunService {
         UUID replayId = override != null ? override.replayRunId() : profile.getReplayRunId();
         String mockJson = override != null ? override.mockJson() : profile.getLlmMockJson();
         if (llmMode == RunLlmMode.REPLAY) {
-            checkReplaySource(orgId, version.getAgent().getId(), replayId);
+            replaySource.check(orgId, version.getAgent().getId(), replayId);
         }
 
         Instant now = Instant.now();
@@ -181,22 +178,6 @@ public class SandboxRunService {
         pending.setDeadlineAt(waitForRebuild ? now.plus(RunController.PENDING_BUILD_TIMEOUT)
                 : now.plusSeconds(RunController.SANDBOX_TIMEOUT_SECONDS));
         return resolver.saveWithPins(pending, pins);
-    }
-
-    private void checkReplaySource(UUID orgId, UUID agentId, UUID replayId) {
-        Run source = replayId == null ? null : runs.findById(replayId).orElse(null);
-        boolean validOwner = source != null && source.getConnection() == null && source.getMode() == RunMode.SANDBOX
-                && orgId.equals(source.getInitiatedByOrgId()) && agentId.equals(source.getAgentVersion().getAgent().getId());
-        if (!validOwner) {
-            throw new SandboxApiException(HttpStatus.FORBIDDEN, "REPLAY_SOURCE_INVALID",
-                    "The replay source is not a sandbox run of this agent owned by your org");
-        }
-        boolean hasRecording = llmCalls.existsByRunIdAndStatusAndSourceNotAndRecordingExpiresAtIsNotNullAndRecordingPurgedAtIsNull(
-                replayId, LlmCallStatus.OK, LlmSource.MOCK);
-        if (!hasRecording) {
-            throw new SandboxApiException(HttpStatus.UNPROCESSABLE_ENTITY, "REPLAY_SOURCE_INVALID",
-                    "That run has no recorded calls to replay");
-        }
     }
 
     private AgentVersion ownedVersion(UUID orgId, UUID agentVersionId) {
