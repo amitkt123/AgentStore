@@ -44,4 +44,9 @@ public class DeveloperVerificationController {
     public DeveloperVerificationView uploadPanDocument(@RequestParam("file") MultipartFile file) throws IOException {
         return DeveloperVerificationView.from(service.uploadPanDocument(Caller.current().orgId(), file));
     }
+
+    @PostMapping("/submit")
+    public DeveloperVerificationView submit() {
+        return DeveloperVerificationView.from(service.submit(Caller.current().orgId()));
+    }
 }

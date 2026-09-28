@@ -262,4 +262,61 @@ class DeveloperVerificationApiTest extends AbstractStorageIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody().get("code")).isEqualTo("VERIFICATION_LOCKED");
     }
+
+    ResponseEntity<Map> submit(Org org) {
+        return rest.exchange(base() + "/submit", HttpMethod.POST, new HttpEntity<>(null, fx.bearer(org)), Map.class);
+    }
+
+    void completeAllSteps(Org dev) {
+        patch(dev, "ABOUT", Map.of("legalName", "Acme LLP", "displayName", "Acme", "country", "IN", "city", "Pune",
+                "entityType", "LLP"));
+        patch(dev, "TAX_IDS", Map.of("pan", "ABCDE1234F"));
+        patch(dev, "PHONE", Map.of("phone", "9876543210"));
+        patch(dev, "AGREEMENT", Map.of("agreementVersion", "2.1"));
+        uploadPanDocument(dev, "image/jpeg", "fake-jpeg-bytes".getBytes());
+    }
+
+    @Test
+    void submitWithMissingStepsIsIncompleteAndNamesWhatsMissing() {
+        var dev = fx.developer();
+        patch(dev, "ABOUT", Map.of("legalName", "Acme LLP", "displayName", "Acme", "country", "IN", "city", "Pune",
+                "entityType", "LLP"));
+
+        var response = submit(dev);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("VERIFICATION_INCOMPLETE");
+        @SuppressWarnings("unchecked")
+        var missing = (java.util.List<String>) response.getBody().get("missingSteps");
+        assertThat(missing).contains("TAX_IDS", "PHONE", "AGREEMENT", "PAN_DOCUMENT");
+    }
+
+    @Test
+    void submitSucceedsWhenEverythingIsPresentAndThenLocksFurtherEdits() {
+        var dev = fx.developer();
+        completeAllSteps(dev);
+
+        var response = submit(dev);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().get("status")).isEqualTo("PENDING");
+        assertThat(response.getBody().get("submittedAt")).isNotNull();
+
+        var lockedPatch = patch(dev, "ABOUT", Map.of("legalName", "Changed"));
+        assertThat(lockedPatch.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        var lockedUpload = uploadPanDocument(dev, "image/jpeg", "more-bytes".getBytes());
+        assertThat(lockedUpload.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void resubmissionFromFixRequestedIncrementsCountExactlyOncePerSubmit() {
+        var dev = fx.developer();
+        completeAllSteps(dev);
+        fx.setStatus(dev, "FIX_REQUESTED");
+
+        var response = submit(dev);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().get("resubmissionCount")).isEqualTo(1);
+    }
 }

@@ -8,7 +8,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -74,6 +77,28 @@ public class DeveloperVerificationService {
         String key = "developer-verification/" + orgId + "/pan-document";
         storage.put(key, file.getBytes());
         v.setPanDocumentKey(key);
+        return repo.save(v);
+    }
+
+    @Transactional
+    public DeveloperVerification submit(UUID orgId) {
+        DeveloperVerification v = getOrCreate(orgId);
+        requireEditable(v);
+        List<String> missing = new ArrayList<>();
+        if (!aboutComplete(v)) missing.add("ABOUT");
+        if (v.getPanEncrypted() == null) missing.add("TAX_IDS");
+        if (v.getPhoneEncrypted() == null) missing.add("PHONE");
+        if (v.getAgreementAcceptedAt() == null) missing.add("AGREEMENT");
+        if (v.getPanDocumentKey() == null) missing.add("PAN_DOCUMENT");
+        if (!missing.isEmpty()) {
+            throw VerificationApiException.incomplete(missing);
+        }
+        boolean wasFixRequested = v.getStatus() == VerificationStatus.FIX_REQUESTED;
+        v.setStatus(VerificationStatus.PENDING);
+        v.setSubmittedAt(Instant.now());
+        if (wasFixRequested) {
+            v.setResubmissionCount(v.getResubmissionCount() + 1);
+        }
         return repo.save(v);
     }
 
