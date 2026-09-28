@@ -13,10 +13,20 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,6 +36,7 @@ class DeveloperVerificationApiTest extends AbstractStorageIntegrationTest {
     @Autowired TestRestTemplate rest;
     @Autowired DeveloperVerificationFixtures fx;
     @Autowired DeveloperVerificationRepository repo;
+    @Autowired PlatformTransactionManager txManager;
 
     String base() {
         return "http://localhost:" + port + "/api/v1/developer/verification";
@@ -37,6 +48,10 @@ class DeveloperVerificationApiTest extends AbstractStorageIntegrationTest {
 
     ResponseEntity<Map> patch(Org org, String step, Map<String, String> fields) {
         return call(HttpMethod.PATCH, base(), Map.of("step", step, "fields", fields), org);
+    }
+
+    ResponseEntity<Map> rawPatch(Org org, Map<String, Object> body) {
+        return call(HttpMethod.PATCH, base(), body, org);
     }
 
     @Test
@@ -357,6 +372,184 @@ class DeveloperVerificationApiTest extends AbstractStorageIntegrationTest {
         for (var response : java.util.List.of(about, tax, phone, agreement, doc, submitted, fetched)) {
             assertThat(response.getBody().toString()).doesNotContain(rawPan).doesNotContain(rawGstin)
                     .doesNotContain(rawPhone);
+        }
+    }
+
+    @Test
+    void patchWithNoStepIsInvalidFieldNotA500() {
+        var dev = fx.developer();
+
+        var response = rawPatch(dev, Map.of("fields", Map.of("legalName", "Acme LLP")));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("INVALID_FIELD");
+    }
+
+    @Test
+    void patchWithNoFieldsIsInvalidFieldNotA500() {
+        var dev = fx.developer();
+
+        var response = rawPatch(dev, Map.of("step", "ABOUT"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("INVALID_FIELD");
+    }
+
+    @Test
+    void badStepTextIsACleanBadRequestWithACodeNotSpringsDefaultErrorBody() {
+        var dev = fx.developer();
+
+        var response = rawPatch(dev, Map.of("step", "BOGUS", "fields", Map.of()));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("INVALID_FIELD");
+    }
+
+    @Test
+    void lowerCaseEntityTypeIsInvalidFieldNotA500() {
+        var dev = fx.developer();
+
+        var response = patch(dev, "ABOUT", Map.of("entityType", "llp"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("INVALID_FIELD");
+    }
+
+    @Test
+    void overLengthLegalNameIsInvalidFieldNotADatabaseError() {
+        var dev = fx.developer();
+
+        var response = patch(dev, "ABOUT", Map.of("legalName", "A".repeat(256)));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("INVALID_FIELD");
+    }
+
+    @Test
+    void overLengthDisplayNameIsInvalidFieldNotADatabaseError() {
+        var dev = fx.developer();
+
+        var response = patch(dev, "ABOUT", Map.of("displayName", "A".repeat(256)));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("INVALID_FIELD");
+    }
+
+    @Test
+    void overLengthCityIsInvalidFieldNotADatabaseError() {
+        var dev = fx.developer();
+
+        var response = patch(dev, "ABOUT", Map.of("city", "A".repeat(101)));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("INVALID_FIELD");
+    }
+
+    @Test
+    void missingContentTypeOnTheUploadPartIsUnsupportedDocumentTypeNotA500() {
+        var dev = fx.developer();
+        var headers = fx.bearer(dev);
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        // No per-part Content-Type at all (some HTTP clients omit it) — MultipartFile#getContentType() is then null.
+        // An extensionless filename stops Spring's client-side multipart writer from guessing one from the name.
+        body.add("file", new ByteArrayResource("fake-jpeg-bytes".getBytes()) {
+            @Override
+            public String getFilename() {
+                return "pan";
+            }
+        });
+
+        var response = rest.exchange(base() + "/pan-document", HttpMethod.POST, new HttpEntity<>(body, headers),
+                Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(response.getBody().get("code")).isEqualTo("UNSUPPORTED_DOCUMENT_TYPE");
+    }
+
+    @Test
+    void patchingWhileFixRequestedNeverIncrementsResubmissionCountOnlySubmitDoes() {
+        var dev = fx.developer();
+        completeAllSteps(dev);
+        fx.setStatus(dev, "FIX_REQUESTED");
+
+        var afterPatch1 = patch(dev, "ABOUT", Map.of("city", "Mumbai"));
+        assertThat(afterPatch1.getBody().get("resubmissionCount")).isEqualTo(0);
+        var afterPatch2 = patch(dev, "PHONE", Map.of("phone", "9123456780"));
+        assertThat(afterPatch2.getBody().get("resubmissionCount")).isEqualTo(0);
+
+        var afterSubmit = submit(dev);
+        assertThat(afterSubmit.getBody().get("resubmissionCount")).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentFirstTouchesForTheSameOrgBothSucceedWithExactlyOneRowCreated() throws Exception {
+        var dev = fx.developer();
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ResponseEntity<Map>> first = pool.submit(() -> raceGet(dev, ready, go));
+            Future<ResponseEntity<Map>> second = pool.submit(() -> raceGet(dev, ready, go));
+            ready.await(5, TimeUnit.SECONDS);
+            go.countDown();
+
+            assertThat(first.get(10, TimeUnit.SECONDS).getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(second.get(10, TimeUnit.SECONDS).getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(repo.findByOrgId(dev.getId())).isPresent();
+        } finally {
+            pool.shutdown();
+        }
+    }
+
+    private ResponseEntity<Map> raceGet(Org dev, CountDownLatch ready, CountDownLatch go) throws InterruptedException {
+        ready.countDown();
+        go.await(5, TimeUnit.SECONDS);
+        return call(HttpMethod.GET, base(), null, dev);
+    }
+
+    @Test
+    void findByOrgIdForUpdateSerializesConcurrentWriters() throws Exception {
+        var dev = fx.developer();
+        call(HttpMethod.GET, base(), null, dev); // ensure the row exists before locking it
+
+        TransactionTemplate tx = new TransactionTemplate(txManager);
+        List<String> order = Collections.synchronizedList(new ArrayList<>());
+        CountDownLatch firstHasLock = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> first = pool.submit(() -> tx.executeWithoutResult(status -> {
+                repo.findByOrgIdForUpdate(dev.getId());
+                order.add("first-locked");
+                firstHasLock.countDown();
+                await(releaseFirst);
+            }));
+            firstHasLock.await(5, TimeUnit.SECONDS);
+
+            Future<?> second = pool.submit(() -> tx.executeWithoutResult(status -> {
+                repo.findByOrgIdForUpdate(dev.getId());
+                order.add("second-locked");
+            }));
+            // "second" must still be blocked on the row lock while "first" holds it.
+            Thread.sleep(300);
+            assertThat(order).containsExactly("first-locked");
+
+            releaseFirst.countDown();
+            first.get(5, TimeUnit.SECONDS);
+            second.get(5, TimeUnit.SECONDS);
+            assertThat(order).containsExactly("first-locked", "second-locked");
+        } finally {
+            pool.shutdown();
+        }
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
         }
     }
 }

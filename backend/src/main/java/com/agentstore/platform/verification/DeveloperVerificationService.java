@@ -28,25 +28,64 @@ public class DeveloperVerificationService {
     private static final Pattern PHONE_E164 = Pattern.compile("^\\+\\d{10,15}$");
     private static final Set<String> ALLOWED_DOCUMENT_TYPES = Set.of("image/jpeg", "image/png", "application/pdf");
     private static final long MAX_DOCUMENT_BYTES = 5L * 1024 * 1024;
+    private static final int MAX_LEGAL_NAME_LENGTH = 255;
+    private static final int MAX_DISPLAY_NAME_LENGTH = 255;
+    private static final int MAX_CITY_LENGTH = 100;
 
     private final DeveloperVerificationRepository repo;
     private final AesGcmCipher cipher;
     private final ObjectStorage storage;
+    private final DeveloperVerificationRowCreator rowCreator;
 
-    public DeveloperVerificationService(DeveloperVerificationRepository repo, AesGcmCipher cipher, ObjectStorage storage) {
+    public DeveloperVerificationService(DeveloperVerificationRepository repo, AesGcmCipher cipher,
+                                         ObjectStorage storage, DeveloperVerificationRowCreator rowCreator) {
         this.repo = repo;
         this.cipher = cipher;
         this.storage = storage;
+        this.rowCreator = rowCreator;
     }
 
     @Transactional
     public DeveloperVerification getOrCreate(UUID orgId) {
-        return repo.findByOrgId(orgId).orElseGet(() -> repo.save(new DeveloperVerification(orgId)));
+        ensureRowExists(orgId);
+        return repo.findByOrgId(orgId).orElseThrow();
+    }
+
+    /** Like {@link #getOrCreate}, but locks the row against concurrent writers for the rest of this transaction. */
+    private DeveloperVerification lockOrCreate(UUID orgId) {
+        ensureRowExists(orgId);
+        return repo.findByOrgIdForUpdate(orgId).orElseThrow();
+    }
+
+    /**
+     * Guarantees a row exists for {@code orgId} without letting a losing race poison this transaction. The
+     * creation attempt runs in its own transaction (see {@link DeveloperVerificationRowCreator}); if it fails
+     * because a concurrent first touch already created the row, this transaction — never having touched the
+     * failing statement itself — simply re-checks and finds it. A failure that persists is a genuine bug and
+     * is rethrown.
+     */
+    private void ensureRowExists(UUID orgId) {
+        if (repo.findByOrgId(orgId).isPresent()) {
+            return;
+        }
+        try {
+            rowCreator.createIfAbsent(orgId);
+        } catch (RuntimeException e) {
+            if (repo.findByOrgId(orgId).isEmpty()) {
+                throw e;
+            }
+        }
     }
 
     @Transactional
     public DeveloperVerification patchStep(UUID orgId, VerificationStep step, Map<String, String> fields) {
-        DeveloperVerification v = getOrCreate(orgId);
+        if (step == null) {
+            throw VerificationApiException.invalidField("step is required");
+        }
+        if (fields == null) {
+            throw VerificationApiException.invalidField("fields is required");
+        }
+        DeveloperVerification v = lockOrCreate(orgId);
         requireEditable(v);
         switch (step) {
             case ABOUT -> applyAbout(v, fields);
@@ -65,7 +104,7 @@ public class DeveloperVerificationService {
 
     @Transactional
     public DeveloperVerification uploadPanDocument(UUID orgId, MultipartFile file) throws IOException {
-        DeveloperVerification v = getOrCreate(orgId);
+        DeveloperVerification v = lockOrCreate(orgId);
         requireEditable(v);
         if (file.getSize() > MAX_DOCUMENT_BYTES) {
             throw VerificationApiException.documentTooLarge();
@@ -82,7 +121,7 @@ public class DeveloperVerificationService {
 
     @Transactional
     public DeveloperVerification submit(UUID orgId) {
-        DeveloperVerification v = getOrCreate(orgId);
+        DeveloperVerification v = lockOrCreate(orgId);
         requireEditable(v);
         List<String> missing = new ArrayList<>();
         if (!aboutComplete(v)) missing.add("ABOUT");
@@ -109,16 +148,20 @@ public class DeveloperVerificationService {
     }
 
     private void applyAbout(DeveloperVerification v, Map<String, String> fields) {
-        if (fields.containsKey("legalName")) v.setLegalName(nonBlank(fields.get("legalName"), "legalName"));
-        if (fields.containsKey("displayName")) v.setDisplayName(nonBlank(fields.get("displayName"), "displayName"));
+        if (fields.containsKey("legalName")) {
+            v.setLegalName(nonBlank(fields.get("legalName"), "legalName", MAX_LEGAL_NAME_LENGTH));
+        }
+        if (fields.containsKey("displayName")) {
+            v.setDisplayName(nonBlank(fields.get("displayName"), "displayName", MAX_DISPLAY_NAME_LENGTH));
+        }
         if (fields.containsKey("country")) {
-            String country = nonBlank(fields.get("country"), "country");
+            String country = nonBlank(fields.get("country"), "country", 2);
             if (country.length() != 2) {
                 throw VerificationApiException.invalidField("country must be a 2-letter code");
             }
             v.setCountry(country.toUpperCase(Locale.ROOT));
         }
-        if (fields.containsKey("city")) v.setCity(nonBlank(fields.get("city"), "city"));
+        if (fields.containsKey("city")) v.setCity(nonBlank(fields.get("city"), "city", MAX_CITY_LENGTH));
         if (fields.containsKey("entityType")) {
             try {
                 v.setEntityType(VerificationEntityType.valueOf(fields.get("entityType")));
@@ -182,9 +225,12 @@ public class DeveloperVerificationService {
         return value.length() < 8 ? "****" : value.substring(value.length() - 4);
     }
 
-    private static String nonBlank(String value, String field) {
+    private static String nonBlank(String value, String field, int maxLength) {
         if (value == null || value.isBlank()) {
             throw VerificationApiException.invalidField(field + " must not be blank");
+        }
+        if (value.length() > maxLength) {
+            throw VerificationApiException.invalidField(field + " must be at most " + maxLength + " characters");
         }
         return value;
     }
