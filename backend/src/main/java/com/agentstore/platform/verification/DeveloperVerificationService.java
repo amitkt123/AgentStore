@@ -1,13 +1,17 @@
 package com.agentstore.platform.verification;
 
 import com.agentstore.platform.common.AesGcmCipher;
+import com.agentstore.platform.storage.ObjectStorage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -19,13 +23,17 @@ public class DeveloperVerificationService {
     private static final Pattern GSTIN_PATTERN = Pattern.compile("^[0-9]{2}[A-Z0-9]{13}$");
     private static final Pattern PHONE_IN = Pattern.compile("^[6-9]\\d{9}$");
     private static final Pattern PHONE_E164 = Pattern.compile("^\\+\\d{10,15}$");
+    private static final Set<String> ALLOWED_DOCUMENT_TYPES = Set.of("image/jpeg", "image/png", "application/pdf");
+    private static final long MAX_DOCUMENT_BYTES = 5L * 1024 * 1024;
 
     private final DeveloperVerificationRepository repo;
     private final AesGcmCipher cipher;
+    private final ObjectStorage storage;
 
-    public DeveloperVerificationService(DeveloperVerificationRepository repo, AesGcmCipher cipher) {
+    public DeveloperVerificationService(DeveloperVerificationRepository repo, AesGcmCipher cipher, ObjectStorage storage) {
         this.repo = repo;
         this.cipher = cipher;
+        this.storage = storage;
     }
 
     @Transactional
@@ -49,6 +57,23 @@ public class DeveloperVerificationService {
                 v.setCurrentStep(candidate);
             }
         }
+        return repo.save(v);
+    }
+
+    @Transactional
+    public DeveloperVerification uploadPanDocument(UUID orgId, MultipartFile file) throws IOException {
+        DeveloperVerification v = getOrCreate(orgId);
+        requireEditable(v);
+        if (file.getSize() > MAX_DOCUMENT_BYTES) {
+            throw VerificationApiException.documentTooLarge();
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_DOCUMENT_TYPES.contains(contentType)) {
+            throw VerificationApiException.unsupportedDocumentType();
+        }
+        String key = "developer-verification/" + orgId + "/pan-document";
+        storage.put(key, file.getBytes());
+        v.setPanDocumentKey(key);
         return repo.save(v);
     }
 

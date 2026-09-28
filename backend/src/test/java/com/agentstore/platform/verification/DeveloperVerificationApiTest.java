@@ -6,10 +6,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 import java.util.Map;
 
@@ -196,5 +201,65 @@ class DeveloperVerificationApiTest extends AbstractStorageIntegrationTest {
         var response = patch(dev, "ABOUT", Map.of("legalName", "New Name"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    ResponseEntity<Map> uploadPanDocument(Org dev, String contentType, byte[] bytes) {
+        var headers = fx.bearer(dev);
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        // ByteArrayResource carries no real Content-Type of its own; wrapping it in an HttpEntity with its
+        // own part-level headers is how the declared type reaches the server's per-part Content-Type.
+        HttpHeaders partHeaders = new HttpHeaders();
+        partHeaders.setContentType(MediaType.parseMediaType(contentType));
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("file", new HttpEntity<>(new ByteArrayResource(bytes) {
+            @Override
+            public String getFilename() {
+                return "pan.jpg";
+            }
+        }, partHeaders));
+        return rest.exchange(base() + "/pan-document", HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+    }
+
+    @Test
+    void oversizedPanDocumentIsRejected() {
+        var dev = fx.developer();
+        byte[] tooBig = new byte[6 * 1024 * 1024];
+
+        var response = uploadPanDocument(dev, "image/jpeg", tooBig);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(response.getBody().get("code")).isEqualTo("DOCUMENT_TOO_LARGE");
+    }
+
+    @Test
+    void wrongContentTypePanDocumentIsRejected() {
+        var dev = fx.developer();
+
+        var response = uploadPanDocument(dev, "text/plain", "not a document".getBytes());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(response.getBody().get("code")).isEqualTo("UNSUPPORTED_DOCUMENT_TYPE");
+    }
+
+    @Test
+    void validPanDocumentUploadSetsUploadedFlag() {
+        var dev = fx.developer();
+
+        var response = uploadPanDocument(dev, "image/jpeg", "fake-jpeg-bytes".getBytes());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().get("panDocumentUploaded")).isEqualTo(true);
+    }
+
+    @Test
+    void panDocumentUploadWhilePendingIsLocked() {
+        var dev = fx.developer();
+        call(HttpMethod.GET, base(), null, dev);
+        fx.setStatus(dev, "PENDING");
+
+        var response = uploadPanDocument(dev, "image/jpeg", "fake-jpeg-bytes".getBytes());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody().get("code")).isEqualTo("VERIFICATION_LOCKED");
     }
 }
