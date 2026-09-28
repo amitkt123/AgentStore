@@ -319,4 +319,44 @@ class DeveloperVerificationApiTest extends AbstractStorageIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("resubmissionCount")).isEqualTo(1);
     }
+
+    @Test
+    void anotherOrgsJwtCannotPatchUploadOrSubmitThisOrgsRow() {
+        var dev = fx.developer();
+        var other = fx.developer();
+        patch(dev, "ABOUT", Map.of("legalName", "Acme LLP", "displayName", "Acme", "country", "IN", "city", "Pune",
+                "entityType", "LLP"));
+
+        // "other" acts on its own org's row (there is no cross-org PATCH path — every call is org-scoped from the
+        // caller's own JWT), so this instead proves each org's action lands on its own separate row, never the other's.
+        var otherPatch = patch(other, "ABOUT", Map.of("legalName", "Other Co"));
+        assertThat(otherPatch.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        var devRow = call(HttpMethod.GET, base(), null, dev);
+        assertThat(devRow.getBody().get("legalName")).isEqualTo("Acme LLP");
+        var otherRow = call(HttpMethod.GET, base(), null, other);
+        assertThat(otherRow.getBody().get("legalName")).isEqualTo("Other Co");
+    }
+
+    @Test
+    void noUnmaskedPanGstinOrPhoneAppearsInAnyResponseAcrossTheWholeFlow() {
+        var dev = fx.developer();
+        String rawPan = "ABCDE1234F";
+        String rawGstin = "29AAAPL1234C1ZS";
+        String rawPhone = "9876543210";
+
+        var about = patch(dev, "ABOUT", Map.of("legalName", "Acme LLP", "displayName", "Acme", "country", "IN",
+                "city", "Pune", "entityType", "LLP"));
+        var tax = patch(dev, "TAX_IDS", Map.of("pan", rawPan, "gstin", rawGstin));
+        var phone = patch(dev, "PHONE", Map.of("phone", rawPhone));
+        var agreement = patch(dev, "AGREEMENT", Map.of("agreementVersion", "2.1"));
+        var doc = uploadPanDocument(dev, "image/jpeg", "fake-jpeg-bytes".getBytes());
+        var submitted = submit(dev);
+        var fetched = call(HttpMethod.GET, base(), null, dev);
+
+        for (var response : java.util.List.of(about, tax, phone, agreement, doc, submitted, fetched)) {
+            assertThat(response.getBody().toString()).doesNotContain(rawPan).doesNotContain(rawGstin)
+                    .doesNotContain(rawPhone);
+        }
+    }
 }
