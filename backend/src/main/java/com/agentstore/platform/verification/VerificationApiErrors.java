@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-@RestControllerAdvice(assignableTypes = DeveloperVerificationController.class)
+@RestControllerAdvice(assignableTypes = {DeveloperVerificationController.class, AdminVerificationController.class})
 public class VerificationApiErrors {
 
     @ExceptionHandler(VerificationApiException.class)
