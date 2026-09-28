@@ -28,6 +28,11 @@ public class VerificationApiException extends RuntimeException {
                 "This verification cannot be edited in its current status");
     }
 
+    public static VerificationApiException notPending() {
+        return new VerificationApiException(HttpStatus.CONFLICT, "VERIFICATION_NOT_PENDING",
+                "This verification is not awaiting a decision");
+    }
+
     public static VerificationApiException invalidField(String message) {
         return new VerificationApiException(HttpStatus.BAD_REQUEST, "INVALID_FIELD", message);
     }
