@@ -127,4 +127,31 @@ class DeveloperVerificationReviewServiceTest extends AbstractStorageIntegrationT
                     assertThat(e.code()).isEqualTo("INVALID_FIELD");
                 });
     }
+
+    @Test
+    void aNullOutcomeIsRejectedNotAServerError() throws Exception {
+        var org = fx.developer();
+        var verification = fx.pendingSubmission(org);
+
+        assertThatThrownBy(() -> service.decide(verification.getId(), adminId(),
+                new VerificationDecisionRequest(null, "n/a", null)))
+                .isInstanceOfSatisfying(VerificationApiException.class, e -> {
+                    assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(e.code()).isEqualTo("INVALID_FIELD");
+                });
+    }
+
+    @Test
+    void aCheckWithANullTypeIsRejectedNotAServerError() throws Exception {
+        var org = fx.developer();
+        var verification = fx.pendingSubmission(org);
+
+        assertThatThrownBy(() -> service.decide(verification.getId(), adminId(),
+                new VerificationDecisionRequest(VerificationStatus.VERIFIED, "n/a",
+                        List.of(new VerificationDecisionRequest.CheckInput(null, true, "note")))))
+                .isInstanceOfSatisfying(VerificationApiException.class, e -> {
+                    assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(e.code()).isEqualTo("INVALID_FIELD");
+                });
+    }
 }

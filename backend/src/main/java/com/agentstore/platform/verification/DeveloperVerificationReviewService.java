@@ -53,15 +53,20 @@ public class DeveloperVerificationReviewService {
 
     @Transactional
     public VerificationDetailResponse decide(UUID id, UUID adminUserId, VerificationDecisionRequest request) {
-        if (!DECISION_OUTCOMES.contains(request.outcome())) {
+        if (request.outcome() == null || !DECISION_OUTCOMES.contains(request.outcome())) {
             throw VerificationApiException.invalidField("outcome must be one of " + DECISION_OUTCOMES);
+        }
+        List<VerificationDecisionRequest.CheckInput> inputs = request.checks() == null ? List.of() : request.checks();
+        for (var input : inputs) {
+            if (input == null || input.type() == null) {
+                throw VerificationApiException.invalidField("checks[].type is required");
+            }
         }
         DeveloperVerification v = verifications.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Verification not found"));
         if (v.getStatus() != VerificationStatus.PENDING) {
             throw VerificationApiException.notPending();
         }
-        List<VerificationDecisionRequest.CheckInput> inputs = request.checks() == null ? List.of() : request.checks();
         for (var input : inputs) {
             kycProvider.check(v.getId(), input.type(), input.passed(), input.note(), adminUserId);
         }
