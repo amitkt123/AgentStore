@@ -16,7 +16,7 @@ export function formatBytes(n: number): string {
 
 export function humanize(resource: string): string {
   const s = resource.replace(/[_-]+/g, " ").trim();
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 
 export function formatTime(iso: string | null): string {

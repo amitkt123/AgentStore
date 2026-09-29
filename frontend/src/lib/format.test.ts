@@ -13,4 +13,5 @@ it("formats bytes", () => {
 it("humanizes resource names", () => {
   expect(humanize("bank_statement")).toBe("Bank statement");
   expect(humanize("open-invoices")).toBe("Open invoices");
+  expect(humanize("BASIC_PERSONAL")).toBe("Basic personal");
 });
