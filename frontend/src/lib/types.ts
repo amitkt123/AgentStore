@@ -35,6 +35,7 @@ export interface CostEnvelope {
 export interface ApprovalGateDecl {
   trigger: string;
   description: string;
+  preview?: { columns?: string[]; totalField?: string };
 }
 export interface Manifest {
   name: string;
