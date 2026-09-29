@@ -43,6 +43,22 @@ public class RuntimeLifecycleController {
         runLifecycleService.recordAgentLogs(RunPrincipal.current().runId(), entries);
     }
 
+    @PostMapping("/network-events")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void networkEvents(@Valid @RequestBody NetworkEventBatch batch) {
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (NetworkEventBatch.NetworkEvent event : batch.events()) {
+            Map<String, Object> detail = new LinkedHashMap<>();
+            detail.put("host", event.host());
+            detail.put("count", event.count());
+            if (event.callsite() != null) {
+                detail.put("callsite", event.callsite());
+            }
+            entries.add(detail);
+        }
+        runLifecycleService.recordNetworkEvents(RunPrincipal.current().runId(), entries);
+    }
+
     @PostMapping("/complete")
     public RunStateResponse complete(@Valid @RequestBody(required = false) CompleteRequest request) {
         Map<String, Object> detail = new LinkedHashMap<>();

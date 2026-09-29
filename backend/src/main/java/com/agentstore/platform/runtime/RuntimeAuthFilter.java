@@ -89,7 +89,7 @@ public class RuntimeAuthFilter extends OncePerRequestFilter {
     }
 
     static Kind kindFor(String path) {
-        if (path.equals("/runtime/v1/logs")) {
+        if (path.equals("/runtime/v1/logs") || path.equals("/runtime/v1/network-events")) {
             return Kind.LOGS;
         }
         return path.startsWith("/runtime/v1/llm/") ? Kind.LLM : Kind.DEFAULT;

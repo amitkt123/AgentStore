@@ -103,7 +103,20 @@ public class RunReportService {
 
     private Map<String, Object> network(Run run) {
         Manifest manifest = manifestParser.parse(run.getAgentVersion().getManifestJson());
-        return Map.of("declaredAllowlist", manifest.networkAllowlist(), "note", "live visibility not yet available");
+        Map<String, Long> blocked = new java.util.TreeMap<>();
+        for (RunStep s : stepRepository.findByRunIdOrderByCreatedAtAsc(run.getId())) {
+            if (s.getKind() == RunStepKind.NETWORK_BLOCKED) {
+                try {
+                    var detail = mapper.readTree(s.getDetail());
+                    blocked.merge(detail.path("host").asText(), detail.path("count").asLong(1), Long::sum);
+                } catch (Exception e) {
+                    // a step with unreadable detail contributes nothing
+                }
+            }
+        }
+        List<Map<String, Object>> blockedList = blocked.entrySet().stream()
+                .map(e -> Map.<String, Object>of("host", e.getKey(), "count", e.getValue())).toList();
+        return Map.of("declaredAllowlist", manifest.networkAllowlist(), "blocked", blockedList);
     }
 
     private Map<String, Object> cost(Run run) {

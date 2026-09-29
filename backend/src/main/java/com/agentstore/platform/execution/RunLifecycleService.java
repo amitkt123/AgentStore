@@ -203,6 +203,17 @@ public class RunLifecycleService {
         runRepository.save(run);
     }
 
+    /** Stores blocked-connection reports, one NETWORK_BLOCKED step per event; agent-sourced because the proxy is untrusted. */
+    @Transactional
+    public void recordNetworkEvents(UUID runId, List<Map<String, Object>> events) {
+        Run run = lockOpen(runId);
+        run.setLastHeartbeatAt(Instant.now());
+        for (Map<String, Object> event : events) {
+            step(run, RunStepKind.NETWORK_BLOCKED, RunStepSource.AGENT, event);
+        }
+        runRepository.save(run);
+    }
+
     @Transactional
     public void heartbeat(UUID runId) {
         Run run = lockOpen(runId);

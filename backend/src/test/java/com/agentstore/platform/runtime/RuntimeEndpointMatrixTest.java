@@ -46,6 +46,7 @@ class RuntimeEndpointMatrixTest extends AbstractIntegrationTest {
                 Arguments.of(HttpMethod.POST, "/runtime/v1/usage", Map.of("quantity", 1, "unit", "reconciled_transaction")),
                 Arguments.of(HttpMethod.POST, "/runtime/v1/logs", Map.of("entries", List.of(Map.of("level", "info", "message", "m")))),
                 Arguments.of(HttpMethod.POST, "/runtime/v1/heartbeat", null),
+                Arguments.of(HttpMethod.POST, "/runtime/v1/network-events", Map.of("events", List.of(Map.of("host", "a.example", "count", 1)))),
                 Arguments.of(HttpMethod.POST, "/runtime/v1/complete", Map.of("summary", "s")),
                 Arguments.of(HttpMethod.POST, "/runtime/v1/fail", Map.of("error", "e", "retriable", false)));
     }

@@ -69,7 +69,10 @@ public class RunFlowService {
         }
 
         BigDecimal charged = run.getConnection() == null ? run.getSimulatedCharged() : run.getTotalCharged();
-        return new FlowView(blocks, reachedBlock, new FlowView.Spend(charged, run.getCostCap()), run.getDeadlineAt());
+        long blockedAttempts = allSteps.stream().filter(s -> s.getKind() == RunStepKind.NETWORK_BLOCKED)
+                .mapToLong(s -> fieldOrDefault(s, "count", 1)).sum();
+        return new FlowView(blocks, reachedBlock, new FlowView.Spend(charged, run.getCostCap()), run.getDeadlineAt(),
+                blockedAttempts);
     }
 
     private static Set<String> declaredBlocks(Manifest manifest) {
