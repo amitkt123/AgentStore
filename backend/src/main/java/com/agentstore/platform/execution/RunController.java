@@ -73,6 +73,20 @@ public class RunController {
         if (!connection.getBuyerOrg().getId().equals(claims.orgId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Connection not owned by caller's org");
         }
+        return start(connection);
+    }
+
+    /** Starts a new run on the run's own connection, at the connection's current pinned version and bindings. */
+    @PostMapping("/{runId}/rerun")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    public RunResponse rerun(@PathVariable("runId") String runRef) {
+        UUID runId = runLookup.idOf(runRef);
+        requireOwnedByCaller(runId);
+        Run original = runRepository.findById(runId).orElseThrow();
+        return start(original.getConnection());
+    }
+
+    private RunResponse start(Connection connection) {
         if (connection.getStatus() != ConnectionStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Connection not active");
         }

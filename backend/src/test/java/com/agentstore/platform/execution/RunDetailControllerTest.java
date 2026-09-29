@@ -70,6 +70,9 @@ class RunDetailControllerTest extends AbstractIntegrationTest {
                 new HttpEntity<>(ownerHeaders), RunDetailResponse.class);
 
         assertThat(ownerResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(ownerResponse.getBody().agentId()).isEqualTo(agent.getId());
+        assertThat(ownerResponse.getBody().agentVersionId()).isEqualTo(version.getId());
+        assertThat(ownerResponse.getBody().connectionId()).isEqualTo(connection.getId());
         assertThat(ownerResponse.getBody().steps()).hasSize(1);
         assertThat(ownerResponse.getBody().steps().get(0).kind()).isEqualTo(RunStepKind.READ);
 
