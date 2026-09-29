@@ -24,6 +24,8 @@ class FakeApi:
             if callable(r):
                 return r(*args, **kwargs)
             if isinstance(r, list):
+                if not r:
+                    return None
                 item = r.pop(0)
                 if isinstance(item, Exception):
                     raise item
