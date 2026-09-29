@@ -1,0 +1,23 @@
+{
+  "name": "@agentstore/sdk",
+  "version": "0.1.0",
+  "description": "AgentStore agent SDK",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "generate": "./regenerate.sh",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": { "openapi-fetch": "^0.13.0" },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "openapi-typescript": "^7.4.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.2"
+  }
+}

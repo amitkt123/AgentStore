@@ -12,4 +12,10 @@ if ! diff -r -x __pycache__ "$scratch/py" "$root/sdk/python/agentstore/_generate
   status=1
 fi
 
+"$root/sdk/typescript/regenerate.sh" "$scratch/schema.d.ts" >/dev/null
+if ! diff "$scratch/schema.d.ts" "$root/sdk/typescript/src/generated/schema.d.ts" >/dev/null; then
+  echo "TypeScript SDK client is stale. Run sdk/typescript/regenerate.sh and commit the result." >&2
+  status=1
+fi
+
 exit $status
