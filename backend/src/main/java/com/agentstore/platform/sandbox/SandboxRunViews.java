@@ -56,7 +56,7 @@ public class SandboxRunViews {
     }
 
     public SandboxRunSummary summary(Run run) {
-        String displayId = "S-" + run.getId().toString().substring(0, 8).toUpperCase();
+        String displayId = run.getDisplayId();
         String profileName = run.getSandboxProfileId() == null ? null
                 : profiles.findById(run.getSandboxProfileId()).map(SandboxProfile::getName).orElse(null);
         String versionLabel = run.getAgentVersion().getVersionNumber() + " "

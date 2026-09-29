@@ -84,6 +84,23 @@ public class Run {
 
     private UUID sandboxProfileId;
 
+    /** 'R-12' or 'S-4'; assigned by the run_display_id trigger and read back after insert. */
+    @Setter(AccessLevel.NONE)
+    @org.hibernate.annotations.Generated(event = org.hibernate.generator.EventType.INSERT)
+    @Column(name = "display_id", insertable = false, updatable = false)
+    private String displayId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "terminal_reason")
+    private TerminalReason terminalReason;
+
+    /** The block of the most recent block-carrying step; kept in step with FlowView.reachedBlock. */
+    private String reachedBlock;
+
+    /** The closing step's summary, for the run list search. */
+    @Column(columnDefinition = "text")
+    private String summary;
+
     /** What a SANDBOX run's usage reports would have cost after the cap. No money moves. */
     private BigDecimal simulatedCharged = BigDecimal.ZERO;
 
