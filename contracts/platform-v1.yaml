@@ -76,7 +76,6 @@ paths:
         required: true
         schema:
           type: string
-          format: uuid
       responses:
         "200":
           description: OK
@@ -242,6 +241,9 @@ components:
         deadlineAt:
           type: string
           format: date-time
+        blockedAttempts:
+          type: integer
+          format: int64
     Spend:
       properties:
         charged:
