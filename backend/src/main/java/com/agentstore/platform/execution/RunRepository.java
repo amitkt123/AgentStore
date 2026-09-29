@@ -24,6 +24,8 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
 
     List<Run> findByStatusAndAgentVersionId(RunStatus status, UUID agentVersionId);
 
+    Optional<Run> findByDisplayId(String displayId);
+
     Optional<Run> findFirstByCallbackTokenHash(String callbackTokenHash);
 
     long countByModeAndInitiatedByOrgIdAndStatusIn(RunMode mode, java.util.UUID orgId, Collection<RunStatus> statuses);

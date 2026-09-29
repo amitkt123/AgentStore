@@ -17,17 +17,21 @@ public class RunDetailController {
     private final RunRepository runRepository;
     private final RunStepRepository runStepRepository;
     private final RunFlowService flowService;
+    private final RunLookup runLookup;
 
-    public RunDetailController(RunRepository runRepository, RunStepRepository runStepRepository, RunFlowService flowService) {
+    public RunDetailController(RunRepository runRepository, RunStepRepository runStepRepository, RunFlowService flowService,
+                               RunLookup runLookup) {
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.flowService = flowService;
+        this.runLookup = runLookup;
     }
 
     @GetMapping("/{runId}")
     @PreAuthorize("isAuthenticated()")
-    public RunDetailResponse get(@PathVariable UUID runId) {
-        Run run = findRun(runId);
+    public RunDetailResponse get(@PathVariable("runId") String runRef) {
+        Run run = runLookup.find(runRef);
+        UUID runId = run.getId();
         if (run.getConnection() == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found");   // a sandbox run is not a buyer's
         }
@@ -41,8 +45,8 @@ public class RunDetailController {
     /** Any run the caller can already view — unlike {@link #get}, not restricted to a buyer's own run (spec §4). */
     @GetMapping("/{runId}/flow")
     @PreAuthorize("isAuthenticated()")
-    public FlowView flow(@PathVariable UUID runId) {
-        Run run = findRun(runId);
+    public FlowView flow(@PathVariable("runId") String runRef) {
+        Run run = runLookup.find(runRef);
         requireViewable(run);
         return flowService.compute(run);
     }
@@ -56,11 +60,6 @@ public class RunDetailController {
                 ? runRepository.findByConnectionBuyerOrgIdOrderByStartedAtDesc(claims.orgId())
                 : runRepository.findByConnectionBuyerOrgIdAndStatusOrderByStartedAtDesc(claims.orgId(), status);
         return runs.stream().map(RunSummaryResponse::from).toList();
-    }
-
-    private Run findRun(UUID runId) {
-        return runRepository.findById(runId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found"));
     }
 
     /** Same ownership rule as the run-detail endpoint, generalized to a run with no buyer (a sandbox run's initiator). */

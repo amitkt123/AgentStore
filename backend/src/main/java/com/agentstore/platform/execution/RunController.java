@@ -41,12 +41,13 @@ public class RunController {
     private final RebuildService rebuildService;
     private final PendingBuildRuns pendingBuildRuns;
     private final BindingResolver bindingResolver;
+    private final RunLookup runLookup;
 
     public RunController(ConnectionRepository connectionRepository, RunRepository runRepository,
                          ManifestParser manifestParser, RunTokenService runTokenService,
                          WalletReservationService walletReservationService, GateService gateService,
                          RunLauncher runLauncher, RebuildService rebuildService, PendingBuildRuns pendingBuildRuns,
-                         BindingResolver bindingResolver) {
+                         BindingResolver bindingResolver, RunLookup runLookup) {
         this.connectionRepository = connectionRepository;
         this.runRepository = runRepository;
         this.manifestParser = manifestParser;
@@ -57,6 +58,7 @@ public class RunController {
         this.rebuildService = rebuildService;
         this.pendingBuildRuns = pendingBuildRuns;
         this.bindingResolver = bindingResolver;
+        this.runLookup = runLookup;
     }
 
     /** How long a run may wait for its agent to be rebuilt before the reaper times it out. */
@@ -128,22 +130,25 @@ public class RunController {
 
     @PostMapping("/{runId}/approve")
     @PreAuthorize("hasRole('BUYER_APPROVER')")
-    public RunResponse approve(@PathVariable UUID runId, @RequestBody ApproveRunRequest request) {
+    public RunResponse approve(@PathVariable("runId") String runRef, @RequestBody ApproveRunRequest request) {
+        UUID runId = runLookup.idOf(runRef);
         requireOwnedByCaller(runId);
         return RunResponse.from(gateService.decide(runId, null, true, callerUserId(), request.notes()));
     }
 
     @PostMapping("/{runId}/reject")
     @PreAuthorize("hasRole('BUYER_APPROVER')")
-    public RunResponse reject(@PathVariable UUID runId, @RequestBody ApproveRunRequest request) {
+    public RunResponse reject(@PathVariable("runId") String runRef, @RequestBody ApproveRunRequest request) {
+        UUID runId = runLookup.idOf(runRef);
         requireOwnedByCaller(runId);
         return RunResponse.from(gateService.decide(runId, null, false, callerUserId(), request.notes()));
     }
 
     @PostMapping("/{runId}/gates/{gateId}/decision")
     @PreAuthorize("hasRole('BUYER_APPROVER')")
-    public RunResponse decide(@PathVariable UUID runId, @PathVariable UUID gateId,
+    public RunResponse decide(@PathVariable("runId") String runRef, @PathVariable UUID gateId,
                               @Valid @RequestBody GateDecisionRequest request) {
+        UUID runId = runLookup.idOf(runRef);
         requireOwnedByCaller(runId);
         return RunResponse.from(gateService.decide(runId, gateId, request.decision() == GateDecision.APPROVE,
                 callerUserId(), request.note()));

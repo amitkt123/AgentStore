@@ -32,12 +32,15 @@ public class SandboxRunController {
     private final SandboxRunViews views;
     private final RunRepository runs;
     private final GateService gateService;
+    private final com.agentstore.platform.execution.RunLookup runLookup;
 
-    public SandboxRunController(SandboxRunService service, SandboxRunViews views, RunRepository runs, GateService gateService) {
+    public SandboxRunController(SandboxRunService service, SandboxRunViews views, RunRepository runs, GateService gateService,
+                                com.agentstore.platform.execution.RunLookup runLookup) {
         this.service = service;
         this.views = views;
         this.runs = runs;
         this.gateService = gateService;
+        this.runLookup = runLookup;
     }
 
     @PostMapping
@@ -66,12 +69,13 @@ public class SandboxRunController {
     }
 
     @GetMapping("/{id}")
-    public SandboxRunViews.SandboxRunDetail get(@PathVariable UUID id) {
-        return views.detail(service.owned(Caller.current().orgId(), id));
+    public SandboxRunViews.SandboxRunDetail get(@PathVariable("id") String runRef) {
+        return views.detail(service.owned(Caller.current().orgId(), runLookup.idOf(runRef)));
     }
 
     @PostMapping("/{id}/cancel")
-    public SandboxRunViews.SandboxRunSummary cancel(@PathVariable UUID id) {
+    public SandboxRunViews.SandboxRunSummary cancel(@PathVariable("id") String runRef) {
+        UUID id = runLookup.idOf(runRef);
         var claims = Caller.current();
         service.cancel(claims.orgId(), id);
         return views.summary(service.owned(claims.orgId(), id));
@@ -79,14 +83,16 @@ public class SandboxRunController {
 
     @PostMapping("/{id}/rerun")
     @ResponseStatus(HttpStatus.CREATED)
-    public SandboxRunViews.SandboxRunSummary rerun(@PathVariable UUID id) {
+    public SandboxRunViews.SandboxRunSummary rerun(@PathVariable("id") String runRef) {
+        UUID id = runLookup.idOf(runRef);
         var claims = Caller.current();
         return views.summary(service.rerun(claims.orgId(), claims.userId(), id));
     }
 
     @PostMapping("/{id}/gates/{gateId}/decision")
-    public SandboxRunViews.SandboxRunSummary decide(@PathVariable UUID id, @PathVariable UUID gateId,
+    public SandboxRunViews.SandboxRunSummary decide(@PathVariable("id") String runRef, @PathVariable UUID gateId,
                                                     @jakarta.validation.Valid @RequestBody GateDecision body) {
+        UUID id = runLookup.idOf(runRef);
         var claims = Caller.current();
         Run run = service.owned(claims.orgId(), id);
         gateService.decide(run.getId(), gateId, body.approve(), claims.userId(), body.note());
