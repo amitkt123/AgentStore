@@ -100,6 +100,15 @@ class GatePreviewBuilderTest extends AbstractStorageIntegrationTest {
     }
 
     @Test
+    void noAffectedResourcesMeansNoPreviewBecauseNothingWouldBeCommitted() {
+        UUID runId = newRun();
+        stage(runId, "journal_entries", "{\"a\":1}");
+        // OutputCommitService commits nothing for an empty list, so the buyer must not be shown a preview of everything
+        assertThat(builder.build(runId, List.of(), null)).isNull();
+        assertThat(builder.build(runId, null, null)).isNull();
+    }
+
+    @Test
     void onlyOutputsForAffectedResourcesAreUsed() throws Exception {
         UUID runId = newRun();
         stage(runId, "journal_entries", "{\"a\":1}", "{\"a\":2}");

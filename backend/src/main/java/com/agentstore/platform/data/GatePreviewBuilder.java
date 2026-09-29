@@ -35,10 +35,12 @@ public class GatePreviewBuilder {
 
     /** JSON {columns?, rows, totalRows, total?}, or null when nothing is staged for the affected resources. */
     public String build(UUID runId, List<String> affectedResources, ApprovalGateDecl.Preview config) {
+        if (affectedResources == null || affectedResources.isEmpty()) {
+            return null;   // OutputCommitService commits nothing for a gate that names no resources: show nothing either
+        }
         List<RunOutput> staged = outputs.findByRunIdOrderByCreatedAtAsc(runId).stream()
                 .filter(o -> o.getStatus() == OutputStatus.STAGED && o.getStorageKey() != null)
-                .filter(o -> affectedResources == null || affectedResources.isEmpty()
-                        || affectedResources.contains(o.getResourceName()))
+                .filter(o -> affectedResources.contains(o.getResourceName()))
                 .toList();
         if (staged.isEmpty()) {
             return null;

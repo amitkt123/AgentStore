@@ -31,7 +31,7 @@ ALTER TABLE review_item ADD COLUMN display_id VARCHAR(20);
 - `R-<n>` for production and trial runs, `S-<n>` for sandbox runs (`run.mode = SANDBOX`), `RV-<n>` for review items.
 - A `BEFORE INSERT` trigger on `run` and `review_item` assigns the ID from the sequence, so every insert path (`RunController`, `SandboxRunService`, review-item creation, tests) keeps working. Hibernate reads it back after insert (`@Generated`).
 - Sequences are global, so IDs reveal rough platform volume. The parent spec accepts this.
-- **Lookup.** Every `/api/v1/runs/{id}/**` and sandbox run path takes a string and resolves it as a UUID first, then as a display ID. One `RunLookup.find(idOrDisplay)` is used by all controllers, so ownership checks stay where they are. An unknown or foreign ID is 404 as today.
+- **Lookup.** Every `/api/v1/runs/{id}/**` and sandbox run path takes a string and resolves it as a UUID first, then as a display ID. One `RunLookup.find(idOrDisplay)` is used by all controllers, so ownership checks stay where they are. An unknown ID is 404. A run owned by another org is still 403 on the buyer paths, as before WS1b (see `docs/known-issues.md`).
 - Response DTOs (`RunResponse`, `RunSummaryResponse`, `RunDetailResponse`, sandbox run responses, review item responses) gain `displayId`. UUIDs keep working everywhere.
 
 ## 2. Why a run stopped
