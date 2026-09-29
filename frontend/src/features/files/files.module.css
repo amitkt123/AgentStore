@@ -1,0 +1,6 @@
+.wrap { display: flex; flex-direction: column; gap: 16px; }
+.storage { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; color: var(--ink2); font-size: 13px; }
+.bar { width: 200px; height: 8px; background: var(--l); border-radius: 999px; overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--b); }
+.sub { color: var(--ink3); font-size: 12px; }
+.err { color: var(--bad); margin: 0; }
