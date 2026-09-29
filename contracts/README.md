@@ -9,3 +9,6 @@ After an intended API change, regenerate and commit:
     cd backend && TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock mvn -q test -Dtest=RuntimeContractTest -Dcontract.update=true
 
 Breaking changes go to `/runtime/v2` with a deprecation window (spec §4.2).
+
+The Python and TypeScript SDKs' generated clients are regenerated with `sdk/python/regenerate.sh` and
+`sdk/typescript/regenerate.sh`; CI fails if they drift.
