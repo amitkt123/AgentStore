@@ -18,13 +18,21 @@ public class RunDetailController {
     private final RunStepRepository runStepRepository;
     private final RunFlowService flowService;
     private final RunLookup runLookup;
+    private final GateRequestRepository gateRequestRepository;
+    private final com.agentstore.platform.manifest.ManifestParser manifestParser;
+    private final com.fasterxml.jackson.databind.ObjectMapper mapper;
 
     public RunDetailController(RunRepository runRepository, RunStepRepository runStepRepository, RunFlowService flowService,
-                               RunLookup runLookup) {
+                               RunLookup runLookup, GateRequestRepository gateRequestRepository,
+                               com.agentstore.platform.manifest.ManifestParser manifestParser,
+                               com.fasterxml.jackson.databind.ObjectMapper mapper) {
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.flowService = flowService;
         this.runLookup = runLookup;
+        this.gateRequestRepository = gateRequestRepository;
+        this.manifestParser = manifestParser;
+        this.mapper = mapper;
     }
 
     @GetMapping("/{runId}")
@@ -49,6 +57,15 @@ public class RunDetailController {
         Run run = runLookup.find(runRef);
         requireViewable(run);
         return flowService.compute(run);
+    }
+
+    @GetMapping("/{runId}/gates")
+    @PreAuthorize("isAuthenticated()")
+    public java.util.List<GateDetailResponse> gates(@PathVariable("runId") String runRef) {
+        Run run = runLookup.find(runRef);
+        requireViewable(run);
+        return gateRequestRepository.findByRunIdOrderByCreatedAtDesc(run.getId()).stream()
+                .map(g -> GateDetailResponse.from(g, GateCosts.costIfApproved(run, g, manifestParser), mapper)).toList();
     }
 
     @GetMapping("/mine")
