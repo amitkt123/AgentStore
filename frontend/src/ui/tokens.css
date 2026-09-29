@@ -1,0 +1,11 @@
+:root {
+  --g: #f8fafd; --dot: #d6dfec; --s: #ffffff; --l: #e3e9f2; --l2: #eef2f8;
+  --ink: #0d1a30; --ink2: #46546d; --ink3: #617089;
+  --b: #2b5ce6; --b2: #5b85f0; --b3: #9db6f3; --sky: #edf3ff; --sky2: #d9e5ff;
+  --ok: #0b8a60; --okS: #e2f4eb; --wa: #9e6209; --waS: #fff3dc; --bad: #c23b30; --badS: #fce8e8;
+  --radius: 12px;
+  --rail-w: 72px;
+  --top-h: 64px;
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}

@@ -1,0 +1,6 @@
+.pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.neutral { background: var(--l2); color: var(--ink2); }
+.ok { background: var(--okS); color: var(--ok); }
+.warn { background: var(--waS); color: var(--wa); }
+.bad { background: var(--badS); color: var(--bad); }
+.info { background: var(--sky); color: var(--b); }

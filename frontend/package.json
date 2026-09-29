@@ -11,6 +11,7 @@
     "seed:e2e": "tsx e2e/seed.ts"
   },
   "dependencies": {
+    "geist": "^1.7.2",
     "next": "^14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

@@ -1,0 +1,8 @@
+.btn { min-height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid transparent; font: inherit; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.primary { background: var(--b); color: #fff; }
+.primary:hover:not(:disabled) { background: #244fcb; }
+.ghost { background: var(--s); color: var(--ink); border-color: var(--l); }
+.ghost:hover:not(:disabled) { background: var(--sky); }
+.danger { background: var(--s); color: var(--bad); border-color: var(--badS); }
+@media (max-width: 767px) { .btn { min-height: 44px; } }
