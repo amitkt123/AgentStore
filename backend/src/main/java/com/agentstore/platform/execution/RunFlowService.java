@@ -16,6 +16,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Declared-vs-actual, one block per manifest scope/gate/llm/charge slot, aggregated from run_step (spec §4). Shared
@@ -28,11 +29,14 @@ public class RunFlowService {
     private final RunStepRepository stepRepository;
     private final ManifestParser manifestParser;
     private final ObjectMapper mapper;
+    private final GateRequestRepository gateRequestRepository;
 
-    public RunFlowService(RunStepRepository stepRepository, ManifestParser manifestParser, ObjectMapper mapper) {
+    public RunFlowService(RunStepRepository stepRepository, ManifestParser manifestParser, ObjectMapper mapper,
+                          GateRequestRepository gateRequestRepository) {
         this.stepRepository = stepRepository;
         this.manifestParser = manifestParser;
         this.mapper = mapper;
+        this.gateRequestRepository = gateRequestRepository;
     }
 
     public FlowView compute(Run run) {
@@ -50,7 +54,7 @@ public class RunFlowService {
 
         List<FlowBlock> blocks = new ArrayList<>();
         for (String block : declaredBlocks(manifest)) {
-            blocks.add(declaredBlock(block, byBlock.remove(block), terminal, costCapReached));
+            blocks.add(declaredBlock(run, manifest, block, byBlock.remove(block), terminal, costCapReached));
         }
         for (var entry : byBlock.entrySet()) {
             blocks.add(undeclaredBlock(entry.getKey(), entry.getValue()));
@@ -65,7 +69,10 @@ public class RunFlowService {
         }
 
         BigDecimal charged = run.getConnection() == null ? run.getSimulatedCharged() : run.getTotalCharged();
-        return new FlowView(blocks, reachedBlock, new FlowView.Spend(charged, run.getCostCap()), run.getDeadlineAt());
+        long blockedAttempts = allSteps.stream().filter(s -> s.getKind() == RunStepKind.NETWORK_BLOCKED)
+                .mapToLong(s -> fieldOrDefault(s, "count", 1)).sum();
+        return new FlowView(blocks, reachedBlock, new FlowView.Spend(charged, run.getCostCap()), run.getDeadlineAt(),
+                blockedAttempts);
     }
 
     private static Set<String> declaredBlocks(Manifest manifest) {
@@ -82,7 +89,8 @@ public class RunFlowService {
         return blocks;
     }
 
-    private FlowBlock declaredBlock(String block, List<RunStep> steps, boolean terminal, boolean costCapReached) {
+    private FlowBlock declaredBlock(Run run, Manifest manifest, String block, List<RunStep> steps, boolean terminal,
+                                    boolean costCapReached) {
         if (block.equals("charge")) {
             BlockState state = costCapReached ? BlockState.FAILED
                     : steps != null ? BlockState.DONE
@@ -96,13 +104,31 @@ public class RunFlowService {
             RunStep last = steps.get(steps.size() - 1);
             return last.getKind() == RunStepKind.GATE_DECIDED
                     ? FlowBlock.declared(block, BlockState.DONE, null, null)
-                    : FlowBlock.declared(block, BlockState.WAITING, null, stringField(last, "gateId"));
+                    : FlowBlock.declared(block, BlockState.WAITING, waitingMetrics(run, stringField(last, "gateId")),
+                            stringField(last, "gateId"));
         }
         if (steps == null) {
             return FlowBlock.declared(block, terminal ? BlockState.SKIPPED : BlockState.IDLE, null, null);
         }
         boolean violated = steps.stream().anyMatch(s -> s.getKind() == RunStepKind.SCOPE_VIOLATION);
         return FlowBlock.declared(block, violated ? BlockState.FAILED : BlockState.DONE, metrics(block, steps), null);
+    }
+
+    private Map<String, Object> waitingMetrics(Run run, String gateId) {
+        if (gateId == null) {
+            return null;
+        }
+        return gateRequestRepository.findById(UUID.fromString(gateId)).map(gate -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            if (gate.getExpiresAt() != null) {
+                m.put("expiresAt", gate.getExpiresAt().toString());
+            }
+            BigDecimal cost = GateCosts.costIfApproved(run, gate, manifestParser);
+            if (cost != null) {
+                m.put("costIfApproved", cost);
+            }
+            return m;
+        }).orElse(null);
     }
 
     private FlowBlock undeclaredBlock(String block, List<RunStep> steps) {

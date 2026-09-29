@@ -17,17 +17,46 @@ public class RunDetailController {
     private final RunRepository runRepository;
     private final RunStepRepository runStepRepository;
     private final RunFlowService flowService;
+    private final RunLookup runLookup;
+    private final RunListService runListService;
+    private final GateRequestRepository gateRequestRepository;
+    private final com.agentstore.platform.manifest.ManifestParser manifestParser;
+    private final com.fasterxml.jackson.databind.ObjectMapper mapper;
 
-    public RunDetailController(RunRepository runRepository, RunStepRepository runStepRepository, RunFlowService flowService) {
+    public RunDetailController(RunRepository runRepository, RunStepRepository runStepRepository, RunFlowService flowService,
+                               RunLookup runLookup, GateRequestRepository gateRequestRepository,
+                               com.agentstore.platform.manifest.ManifestParser manifestParser,
+                               com.fasterxml.jackson.databind.ObjectMapper mapper, RunListService runListService) {
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.flowService = flowService;
+        this.runLookup = runLookup;
+        this.gateRequestRepository = gateRequestRepository;
+        this.manifestParser = manifestParser;
+        this.mapper = mapper;
+        this.runListService = runListService;
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    public RunListResponse list(@RequestParam(required = false) String group,
+                                @RequestParam(required = false) UUID agentId,
+                                @RequestParam(required = false) String q,
+                                @RequestParam(required = false) java.time.Instant from,
+                                @RequestParam(required = false) java.time.Instant to,
+                                @RequestParam(defaultValue = "0") int page,
+                                @RequestParam(defaultValue = "25") int size) {
+        var claims = (JwtService.Claims)
+                SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return runListService.list(claims.orgId(), new RunListQuery(group == null ? null : RunGroup.fromKey(group),
+                agentId, q, from, to, page, size));
     }
 
     @GetMapping("/{runId}")
     @PreAuthorize("isAuthenticated()")
-    public RunDetailResponse get(@PathVariable UUID runId) {
-        Run run = findRun(runId);
+    public RunDetailResponse get(@PathVariable("runId") String runRef) {
+        Run run = runLookup.find(runRef);
+        UUID runId = run.getId();
         if (run.getConnection() == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found");   // a sandbox run is not a buyer's
         }
@@ -35,16 +64,25 @@ public class RunDetailController {
 
         var steps = runStepRepository.findByRunIdOrderByCreatedAtAsc(runId).stream()
                 .map(RunStepResponse::from).toList();
-        return new RunDetailResponse(run.getId(), run.getStatus(), run.getCostCap(), run.getTotalCharged(), steps);
+        return new RunDetailResponse(run.getId(), run.getDisplayId(), run.getStatus(), run.getTerminalReason(), run.getCostCap(), run.getTotalCharged(), steps);
     }
 
     /** Any run the caller can already view — unlike {@link #get}, not restricted to a buyer's own run (spec §4). */
     @GetMapping("/{runId}/flow")
     @PreAuthorize("isAuthenticated()")
-    public FlowView flow(@PathVariable UUID runId) {
-        Run run = findRun(runId);
+    public FlowView flow(@PathVariable("runId") String runRef) {
+        Run run = runLookup.find(runRef);
         requireViewable(run);
         return flowService.compute(run);
+    }
+
+    @GetMapping("/{runId}/gates")
+    @PreAuthorize("isAuthenticated()")
+    public java.util.List<GateDetailResponse> gates(@PathVariable("runId") String runRef) {
+        Run run = runLookup.find(runRef);
+        requireViewable(run);
+        return gateRequestRepository.findByRunIdOrderByCreatedAtDesc(run.getId()).stream()
+                .map(g -> GateDetailResponse.from(g, GateCosts.costIfApproved(run, g, manifestParser), mapper)).toList();
     }
 
     @GetMapping("/mine")
@@ -56,11 +94,6 @@ public class RunDetailController {
                 ? runRepository.findByConnectionBuyerOrgIdOrderByStartedAtDesc(claims.orgId())
                 : runRepository.findByConnectionBuyerOrgIdAndStatusOrderByStartedAtDesc(claims.orgId(), status);
         return runs.stream().map(RunSummaryResponse::from).toList();
-    }
-
-    private Run findRun(UUID runId) {
-        return runRepository.findById(runId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found"));
     }
 
     /** Same ownership rule as the run-detail endpoint, generalized to a run with no buyer (a sandbox run's initiator). */

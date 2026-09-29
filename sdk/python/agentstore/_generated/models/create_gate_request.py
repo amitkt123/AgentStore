@@ -24,12 +24,14 @@ class CreateGateRequest:
         summary (str):
         payload (CreateGateRequestPayload):
         affects_resources (list[str] | Unset):
+        estimated_units (float | Unset):
     """
 
     action: str
     summary: str
     payload: CreateGateRequestPayload
     affects_resources: list[str] | Unset = UNSET
+    estimated_units: float | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -43,6 +45,8 @@ class CreateGateRequest:
         if not isinstance(self.affects_resources, Unset):
             affects_resources = self.affects_resources
 
+        estimated_units = self.estimated_units
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -54,6 +58,8 @@ class CreateGateRequest:
         )
         if affects_resources is not UNSET:
             field_dict["affectsResources"] = affects_resources
+        if estimated_units is not UNSET:
+            field_dict["estimatedUnits"] = estimated_units
 
         return field_dict
 
@@ -72,11 +78,14 @@ class CreateGateRequest:
 
         affects_resources = cast(list[str], d.pop("affectsResources", UNSET))
 
+        estimated_units = d.pop("estimatedUnits", UNSET)
+
         create_gate_request = cls(
             action=action,
             summary=summary,
             payload=payload,
             affects_resources=affects_resources,
+            estimated_units=estimated_units,
         )
 
         create_gate_request.additional_properties = d

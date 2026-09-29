@@ -83,7 +83,7 @@ public class PendingBuildRuns implements BuildFinishedListener {
                     }
                 } else {
                     runLifecycleService.terminate(run.getId(), RunStatus.PENDING_BUILD, RunStatus.FAILED,
-                            RunStepKind.FAILED, Map.of("summary", "The agent could not be rebuilt for this platform",
+                            TerminalReason.AGENT_FAILED, RunStepKind.FAILED, Map.of("summary", "The agent could not be rebuilt for this platform",
                                     "code", failureCode == null ? BuildFailureCodes.BUILD_FAILED : failureCode));
                 }
             } catch (RuntimeException e) {

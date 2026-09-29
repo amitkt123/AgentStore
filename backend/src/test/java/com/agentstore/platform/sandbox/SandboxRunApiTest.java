@@ -59,7 +59,7 @@ class SandboxRunApiTest extends AbstractStorageIntegrationTest {
                 Map.of("agentVersionId", dev.version().getId(), "profileId", profile.getId()), dev.org(), UserRole.DEVELOPER);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody().get("displayId").toString()).matches("S-[0-9A-F]{8}");
+        assertThat(response.getBody().get("displayId").toString()).matches("S-\\d+");
         assertThat(response.getBody().get("versionLabel")).isEqualTo("1.0.0 draft");
         assertThat(response.getBody().get("profileName")).isEqualTo("smoke");
         assertThat(response.getBody().get("status")).isEqualTo("RUNNING");

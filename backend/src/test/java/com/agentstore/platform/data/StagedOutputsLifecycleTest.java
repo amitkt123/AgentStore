@@ -4,6 +4,7 @@ import com.agentstore.platform.AbstractStorageIntegrationTest;
 import com.agentstore.platform.execution.GateRequest;
 import com.agentstore.platform.execution.GateService;
 import com.agentstore.platform.execution.RunLifecycleService;
+import com.agentstore.platform.execution.TerminalReason;
 import com.agentstore.platform.execution.RunRepository;
 import com.agentstore.platform.execution.RunStatus;
 import com.agentstore.platform.manifest.ManifestParser;
@@ -87,7 +88,7 @@ class StagedOutputsLifecycleTest extends AbstractStorageIntegrationTest {
         stage("journal_entries");
         openGate("journal_entries");
 
-        boolean ended = gateService.expire(agent.run().getId(), RunStatus.AWAITING_APPROVAL, Map.of("summary", "expired"));
+        boolean ended = gateService.expire(agent.run().getId(), RunStatus.AWAITING_APPROVAL, TerminalReason.GATE_EXPIRED, Map.of("summary", "expired"));
 
         assertThat(ended).isTrue();
         assertThat(statuses()).containsExactly(OutputStatus.DISCARDED);

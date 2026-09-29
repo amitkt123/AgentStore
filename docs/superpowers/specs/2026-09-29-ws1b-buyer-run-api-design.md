@@ -29,9 +29,9 @@ ALTER TABLE review_item ADD COLUMN display_id VARCHAR(20);
 ```
 
 - `R-<n>` for production and trial runs, `S-<n>` for sandbox runs (`run.mode = SANDBOX`), `RV-<n>` for review items.
-- A `DisplayIds` component assigns the ID where rows are created: `RunController` (buyer runs), `SandboxRunService` (sandbox runs), and review-item creation in the publishing service.
+- A `BEFORE INSERT` trigger on `run` and `review_item` assigns the ID from the sequence, so every insert path (`RunController`, `SandboxRunService`, review-item creation, tests) keeps working. Hibernate reads it back after insert (`@Generated`).
 - Sequences are global, so IDs reveal rough platform volume. The parent spec accepts this.
-- **Lookup.** Every `/api/v1/runs/{id}/**` and sandbox run path takes a string and resolves it as a UUID first, then as a display ID. One `RunLookup.find(idOrDisplay)` is used by all controllers, so ownership checks stay where they are. An unknown or foreign ID is 404 as today.
+- **Lookup.** Every `/api/v1/runs/{id}/**` and sandbox run path takes a string and resolves it as a UUID first, then as a display ID. One `RunLookup.find(idOrDisplay)` is used by all controllers, so ownership checks stay where they are. An unknown ID is 404. A run owned by another org is still 403 on the buyer paths, as before WS1b (see `docs/known-issues.md`).
 - Response DTOs (`RunResponse`, `RunSummaryResponse`, `RunDetailResponse`, sandbox run responses, review item responses) gain `displayId`. UUIDs keep working everywhere.
 
 ## 2. Why a run stopped
@@ -45,13 +45,14 @@ It is set where a run ends. `RunLifecycleService.finish` and `terminate` take th
 | `complete` | `FINISHED` |
 | agent `/fail`, launch or build failure | `AGENT_FAILED` |
 | `rejectGate` (finishes as `CANCELLED`) | `GATE_REJECTED` |
+| sandbox cancel (`SandboxRunService.cancel`) | `CANCELLED` |
 | `GateService.expire` | `GATE_EXPIRED` |
 | `RunReaper` timeout | `TIMED_OUT` |
 | `RunReaper` runner lost | `SANDBOX_LOST` |
 | `charge` cap reached | `COST_CAP_REACHED` |
 | `recordViolation` at `MAX_PRODUCTION_VIOLATIONS` | `SCOPE_VIOLATIONS` |
 
-`CANCELLED` has no code path today (there is no buyer cancel endpoint); the value stays in the enum for when one exists. Existing terminal runs are backfilled where status and closing step make the reason unambiguous (COMPLETED to `FINISHED`; a `TIMEOUT` step on EXPIRED with a gate to `GATE_EXPIRED`; the `SCOPE_VIOLATIONS` and `COST_CAP_REACHED` closing steps) and left null otherwise. `terminalReason` is null while a run is not terminal.
+`CANCELLED` is set by the sandbox cancel path (`SandboxRunService.cancel`); a buyer cancel endpoint does not exist yet. Existing terminal runs are backfilled where status and closing step make the reason unambiguous (COMPLETED to `FINISHED`; a `TIMEOUT` step on EXPIRED with a gate to `GATE_EXPIRED`; the `SCOPE_VIOLATIONS` and `COST_CAP_REACHED` closing steps) and left null otherwise. `terminalReason` is null while a run is not terminal.
 
 ## 3. Gate additions
 
@@ -145,5 +146,5 @@ TDD with Testcontainers as elsewhere.
 
 - WS14: `EMAIL_LINK` / `SLACK_LINK` decisions.
 - WS15: configurable approver list replaces the snapshot source.
-- A buyer cancel endpoint (would use `CANCELLED`).
+- A buyer cancel endpoint (would also use `CANCELLED`).
 - The in-sandbox proxy that posts `network-events`.

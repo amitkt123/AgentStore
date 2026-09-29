@@ -17,6 +17,15 @@ describe("Gates", () => {
     expect(f.calls[1][1]).toEqual(["g-1", 25]);
   });
 
+  it("sends estimatedUnits only when given", async () => {
+    const f = fakeApi({ createGate: { gateId: "g", status: "APPROVED" } });
+    await new Gates(f.api).request({ action: "a", summary: "s", payload: {}, estimatedUnits: 142 });
+    expect((f.calls[0][1][0] as Record<string, unknown>).estimatedUnits).toBe(142);
+    const g = fakeApi({ createGate: { gateId: "g", status: "APPROVED" } });
+    await new Gates(g.api).request({ action: "a", summary: "s", payload: {} });
+    expect(g.calls[0][1][0]).not.toHaveProperty("estimatedUnits");
+  });
+
   it("does not poll when decided at creation", async () => {
     const f = fakeApi({ createGate: { gateId: "g", status: "APPROVED" } });
     expect((await new Gates(f.api).request({ action: "a", summary: "s", payload: {} })).approved).toBe(true);

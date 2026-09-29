@@ -80,6 +80,20 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/WriteResult"
+  /runtime/v1/network-events:
+    post:
+      tags:
+      - runtime-lifecycle-controller
+      operationId: networkEvents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NetworkEventBatch"
+        required: true
+      responses:
+        "204":
+          description: No Content
   /runtime/v1/logs:
     post:
       tags:
@@ -309,6 +323,31 @@ components:
           format: int32
         staged:
           type: boolean
+    NetworkEvent:
+      properties:
+        host:
+          type: string
+          maxLength: 255
+          minLength: 0
+        count:
+          type: integer
+          format: int32
+          maximum: 1000000
+          minimum: 1
+        callsite:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - host
+    NetworkEventBatch:
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkEvent"
+      required:
+      - events
     LogBatch:
       properties:
         entries:
@@ -350,6 +389,9 @@ components:
           type: array
           items:
             type: string
+        estimatedUnits:
+          type: number
+          maximum: 9999999999
       required:
       - action
       - payload

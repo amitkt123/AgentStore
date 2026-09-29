@@ -44,8 +44,15 @@ public class ManifestParser {
 
         List<ApprovalGateDecl> gates = new ArrayList<>();
         for (JsonNode g : root.path("approvalGates")) {
+            JsonNode p = g.path("preview");
+            ApprovalGateDecl.Preview preview = null;
+            if (p.isObject()) {
+                List<String> cols = new ArrayList<>();
+                p.path("columns").forEach(c -> cols.add(c.asText()));
+                preview = new ApprovalGateDecl.Preview(cols, p.hasNonNull("totalField") ? p.get("totalField").asText() : null);
+            }
             gates.add(new ApprovalGateDecl(g.get("trigger").asText(), g.path("description").asText(""),
-                    g.path("timeoutMinutes").asInt(ApprovalGateDecl.DEFAULT_TIMEOUT_MINUTES)));
+                    g.path("timeoutMinutes").asInt(ApprovalGateDecl.DEFAULT_TIMEOUT_MINUTES), preview));
         }
 
         List<String> dataClasses = new ArrayList<>();

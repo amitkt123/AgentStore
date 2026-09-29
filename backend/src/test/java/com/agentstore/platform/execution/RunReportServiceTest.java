@@ -36,6 +36,23 @@ class RunReportServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void blockedNetworkAttemptsAreAggregatedPerHostInTheReport() throws Exception {
+        var dev = sandboxFixtures.developer("valid-runtime-agent.json");
+        Run run = sandboxFixtures.sandboxRun(dev, null, RunStatus.RUNNING);
+
+        lifecycle.recordNetworkEvents(run.getId(), java.util.List.of(
+                Map.of("host", "evil.example", "count", 3), Map.of("host", "evil.example", "count", 2),
+                Map.of("host", "other.example", "count", 1)));
+        lifecycle.complete(run.getId(), Map.of("summary", "done"));
+
+        var network = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(reports.findById(run.getId()).orElseThrow().getReportJson()).get("network");
+        assertThat(network.get("blocked")).hasSize(2);
+        assertThat(network.get("blocked").toString()).contains("{\"host\":\"evil.example\",\"count\":5}")
+                .contains("{\"host\":\"other.example\",\"count\":1}");
+    }
+
+    @Test
     void violationsProduceAnIssuesReportWithTheViolationCount() {
         var dev = sandboxFixtures.developer("valid-runtime-agent.json");
         Run run = sandboxFixtures.sandboxRun(dev, null, RunStatus.RUNNING);
@@ -64,7 +81,7 @@ class RunReportServiceTest extends AbstractIntegrationTest {
         var dev = sandboxFixtures.developer("valid-runtime-agent.json");
         Run run = sandboxFixtures.sandboxRun(dev, null, RunStatus.RUNNING);
 
-        lifecycle.terminate(run.getId(), RunStatus.RUNNING, RunStatus.TIMED_OUT, RunStepKind.TIMEOUT,
+        lifecycle.terminate(run.getId(), RunStatus.RUNNING, RunStatus.TIMED_OUT, TerminalReason.TIMED_OUT, RunStepKind.TIMEOUT,
                 Map.of("summary", "no heartbeat"));
 
         RunReport report = reports.findById(run.getId()).orElseThrow();

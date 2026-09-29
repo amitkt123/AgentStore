@@ -75,10 +75,10 @@ public class RunReaper {
                 return false;
             }
             return gateService.expire(run.getId(), snapshotStatus,
-                    Map.of("summary", "No approval decision in time; run stopped"));
+                    gateExpired ? TerminalReason.GATE_EXPIRED : TerminalReason.TIMED_OUT, Map.of("summary", "No approval decision in time; run stopped"));
         }
         if (deadlinePassed) {
-            return runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.TIMED_OUT, RunStepKind.TIMEOUT,
+            return runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.TIMED_OUT, TerminalReason.TIMED_OUT, RunStepKind.TIMEOUT,
                     Map.of("summary", "Run exceeded its time limit"));
         }
         if (snapshotStatus == RunStatus.RUNNING && run.getSandboxId() != null) {
@@ -90,7 +90,7 @@ public class RunReaper {
                     detail.put("exitCode", sandbox.exitCode());
                 }
                 return runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.FAILED,
-                        RunStepKind.FAILED, detail);
+                        TerminalReason.SANDBOX_LOST, RunStepKind.FAILED, detail);
             }
         }
         return false;

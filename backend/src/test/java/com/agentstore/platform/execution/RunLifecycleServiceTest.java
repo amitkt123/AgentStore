@@ -63,9 +63,9 @@ class RunLifecycleServiceTest extends AbstractIntegrationTest {
         String sandboxId = sandbox();
         Run run = fixtures.run(scenario(), RunStatus.RUNNING, sandboxId, "tok-" + UUID.randomUUID());
 
-        assertThat(lifecycle.terminate(run.getId(), RunStatus.TIMED_OUT, RunStepKind.TIMEOUT,
+        assertThat(lifecycle.terminate(run.getId(), RunStatus.TIMED_OUT, TerminalReason.TIMED_OUT, RunStepKind.TIMEOUT,
                 Map.of("summary", "Run exceeded its time limit"))).isTrue();
-        assertThat(lifecycle.terminate(run.getId(), RunStatus.FAILED, RunStepKind.FAILED, Map.of())).isFalse();
+        assertThat(lifecycle.terminate(run.getId(), RunStatus.FAILED, TerminalReason.AGENT_FAILED, RunStepKind.FAILED, Map.of())).isFalse();
 
         Run after = runRepository.findById(run.getId()).orElseThrow();
         assertThat(after.getStatus()).isEqualTo(RunStatus.TIMED_OUT);

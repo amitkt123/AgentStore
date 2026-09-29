@@ -10,7 +10,13 @@ export type RunStatus =
 export type RunStepKind =
   | "READ" | "WRITE" | "GATE" | "COST" | "COMPLETE" | "FAILED" | "TIMEOUT" | "COST_CAP_REACHED"
   | "DATA_READ" | "DATA_WRITE" | "WRITE_STAGED" | "GATE_REQUESTED" | "GATE_DECIDED"
-  | "LLM_CALL" | "USAGE" | "SCOPE_VIOLATION" | "AGENT_LOG";
+  | "LLM_CALL" | "USAGE" | "SCOPE_VIOLATION" | "AGENT_LOG" | "CANCELLED" | "NETWORK_BLOCKED";
+export type TerminalReason =
+  | "FINISHED" | "GATE_REJECTED" | "GATE_EXPIRED" | "COST_CAP_REACHED" | "TIMED_OUT" | "SCOPE_VIOLATIONS"
+  | "AGENT_FAILED" | "CANCELLED" | "SANDBOX_LOST";
+export type DecidedVia = "WEB" | "EMAIL_LINK" | "SLACK_LINK";
+export type GateStatus = "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED";
+export type RunGroup = "needs_you" | "running" | "finished" | "stopped";
 export type RunStepSource = "PLATFORM" | "AGENT";
 export type LedgerEntryType = "CHARGE" | "REVERSAL" | "FEE";
 export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -35,6 +41,7 @@ export interface CostEnvelope {
 export interface ApprovalGateDecl {
   trigger: string;
   description: string;
+  preview?: { columns?: string[]; totalField?: string };
 }
 export interface Manifest {
   name: string;
@@ -114,7 +121,9 @@ export interface ConnectionSummaryResponse extends ConnectionResponse {
 
 export interface RunResponse {
   id: string;
+  displayId: string;
   status: RunStatus;
+  terminalReason: TerminalReason | null;
 }
 export interface RunStepResponse {
   kind: RunStepKind;
@@ -124,17 +133,58 @@ export interface RunStepResponse {
 }
 export interface RunDetailResponse {
   id: string;
+  displayId: string;
   status: RunStatus;
+  terminalReason: TerminalReason | null;
   costCap: number;
   totalCharged: number;
   steps: RunStepResponse[];
 }
 export interface RunSummaryResponse {
   id: string;
+  displayId: string;
   agentName: string;
   status: RunStatus;
+  terminalReason: TerminalReason | null;
   totalCharged: number;
   startedAt: string;
+}
+
+export interface GateDetail {
+  gateId: string;
+  action: string;
+  summary: string;
+  payload: unknown;
+  status: GateStatus;
+  expiresAt: string;
+  estimatedUnits: number | null;
+  costIfApproved: number | null;
+  preview: { columns?: string[]; rows: Record<string, unknown>[]; totalRows: number; total?: number } | null;
+  decidedVia: DecidedVia | null;
+  decidedByUserId: string | null;
+  decidedAt: string | null;
+  note: string | null;
+}
+export interface RunListItem {
+  id: string;
+  displayId: string;
+  agent: string;
+  version: string;
+  status: RunStatus;
+  terminalReason: TerminalReason | null;
+  reachedBlock: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  charged: number;
+  held: number;
+  decidedBy: { name: string } | null;
+}
+export interface RunListResponse {
+  items: RunListItem[];
+  counts: Record<RunGroup, number>;
+  page: number;
+  size: number;
+  total: number;
 }
 
 export interface StatementLineResponse {

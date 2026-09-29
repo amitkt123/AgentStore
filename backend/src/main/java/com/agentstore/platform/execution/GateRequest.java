@@ -51,6 +51,33 @@ public class GateRequest {
     private Instant decidedAt;
     private Instant expiresAt;
 
+    @Column(name = "estimated_units")
+    private java.math.BigDecimal estimatedUnits;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private String preview;
+
+    @Enumerated(EnumType.STRING)
+    private DecidedVia decidedVia;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "eligible_approver_ids", columnDefinition = "jsonb")
+    private String eligibleApproverIdsJson;
+
+    /** Null when the gate is unrestricted (sandbox runs, or a buyer org with no approver members). */
+    public java.util.List<java.util.UUID> eligibleApproverIds() {
+        if (eligibleApproverIdsJson == null) {
+            return null;
+        }
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(eligibleApproverIdsJson,
+                    new com.fasterxml.jackson.core.type.TypeReference<java.util.List<java.util.UUID>>() {});
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Corrupt eligible_approver_ids on gate " + id, e);
+        }
+    }
+
     public GateRequest(Run run, String action, String summary, String payload, String affectsResources,
                        Instant expiresAt) {
         this.run = run;

@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runtime/v1/network-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["networkEvents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/runtime/v1/logs": {
         parameters: {
             query?: never;
@@ -236,6 +252,15 @@ export interface components {
             accepted?: number;
             staged?: boolean;
         };
+        NetworkEvent: {
+            host: string;
+            /** Format: int32 */
+            count?: number;
+            callsite?: string;
+        };
+        NetworkEventBatch: {
+            events: components["schemas"]["NetworkEvent"][];
+        };
         LogBatch: {
             entries: components["schemas"]["LogEntry"][];
         };
@@ -253,6 +278,7 @@ export interface components {
                 [key: string]: unknown;
             };
             affectsResources?: string[];
+            estimatedUnits?: number;
         };
         GateCreatedResponse: {
             /** Format: uuid */
@@ -421,6 +447,28 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["WriteResult"];
                 };
+            };
+        };
+    };
+    networkEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkEventBatch"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

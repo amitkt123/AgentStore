@@ -25,13 +25,16 @@ public class RuntimeGateController {
     private final GateService gateService;
     private final ObjectMapper objectMapper;
     private final SandboxGatePolicy sandboxGatePolicy;
+    private final com.agentstore.platform.data.GatePreviewBuilder previewBuilder;
 
     public RuntimeGateController(ScopeGuard scopeGuard, GateService gateService, ObjectMapper objectMapper,
-                                 SandboxGatePolicy sandboxGatePolicy) {
+                                 SandboxGatePolicy sandboxGatePolicy,
+                                 com.agentstore.platform.data.GatePreviewBuilder previewBuilder) {
         this.scopeGuard = scopeGuard;
         this.gateService = gateService;
         this.objectMapper = objectMapper;
         this.sandboxGatePolicy = sandboxGatePolicy;
+        this.previewBuilder = previewBuilder;
     }
 
     @PostMapping
@@ -40,9 +43,10 @@ public class RuntimeGateController {
         RunPrincipal principal = RunPrincipal.current();
         ApprovalGateDecl declared = scopeGuard.gateAction(principal, request.action());
         List<String> affects = request.affectsResources() == null ? List.of() : request.affectsResources();
+        String previewJson = previewBuilder.build(principal.runId(), affects, declared.preview());
         GateRequest gate = gateService.open(principal.runId(), declared.trigger(), declared.timeoutMinutes(),
                 request.summary(), objectMapper.writeValueAsString(request.payload()),
-                objectMapper.writeValueAsString(affects));
+                objectMapper.writeValueAsString(affects), request.estimatedUnits(), previewJson);
         if (principal.mode() == RunMode.SANDBOX) {
             gate = sandboxGatePolicy.apply(principal.runId(), gate);
         }

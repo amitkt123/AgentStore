@@ -22,6 +22,8 @@ from .llm import Llm
 from .log_batch import LogBatch
 from .log_entry import LogEntry
 from .log_entry_fields import LogEntryFields
+from .network_event import NetworkEvent
+from .network_event_batch import NetworkEventBatch
 from .record_page import RecordPage
 from .record_page_records_item import RecordPageRecordsItem
 from .resource_meta import ResourceMeta
@@ -56,6 +58,8 @@ __all__ = (
     "LogBatch",
     "LogEntry",
     "LogEntryFields",
+    "NetworkEvent",
+    "NetworkEventBatch",
     "RecordPage",
     "RecordPageRecordsItem",
     "ResourceMeta",

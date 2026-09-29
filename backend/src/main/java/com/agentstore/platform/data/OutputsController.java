@@ -35,15 +35,19 @@ public class OutputsController {
     private final RunRepository runs;
     private final RunOutputRepository outputs;
     private final ObjectStorage storage;
+    private final com.agentstore.platform.execution.RunLookup runLookup;
 
-    public OutputsController(RunRepository runs, RunOutputRepository outputs, ObjectStorage storage) {
+    public OutputsController(RunRepository runs, RunOutputRepository outputs, ObjectStorage storage,
+                             com.agentstore.platform.execution.RunLookup runLookup) {
         this.runs = runs;
         this.outputs = outputs;
         this.storage = storage;
+        this.runLookup = runLookup;
     }
 
     @GetMapping
-    public List<OutputResponse> list(@PathVariable UUID runId, @RequestParam(value = "preview", required = false) Integer preview) {
+    public List<OutputResponse> list(@PathVariable("runId") String runRef, @RequestParam(value = "preview", required = false) Integer preview) {
+        UUID runId = runLookup.idOf(runRef);
         requireOwnRun(runId);
         int rows = preview == null ? 0 : Math.max(0, Math.min(preview, MAX_PREVIEW));
         return outputs.findByRunIdOrderByCreatedAtAsc(runId).stream().map(o -> new OutputResponse(o.getId(),
@@ -53,9 +57,10 @@ public class OutputsController {
     }
 
     @GetMapping("/{outputId}/download")
-    public void download(@PathVariable UUID runId, @PathVariable UUID outputId,
+    public void download(@PathVariable("runId") String runRef, @PathVariable UUID outputId,
                          @RequestParam(value = "format", defaultValue = "csv") String format,
                          HttpServletResponse response) throws IOException {
+        UUID runId = runLookup.idOf(runRef);
         requireOwnRun(runId);
         if (!format.equals("csv") && !format.equals("json")) {
             throw new DataApiException(HttpStatus.BAD_REQUEST, "INVALID_FORMAT", "format must be csv or json");

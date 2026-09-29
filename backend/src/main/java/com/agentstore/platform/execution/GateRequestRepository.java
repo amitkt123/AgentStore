@@ -12,4 +12,6 @@ public interface GateRequestRepository extends JpaRepository<GateRequest, UUID> 
     Optional<GateRequest> findByIdAndRunId(UUID id, UUID runId);
 
     List<GateRequest> findByRunIdOrderByCreatedAtAsc(UUID runId);
+
+    List<GateRequest> findByRunIdOrderByCreatedAtDesc(UUID runId);
 }

@@ -26,6 +26,8 @@ const KIND_LABEL: Record<RunStepResponse["kind"], string> = {
   USAGE: "Reported usage",
   SCOPE_VIOLATION: "Blocked: outside its permissions",
   AGENT_LOG: "Reported by the agent",
+  CANCELLED: "Cancelled",
+  NETWORK_BLOCKED: "Blocked an outside connection",
 };
 
 export function RunTraceStep({ step }: { step: RunStepResponse }) {

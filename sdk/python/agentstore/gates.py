@@ -22,9 +22,11 @@ class Gates:
         self._wait = wait                                   # server caps a single wait at 30s
 
     def request(self, action: str, summary: str, payload: dict, affects: list[str] | None = None, *,
-                raise_on_reject: bool = False) -> Decision:
-        created = self._api.create_gate({"action": action, "summary": summary, "payload": payload,
-                                         "affectsResources": list(affects or [])})
+                estimated_units: float | None = None, raise_on_reject: bool = False) -> Decision:
+        body = {"action": action, "summary": summary, "payload": payload, "affectsResources": list(affects or [])}
+        if estimated_units is not None:
+            body["estimatedUnits"] = estimated_units      # the platform turns this into the buyer's "cost if approved"
+        created = self._api.create_gate(body)
         gate_id, view = created["gateId"], created
         while view["status"] == "PENDING":
             view = self._api.get_gate(gate_id, self._wait)
