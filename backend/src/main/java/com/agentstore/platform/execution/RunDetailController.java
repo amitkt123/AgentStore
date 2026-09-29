@@ -18,6 +18,7 @@ public class RunDetailController {
     private final RunStepRepository runStepRepository;
     private final RunFlowService flowService;
     private final RunLookup runLookup;
+    private final RunListService runListService;
     private final GateRequestRepository gateRequestRepository;
     private final com.agentstore.platform.manifest.ManifestParser manifestParser;
     private final com.fasterxml.jackson.databind.ObjectMapper mapper;
@@ -25,7 +26,7 @@ public class RunDetailController {
     public RunDetailController(RunRepository runRepository, RunStepRepository runStepRepository, RunFlowService flowService,
                                RunLookup runLookup, GateRequestRepository gateRequestRepository,
                                com.agentstore.platform.manifest.ManifestParser manifestParser,
-                               com.fasterxml.jackson.databind.ObjectMapper mapper) {
+                               com.fasterxml.jackson.databind.ObjectMapper mapper, RunListService runListService) {
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.flowService = flowService;
@@ -33,6 +34,22 @@ public class RunDetailController {
         this.gateRequestRepository = gateRequestRepository;
         this.manifestParser = manifestParser;
         this.mapper = mapper;
+        this.runListService = runListService;
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    public RunListResponse list(@RequestParam(required = false) String group,
+                                @RequestParam(required = false) UUID agentId,
+                                @RequestParam(required = false) String q,
+                                @RequestParam(required = false) java.time.Instant from,
+                                @RequestParam(required = false) java.time.Instant to,
+                                @RequestParam(defaultValue = "0") int page,
+                                @RequestParam(defaultValue = "25") int size) {
+        var claims = (JwtService.Claims)
+                SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return runListService.list(claims.orgId(), new RunListQuery(group == null ? null : RunGroup.fromKey(group),
+                agentId, q, from, to, page, size));
     }
 
     @GetMapping("/{runId}")
