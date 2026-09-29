@@ -1,0 +1,11 @@
+.page { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+.card { width: 100%; max-width: 420px; background: var(--s); border: 1px solid var(--l); border-radius: 16px; padding: 32px; box-shadow: 0 8px 30px rgba(13,26,48,0.06); }
+.brand { font-weight: 700; color: var(--b); margin-bottom: 20px; }
+.form { display: flex; flex-direction: column; gap: 16px; }
+.form h1 { font-size: 22px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink2); min-height: 44px; }
+.err { color: var(--bad); margin: 0; }
+.alt { margin: 0; font-size: 13px; color: var(--ink2); }
+.side { border: 1px solid var(--l); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.side legend { font-size: 13px; font-weight: 600; color: var(--ink2); padding: 0 4px; }
+@media (max-width: 480px) { .card { padding: 24px 20px; } }
