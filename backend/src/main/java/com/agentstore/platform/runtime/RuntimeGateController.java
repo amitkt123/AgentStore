@@ -42,7 +42,7 @@ public class RuntimeGateController {
         List<String> affects = request.affectsResources() == null ? List.of() : request.affectsResources();
         GateRequest gate = gateService.open(principal.runId(), declared.trigger(), declared.timeoutMinutes(),
                 request.summary(), objectMapper.writeValueAsString(request.payload()),
-                objectMapper.writeValueAsString(affects));
+                objectMapper.writeValueAsString(affects), request.estimatedUnits(), null);
         if (principal.mode() == RunMode.SANDBOX) {
             gate = sandboxGatePolicy.apply(principal.runId(), gate);
         }

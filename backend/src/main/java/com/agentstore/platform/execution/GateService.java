@@ -10,6 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,21 +29,29 @@ public class GateService {
     private final RunStepRepository runStepRepository;
     private final RunLifecycleService runLifecycleService;
     private final ApplicationEventPublisher events;
+    private final EligibleApprovers eligibleApprovers;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public GateService(RunRepository runRepository, GateRequestRepository gateRequestRepository,
                        RunStepRepository runStepRepository, RunLifecycleService runLifecycleService,
-                       ApplicationEventPublisher events) {
+                       ApplicationEventPublisher events, EligibleApprovers eligibleApprovers) {
         this.runRepository = runRepository;
         this.gateRequestRepository = gateRequestRepository;
         this.runStepRepository = runStepRepository;
         this.runLifecycleService = runLifecycleService;
         this.events = events;
+        this.eligibleApprovers = eligibleApprovers;
     }
 
     @Transactional
     public GateRequest open(UUID runId, String action, int timeoutMinutes, String summary, String payloadJson,
                             String affectsJson) {
+        return open(runId, action, timeoutMinutes, summary, payloadJson, affectsJson, null, null);
+    }
+
+    @Transactional
+    public GateRequest open(UUID runId, String action, int timeoutMinutes, String summary, String payloadJson,
+                            String affectsJson, java.math.BigDecimal estimatedUnits, String previewJson) {
         Run run = lock(runId);
         if (run.getStatus().isTerminal()) {
             throw new RunTerminatedException(run.getStatus());
@@ -51,8 +60,12 @@ public class GateService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A gate is already awaiting approval");
         }
         Instant now = Instant.now();
-        GateRequest gate = gateRequestRepository.save(new GateRequest(run, action, summary, payloadJson, affectsJson,
-                now.plus(Duration.ofMinutes(timeoutMinutes))));
+        GateRequest opened = new GateRequest(run, action, summary, payloadJson, affectsJson,
+                now.plus(Duration.ofMinutes(timeoutMinutes)));
+        opened.setEstimatedUnits(estimatedUnits);
+        opened.setPreview(previewJson);
+        opened.setEligibleApproverIdsJson(eligibleApprovers.snapshotJson(run));
+        GateRequest gate = gateRequestRepository.save(opened);
         run.setStatus(RunStatus.AWAITING_APPROVAL);
         run.setAwaitingSince(now);
         run.setLastHeartbeatAt(now);
@@ -82,10 +95,15 @@ public class GateService {
             if (gate.getStatus() != GateStatus.PENDING) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Gate already " + gate.getStatus());
             }
+            List<UUID> eligible = gate.eligibleApproverIds();
+            if (eligible != null && !eligible.contains(userId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not an approver for this gate");
+            }
             gate.setStatus(approve ? GateStatus.APPROVED : GateStatus.REJECTED);
             gate.setDecidedByUserId(userId);
             gate.setDecisionNote(note);
             gate.setDecidedAt(Instant.now());
+            gate.setDecidedVia(DecidedVia.WEB);
             gateRequestRepository.save(gate);
             events.publishEvent(new GateOutcomeEvent(runId, gate.getId(), gate.getStatus(),
                     gate.affected(), gate.getCreatedAt()));
