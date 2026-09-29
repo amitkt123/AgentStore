@@ -1,0 +1,9 @@
+# Local development profile. Run with: mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# Secrets and per-machine values live in backend/.env (git-ignored, copy from .env.example).
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: jdbc:postgresql://localhost:${DB_PORT:5433}/agentstore
+    username: agentstore
+    password: ${DB_PASSWORD:agentstore}

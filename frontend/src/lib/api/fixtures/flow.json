@@ -1,0 +1,6 @@
+{"blocks":[
+ {"block":"read:bank_statement","state":"DONE","metrics":{"count":412},"gateId":null,"flag":null},
+ {"block":"gate:post_entries","state":"WAITING","metrics":null,"gateId":"22222222-2222-2222-2222-222222222222","flag":null},
+ {"block":"charge","state":"IDLE","metrics":null,"gateId":null,"flag":null},
+ {"block":"write:secret","state":"FAILED","metrics":null,"gateId":null,"flag":"UNDECLARED"}],
+ "reachedBlock":"gate:post_entries","spend":{"charged":0,"cap":500},"deadlineAt":null,"blockedAttempts":1}

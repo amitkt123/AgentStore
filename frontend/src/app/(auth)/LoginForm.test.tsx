@@ -12,9 +12,9 @@ vi.mock("./actions", () => ({ loginAction: vi.fn() }));
 
 it("renders labelled fields and a remember checkbox", () => {
   render(<LoginForm next="/runs" />);
-  expect(screen.getByLabelText("Email")).toBeInTheDocument();
+  expect(screen.getByLabelText("Work email")).toBeInTheDocument();
   expect(screen.getByLabelText("Password")).toBeInTheDocument();
   expect(screen.getByLabelText(/keep me signed in/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: /create an account/i })).toHaveAttribute("href", "/signup");
+  expect(screen.getByRole("link", { name: /create account/i })).toHaveAttribute("href", "/signup");
 });
