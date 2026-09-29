@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Who may decide a gate, snapshotted when it opens. Today that is the buyer org's BUYER_APPROVER members, which is the
- * rule the decision endpoints already enforce through their role check, made explicit. WS15 swaps the source for the
- * configurable approver list. A sandbox run has no buyer org, and an org with no approver members would otherwise
+ * rule the decision endpoints already enforce through their role check, made explicit. A connection's own approver
+ * list, when it has one, replaces that. A sandbox run has no buyer org, and an org with no approver members would otherwise
  * deadlock, so both snapshot as null (unrestricted).
  */
 @Component
@@ -30,7 +30,8 @@ public class EligibleApprovers {
         if (run.getConnection() == null) {
             return null;
         }
-        List<UUID> ids = memberships.findByIdOrgIdOrderByCreatedAtAsc(run.getConnection().getBuyerOrg().getId()).stream()
+        List<UUID> listed = run.getConnection().getApproverUserIds().stream().sorted().toList();
+        List<UUID> ids = !listed.isEmpty() ? listed : memberships.findByIdOrgIdOrderByCreatedAtAsc(run.getConnection().getBuyerOrg().getId()).stream()
                 .filter(m -> m.getRole() == UserRole.BUYER_APPROVER)
                 .map(m -> m.getUser().getId())
                 .toList();
