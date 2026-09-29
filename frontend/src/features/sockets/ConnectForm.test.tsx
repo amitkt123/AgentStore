@@ -30,6 +30,7 @@ it("blocks 'Add and run now' until every socket has a checked file", async () =>
   expect(screen.getByRole("button", { name: /add and run now/i })).toBeDisabled();
   await userEvent.selectOptions(screen.getByLabelText(/bank statement/i), "d1");
   expect(await screen.findByText(/412 rows, columns match/i)).toBeInTheDocument();
+  expect(a.check).toHaveBeenCalledWith("d1", "v1", "bank_statement");
   expect(screen.getByRole("button", { name: /add and run now/i })).toBeEnabled();
 });
 

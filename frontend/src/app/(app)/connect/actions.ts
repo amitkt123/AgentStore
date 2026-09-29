@@ -13,7 +13,8 @@ async function guard<T extends object>(fn: () => Promise<T>): Promise<T | { erro
 }
 
 export const uploadForSocketAction = (fd: FormData) => guard<{ dataset: Dataset }>(async () => ({ dataset: await uploadDataset(fd) }));
-export const checkSocketAction = (datasetId: string, versionId: string) => guard<{ result: CheckResult }>(async () => ({ result: await checkDataset(datasetId, versionId) }));
+export const checkSocketAction = (datasetId: string, versionId: string, resource: string) =>
+  guard<{ result: CheckResult }>(async () => ({ result: await checkDataset(datasetId, versionId, resource) }));
 export const createConnectionAction = (agentId: string, grantedScopes: string[], spendCap: number) =>
   guard<{ connectionId: string }>(async () => ({ connectionId: (await createConnection({ agentId, grantedScopes, spendCap })).id }));
 export const bindSocketAction = (connectionId: string, resource: string, datasetId: string) =>

@@ -21,7 +21,7 @@ export function RunTimeline({ items, nowMs }: { items: RunListItem[]; nowMs: num
           </div>
         </div>
       ))}
-      <div className={styles.axis} aria-hidden="true">{hours.map((h) => <span key={h} className="mono">{String(h).padStart(2, "0")}:00</span>)}</div>
+      <div className={styles.axis} aria-hidden="true">{hours.map((h) => <span key={h} className="mono">{String(h % 24).padStart(2, "0")}:00</span>)}</div>
     </section>
   );
 }

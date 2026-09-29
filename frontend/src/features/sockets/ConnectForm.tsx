@@ -32,7 +32,7 @@ export function ConnectForm({ agentId, versionId, agentName, manifest, datasets:
 
   const runCheck = async (resource: string, datasetId: string) => {
     setPicked((p) => ({ ...p, [resource]: { datasetId, check: null } }));
-    const res = await checkSocketAction(datasetId, versionId);
+    const res = await checkSocketAction(datasetId, versionId, resource);
     if ("error" in res) { setError(res.error); return; }
     setPicked((p) => ({ ...p, [resource]: { datasetId, check: res.result } }));
   };

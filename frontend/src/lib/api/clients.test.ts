@@ -7,7 +7,7 @@ vi.mock("next/headers", () => ({ cookies: () => ({ get: () => ({ value: "tok" })
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
 import { runQueryString, getRunSnapshot, decideGate } from "./runs";
-import { listDatasets } from "./datasets";
+import { checkDataset, listDatasets, uploadDataset } from "./datasets";
 
 function respond(map: Record<string, unknown>) {
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
@@ -44,4 +44,18 @@ it("requests datasets with usage", async () => {
   const list = await listDatasets();
   expect(calls[0].url).toContain("/api/v1/datasets?include=usage");
   expect(list[0].displayName).toBeTruthy();
+});
+
+it("sends the file name as displayName when the caller gives none", async () => {
+  respond({ "/datasets": datasets[0] });
+  const fd = new FormData();
+  fd.set("file", new Blob(["a"]), "statement.csv");
+  await uploadDataset(fd);
+  expect((calls[0].init?.body as FormData).get("displayName")).toBe("statement.csv");
+});
+
+it("sends the resource with a schema check", async () => {
+  respond({ "/check": { ok: true } });
+  await checkDataset("d1", "v1", "bank_statement");
+  expect(JSON.parse(String(calls[0].init?.body))).toEqual({ agentVersionId: "v1", resource: "bank_statement" });
 });
