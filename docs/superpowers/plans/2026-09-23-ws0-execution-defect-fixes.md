@@ -1,6 +1,5 @@
 # WS0 — Execution Defect Fixes Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the existing production run path correct and safe before any new developer-platform work builds on it. That means hashed run tokens compared in constant time, a single locked run-lifecycle service, cost-cap clamping, wallet reservations, runs pinned to a connection's version, a run reaper, and deny-all egress.
 
@@ -23,7 +22,6 @@
 - Egress: `denyOut: ["0.0.0.0/0"]` alongside `allowOut` (E2B docs: allow rules take precedence over deny; domains are not allowed in `denyOut`).
 - Money is `BigDecimal`, scale 2, `RoundingMode.HALF_UP` (existing convention).
 - Integration tests extend `AbstractIntegrationTest` (Testcontainers Postgres, `test` profile, `FakeSandboxProvider`). Docker must be running.
-- Commit messages: conventional-commit style (`fix(execution): …`). **Never add any Claude/Anthropic/AI attribution or `Co-Authored-By` trailer** (user's global instruction).
 - **Out of scope** (owned by later workstreams): B2 agent process start (WS5 sandbox-bridge, which just gets a documented limitation here); B11 `/internal` → `/runtime/v1` + rate limiting (WS1); B6/B7 scope mediation and datasets (WS1/WS2); B8 double-entry ledger (WS10).
 
 ## Review Focus

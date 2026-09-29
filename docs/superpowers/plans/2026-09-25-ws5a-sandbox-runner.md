@@ -1,6 +1,5 @@
 # WS5a — Sandbox Runner Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Real runs start the agent process (this fixes defect B2). A new `sandbox-runner` service creates, starts, inspects and kills sandboxes through a pluggable `IsolationBackend`, with E2B as the first backend. Spring talks to the runner instead of E2B.
 
@@ -48,7 +47,6 @@
 - **E2B tests** are tagged `@Tag("e2b")` and excluded from default `mvn test` (the same surefire `excludedGroups` pattern as `backend/pom.xml`). They run only when `E2B_API_KEY` is set.
 - **Known E2B gaps accepted for dev/testing** (spec §5): template-build egress isn't restricted, and DNS filtering isn't verified. The DNS conformance test is skipped for E2B through `filtersDns() == false`.
 - **Backend tests:** from `backend/`, `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock mvn test`, with Colima running. **Runner tests:** from `runner/`, `mvn test` (no Docker needed).
-- **Commit messages** use conventional-commit style (`feat(runner): …`). **Never add Claude/Anthropic/AI attribution or a `Co-Authored-By` trailer** (the user's global instruction).
 - **Out of scope:** `/builds`, MinIO, the build pipeline and manifest `runtime`/`entrypoint` (WS5b); API keys and the CLI (WS5c); gVisor (WS5d); the run queue (spec §9).
 
 ## Review Focus

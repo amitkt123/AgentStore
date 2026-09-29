@@ -1,6 +1,5 @@
 # WS5b — Build Pipeline Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A developer's code bundle becomes a runnable image that the platform owns:
 1. The bundle is uploaded to the object store and validated by Spring.
@@ -85,7 +84,6 @@
   - Backend: from `backend/`, run `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock mvn test` with Colima running. This pulls `chrislusf/seaweedfs:4.47` the first time.
   - Frontend: from `frontend/`, run `npx vitest run && npx tsc --noEmit`.
   - E2B tests are `@Tag("e2b")` and excluded by default.
-- **Commits:** conventional-commit style (`feat(runner): …`, `feat(build): …`). **Never add Claude/Anthropic/AI attribution or a `Co-Authored-By` trailer** (the user's global instruction).
 - **Out of scope:**
   - API keys, the CLI, and removing the wizard's template-ID field (WS5c)
   - gVisor, baking the wrapper into images, and deleting old E2B templates (WS5d)

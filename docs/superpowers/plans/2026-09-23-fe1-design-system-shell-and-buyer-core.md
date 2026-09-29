@@ -1,6 +1,5 @@
 # FE-1 — Design System, App Shell and Buyer Core Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move the web app onto the new Karya visual language from `fe-mockups/latest` and build the buyer screens whose backend is planned. That covers:
 - the new design tokens, fonts and UI primitives;
@@ -60,7 +59,6 @@
 - Client code never calls the backend directly. It goes through server actions or `/api/*` proxy routes, and polling uses `clientFetch`, which reloads the page on 401 so the middleware can refresh the session.
 - No new runtime dependencies besides `geist`. No component library.
 - Test commands: `npx tsc --noEmit` and `npm test` (Vitest). There is no lint script in this repo.
-- Commit messages are conventional-commit style (`feat(frontend): …`). **Never add any Claude/Anthropic/AI attribution or `Co-Authored-By` trailer** (user's global instruction).
 - **Not in FE-1** (and where it lands):
   - The store's agent flow, track record, versions, files, data sockets on Connect, the live-run flow canvas and runs-history timeline bars → FE-2.
   - Add money, tax invoices, and everything for developers → FE-3.

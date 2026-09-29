@@ -1,6 +1,5 @@
 # FE-3 — Developer Studio, Sandbox, Verification and Money Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the developer side of Karya:
 - the studio, which shows what an agent declared against what it actually did in a sandbox run, with fixes one click away;

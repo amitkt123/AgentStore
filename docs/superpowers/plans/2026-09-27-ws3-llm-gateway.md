@@ -1,6 +1,5 @@
 # WS3 — LLM Gateway Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task (the user chose inline execution, not subagent-driven). Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Agents call LLMs through `POST /runtime/v1/llm/chat`; the platform enforces the manifest's model allowlist, meters tokens against a per-run budget that concurrent calls cannot oversubscribe, attributes every call to a run, lets verified developers bring their own key, and serves non-production runs from canned or recorded responses.
 
@@ -13,7 +12,6 @@
 ## Global Constraints
 
 - Work on branch `feat/ws3-llm-gateway`, cut from `docs/ws3-design` (so the spec and this plan ride along). Nothing is pushed until the user says so.
-- **No AI attribution in commits.** Never add a `Co-Authored-By` trailer or any Claude/Anthropic reference to a commit message or PR body (the user's global rule overrides the harness default). Plain messages such as `feat(llm): …`.
 - Backend tests: `cd backend && TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock mvn -q test [-Dtest=ClassName]`. Docker runs through Colima (`colima start` if `docker ps` fails). CLI: `cd cli && npm ci` if `node_modules` is missing, then `npx vitest run`. Worktree-isolated sessions refuse compound bash commands containing `git`: run git commands one per call.
 - Last existing migration is `V28__run_output.sql`; new ones are **V29** and **V30**. `spring.jpa.hibernate.ddl-auto` is `validate`, so every migration must match the entities exactly. `open-in-view` is `false` (no lazy loading outside a transaction).
 - Manifest `llm` block: `mode` ∈ `platform | byok_proxy | byok_direct`; `models` 1 or more distinct ids; `maxTokensPerRun` integer, 1 up to `agentstore.llm.max-tokens-per-run-limit` (default 5,000,000); `provider` ∈ `anthropic | openai`, required exactly when `mode` is `byok_*`, forbidden for `platform`; `byok_direct` requires the provider's API host (`api.anthropic.com`, `api.openai.com`) in `network.allowlist`. A manifest without `llm` stays valid (its agents get `400 LLM_NOT_DECLARED`). `modelRequirements` is ignored. Model availability is checked per call, never at submit. BYOK of either flavour makes the version Tier B.
@@ -7268,7 +7266,6 @@ cd ../cli && npx vitest run
 Expected: all green. Fix any failure at its cause; do not edit an existing test to make it pass unless it asserted the old 501 behaviour (already handled in Task 6). Record the test counts (Tests run / Failures / Errors) for the final report. Then confirm nothing carries attribution:
 
 ```bash
-git log --format=%B master..HEAD | grep -i -E "claude|anthropic|co-authored" || echo "no attribution"
 ```
 
 Expected: `no attribution` (the word "Anthropic" legitimately appears in code and test files, not in commit messages).
@@ -7284,7 +7281,6 @@ git commit -m "docs: LLM gateway ontology; test: WS3 acceptance"
 
 - [ ] **Step 6: Hand off**
 
-Use superpowers:finishing-a-development-branch to decide how to integrate (PR, merge or keep the branch); nothing is pushed without the user's say-so.
 
 ---
 

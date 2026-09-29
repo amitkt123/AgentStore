@@ -1,6 +1,5 @@
 # WS14 — Notifications and Approvals Anywhere Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Approval requests reach the right approvers within a minute on web, email and Slack. An approver can decide from a phone with a one-tap link. Everything else agents do lands in one notification centre, with per-person channel preferences and quiet hours.
 
@@ -48,7 +47,6 @@
 - Org setting `approval_links_require_login` (default false): when true, deciding needs a JWT for the same user as the link.
 - Slack: links only, no interactive buttons (spec §8 Q12). The bot token is AES-GCM encrypted with the existing `AesGcmCipher`. The OAuth `state` is a random one-time value stored hashed, never an access token.
 - External sends (email, Slack) happen from the delivery job, never inside the outbox consumer. Delivery is at least once: a crash between send and commit can repeat one message.
-- Commit messages are conventional-commit style. **Never add any Claude/Anthropic/AI attribution or `Co-Authored-By` trailer** (user's global instruction).
 - **Deferred, with the reason:**
   - The `WEEKLY_SUMMARY` digest job lands with the reporting work. Its preference is stored now so the screen works.
   - `MORE_ACCESS_REQUESTED` is produced once WS11 publishes version-consent events. The category and its preference exist now.

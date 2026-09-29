@@ -1,6 +1,5 @@
 # WS13 — Identity, Workspaces and Teams Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let one person belong to several orgs (a buyer workspace and a developer studio), sign up by picking a side with their full name, invite teammates with roles and titles, stay signed in with refresh tokens, verify their email, reset a forgotten password, and sign in with Google.
 
@@ -25,7 +24,6 @@
 - Email mode: `agentstore.email.mode` = `log` (default; logs recipient and subject only, never the body) or `smtp`. Tests use a `@Primary` `RecordingEmailSender`.
 - Error codes: duplicate email → 409; expired, used or revoked invitation/token → 410 for invitations, 400 for verify/reset tokens; unknown org membership on switch → 403.
 - Money, run and catalog code are out of scope. Do not touch `execution/`, `ledger/`, `catalog/` or `publishing/` except the two E2E tests named in Tasks 1 and 3.
-- Commit messages are conventional-commit style (`feat(identity): …`). **Never add any Claude/Anthropic/AI attribution or `Co-Authored-By` trailer** (user's global instruction).
 - **Deferred, not dropped:** `org.gstin`/`billing_address` move to WS10, where tax invoices first read them. `sso_required` and workspace SSO move to M3. Revoking live access tokens on member removal is left to the 60-minute expiry, except for gate decisions, which WS15 checks against the database.
 
 ## Review Focus

@@ -1,6 +1,5 @@
 # FE-4 — Karya Admin Consoles Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give Karya's trust team three consoles:
 - **Review pipeline:** every automated stage with its findings, the manifest diff against the live version, the impact on existing buyers, then approve or send back.

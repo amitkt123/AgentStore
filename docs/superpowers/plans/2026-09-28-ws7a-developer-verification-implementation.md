@@ -1,6 +1,5 @@
 # WS7a — Developer Verification Submission Flow — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let a developer org fill out a resumable, step-by-step identity-verification form (About → Tax IDs → Phone → Agreement), upload a PAN document, and submit for review, landing the row in `PENDING`. No checks run yet (that's 7b).
 

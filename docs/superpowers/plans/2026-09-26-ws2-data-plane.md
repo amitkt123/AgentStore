@@ -1,6 +1,5 @@
 # WS2 — Data Plane Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task (the user chose inline execution, not subagent-driven). Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A buyer uploads CSV/JSON/PDF files once, binds them to the resources an agent declares, and the agent reads them through `/runtime/v1/resources/**`; every agent write lands in an output store, staged until an approved gate commits it, and the buyer downloads what was committed.
 
@@ -13,7 +12,6 @@
 ## Global Constraints
 
 - Work on branch `feat/ws2-data-plane`, cut from `docs/ws2-design` (so the spec and this plan ride along). Nothing is pushed until the user says so.
-- **No AI attribution in commits.** Never add a `Co-Authored-By` trailer or any Claude/Anthropic reference to a commit message or PR body (the user's global rule overrides the harness default). Plain messages such as `feat(data): …`.
 - Backend tests: `cd backend && TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock mvn -q test [-Dtest=ClassName]`. Docker runs through Colima (`colima start` if `docker ps` fails). CLI: `cd cli && npm ci` if `node_modules` is missing, then `npx vitest run`.
 - Last existing migration is `V26__gate_request.sql`; new ones are **V27** and **V28**. `spring.jpa.hibernate.ddl-auto` is `validate`, so every migration must match the entities exactly. `open-in-view` is `false` (no lazy loading outside a transaction).
 - Formats are exactly `csv`, `json`, `pdf` (no XLSX). Manifest `resources[]`: `format` ∈ `csv|json|pdf`; `schema` optional and forbidden for `pdf`; `schema.properties.<col>.type` ∈ `string|number|integer|boolean|date` (default `string`); resource names are unique; every scope `resource` names a declared resource **only when `resources` is present**; a `pdf` resource may only be READ. A manifest without `resources` stays valid and its resources are untyped.
@@ -6469,7 +6467,6 @@ git commit -m "docs: data plane ontology; test: WS2 acceptance"
 
 - [ ] **Step 6: Hand off**
 
-Use superpowers:finishing-a-development-branch to decide how to integrate (PR, merge or keep the branch); nothing is pushed without the user's say-so.
 
 ---
 
