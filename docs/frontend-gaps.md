@@ -14,3 +14,4 @@ Mockup elements omitted because the backend has no data or route for them. Updat
 | G8 | Try on sample data | No backend |
 | G9 | Version pinning and "1 new" update badge | Waits on WS9 |
 | G10 | Sign-in with Google | Backend supports it (POST /auth/google) but it needs a Google client id, which is not configured |
+| G11 | Block descriptions on the live run | Run detail has no agentId/versionId to fetch the manifest |
