@@ -29,7 +29,7 @@ it("throws ApiError with the backend message and code", async () => {
 
 it("falls back to a generic message when the body is empty", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 403 })));
-  const err = await api("/api/v1/x").catch((e) => e);
+  const err = (await api("/api/v1/x").catch((e) => e)) as Error;
   expect(err).toBeInstanceOf(ApiError);
   expect(err.message).toBe("Request failed (403)");
 });
