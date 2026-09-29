@@ -1,0 +1,10 @@
+.table { width: 100%; border-collapse: collapse; background: var(--s); border: 1px solid var(--l); border-radius: var(--radius); overflow: hidden; }
+.table th { text-align: left; font-size: 12px; color: var(--ink3); font-weight: 600; padding: 10px 14px; background: var(--l2); }
+.table td { padding: 12px 14px; border-top: 1px solid var(--l2); vertical-align: middle; }
+@media (max-width: 767px) {
+  .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .table, .table tbody, .table tr, .table td { display: block; }
+  .table tr { padding: 10px 14px; border-top: 1px solid var(--l); }
+  .table td { border: 0; padding: 4px 0; display: flex; justify-content: space-between; gap: 12px; }
+  .table td::before { content: attr(data-label); color: var(--ink3); font-size: 12px; }
+}
