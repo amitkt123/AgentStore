@@ -1,17 +1,9 @@
-import type { Metadata } from "next";
-import { Providers } from "./providers";
-import "./globals.css";
-
-export const metadata: Metadata = {
-  title: "Karya — governed agent store",
-};
+export const metadata = { title: "Karya" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="font-sans text-[15px]">
-        <Providers>{children}</Providers>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

@@ -1,17 +1,7 @@
-# dependencies
-/node_modules
-
-# next.js
-/.next/
-
-# env files
+node_modules
+.next
+next-env.d.ts
+test-results
+playwright-report
+tsconfig.tsbuildinfo
 .env*.local
-
-# misc
-.DS_Store
-*.tsbuildinfo
-
-# playwright
-/test-results/
-/playwright-report/
-/blob-report/

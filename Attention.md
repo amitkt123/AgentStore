@@ -36,10 +36,9 @@ by `contracts/runtime-v1.yaml` as the API contract of record.
   credentials from the main platform's blast radius. `runner/e2b-shim` is a Node
   shim behind this boundary, not a dependency on a paid E2B subscription.
 - **Frontend** (`frontend/`): Next.js 14 App Router, React 18, Server Components +
-  Server Actions (`"use server"`) as the default data path, TanStack Query for
-  client-side live/polling state, Tailwind for styling. Route groups
-  (`(buyer)`, `(developer)`, `(admin)`, `(auth)`) partition the app by role at the
-  routing layer, each with its own `layout.tsx`.
+  Server Actions (`"use server"`) as the default data path, thin route handlers
+  polled for live state, plain CSS variables and CSS Modules for styling. Route
+  groups `(auth)` and `(app)` split the public and signed-in areas.
 - **CLI** (`cli/`): Node ≥22, TypeScript ESM, Ajv for manifest JSON-schema
   validation, `yaml`, `fflate` (bundle zipping), `ignore` (gitignore-style
   filtering). `npm run sync-schema` pulls the schema down from
