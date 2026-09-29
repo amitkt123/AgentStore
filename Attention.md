@@ -8,8 +8,8 @@ default to (Spring MVC boilerplate you've seen a million times, generic Next.js
 tutorials, throwaway CLI scripts). When this file conflicts with a "usual" way of
 doing something, this file wins. Its purpose is to prevent context drift across
 long sessions and cold-start "blank slate" chats: read it first, every time, before
-touching code in this repo. It does not replace ONTOLOGY.md (the domain model of
-record) — read that for "what exists"; read this for "how to behave while editing
+touching code in this repo. It does not replace the code and `contracts/` (what exists) or
+`docs/known-issues.md` (known gaps) — read this for "how to behave while editing
 it."
 </system_directive>
 
