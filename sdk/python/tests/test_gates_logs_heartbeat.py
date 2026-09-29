@@ -25,6 +25,15 @@ def test_gate_polls_through_pending_until_approved():
     assert api.calls[1][1] == ("g-1", 25)                   # server-side wait=25
 
 
+def test_estimated_units_is_sent_only_when_given():
+    api = gate_api({"status": "APPROVED"})
+    Gates(api).request("a", "s", {}, estimated_units=142)
+    assert api.calls[0][1][0]["estimatedUnits"] == 142
+    api = gate_api({"status": "APPROVED"})
+    Gates(api).request("a", "s", {})
+    assert "estimatedUnits" not in api.calls[0][1][0]
+
+
 def test_gate_decided_at_creation_does_not_poll():
     api = FakeApi(create_gate={"gateId": "g-1", "status": "APPROVED"})
     assert Gates(api).request("a", "s", {}).approved

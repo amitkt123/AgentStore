@@ -12,6 +12,8 @@ vi.mock("./actions", () => ({
 
 const awaitingRun: RunDetailResponse = {
   id: "r1",
+  displayId: "R-1",
+  terminalReason: null,
   status: "AWAITING_APPROVAL",
   costCap: 18000,
   totalCharged: 16352,

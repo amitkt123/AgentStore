@@ -8,6 +8,8 @@ export interface GateRequest {
   summary: string;
   payload: Record<string, unknown>;
   affects?: string[];
+  /** How many billable units approval would use; the platform turns it into the buyer's "cost if approved". */
+  estimatedUnits?: number;
   raiseOnReject?: boolean;
 }
 
@@ -17,6 +19,7 @@ export class Gates {
   async request(req: GateRequest): Promise<Decision> {
     const created = await this.api.createGate({
       action: req.action, summary: req.summary, payload: req.payload, affectsResources: req.affects ?? [],
+      ...(req.estimatedUnits !== undefined ? { estimatedUnits: req.estimatedUnits } : {}),
     });
     const gateId = created.gateId!;
     let view: { status?: string; note?: string } = created;

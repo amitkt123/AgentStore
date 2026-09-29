@@ -233,6 +233,18 @@ describe("sandbox logs", () => {
     expect(ctx.outLines.filter((l) => l.startsWith("READ:"))).toHaveLength(1);
   });
 
+  it("accepts a display id wherever it accepts a run id", async () => {
+    const { ctx } = await harness([
+      { ...detailRoute([{ kind: "READ", detail: "{}" }, { kind: "COMPLETE", detail: "{}" }], "COMPLETED"),
+        path: "/api/v1/sandbox/runs/S-4" },
+    ]);
+
+    const code = await sandboxLogs(ctx, "S-4");
+
+    expect(code).toBe(0);
+    expect(ctx.outLines.filter((l) => l.startsWith("READ:"))).toHaveLength(1);
+  });
+
   it("a 404 gives a readable error", async () => {
     const { ctx } = await harness([
       { method: "GET", path: `/api/v1/sandbox/runs/${RUN_ID}`, reply: { status: 404, json: { code: "NOT_FOUND", message: "Run not found" } } },

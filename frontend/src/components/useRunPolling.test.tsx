@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isTerminalRunStatus, useRunPolling } from "./useRunPolling";
 import type { RunDetailResponse } from "@/lib/types";
 
-const runningRun: RunDetailResponse = { id: "r1", status: "RUNNING", costCap: 100, totalCharged: 10, steps: [] };
+const runningRun: RunDetailResponse = { id: "r1", displayId: "R-1", terminalReason: null, status: "RUNNING", costCap: 100, totalCharged: 10, steps: [] };
 const completedRun: RunDetailResponse = { ...runningRun, status: "COMPLETED" };
 
 function wrapper({ children }: { children: React.ReactNode }) {
