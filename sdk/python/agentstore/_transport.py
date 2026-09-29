@@ -8,12 +8,19 @@ import httpx
 from .errors import _parse_retry_after, error_from_problem
 
 
-def _retryable(status: int) -> bool:
-    return status == 429 or (status >= 500 and status != 501)
+# POST /usage charges on every call and has no idempotency key, so a 5xx whose response was lost after the server
+# committed would double-charge on retry. 429 is safe: the rate limiter rejects before the request is handled.
+_NO_5XX_RETRY_PATHS = ("/runtime/v1/usage",)
+
+
+def _retryable(status: int, request: httpx.Request) -> bool:
+    if status == 429:
+        return True
+    return status >= 500 and status != 501 and request.url.path not in _NO_5XX_RETRY_PATHS
 
 
 class RetryTransport(httpx.BaseTransport):
-    """Retries 429/5xx (not 501) with exponential backoff + jitter; one policy for every call."""
+    """Retries 429/5xx (not 501; 429 only for POST /usage) with exponential backoff + jitter."""
 
     def __init__(self, inner: httpx.BaseTransport | None = None, max_retries: int = 3, base_delay: float = 0.5,
                  max_delay: float = 8.0, sleep=time.sleep, jitter=random.random):
@@ -33,7 +40,7 @@ class RetryTransport(httpx.BaseTransport):
         attempt = 0
         while True:
             response = self._inner.handle_request(request)
-            if not _retryable(response.status_code) or attempt >= self._max_retries:
+            if not _retryable(response.status_code, request) or attempt >= self._max_retries:
                 return response
             retry_after = _parse_retry_after(response.headers.get("retry-after"))
             response.close()

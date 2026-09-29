@@ -129,3 +129,28 @@ def test_complete_without_outputs_and_fail_and_chat():
 def test_file_content_returns_bytes():
     api = make_api(lambda r: httpx.Response(200, content=b"a,b\n1,2\n"))
     assert api.file_content("bank_statement") == b"a,b\n1,2\n"
+
+
+def test_usage_is_not_retried_on_5xx_to_avoid_double_charging():
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return problem(503, "UNAVAILABLE")
+
+    with pytest.raises(AgentStoreApiError):
+        make_api(handler).usage(1, "page")
+    assert len(calls) == 1
+
+
+def test_usage_is_still_retried_on_429():
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) == 1:
+            return problem(429, "RATE_LIMITED")
+        return httpx.Response(200, json={"charged": 0, "totalCharged": 0, "costCapRemaining": 1})
+
+    make_api(handler).usage(1, "page")
+    assert len(calls) == 2

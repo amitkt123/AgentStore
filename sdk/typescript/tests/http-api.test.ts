@@ -34,6 +34,18 @@ describe("Api over the retrying fetch", () => {
     expect(m.calls()).toBe(4);
   });
 
+  it("does not retry POST /usage on 5xx, to avoid double charging", async () => {
+    const { api, m } = apiOn(() => new Response("down", { status: 503 }));
+    await expect(api.usage(1, "page")).rejects.toMatchObject({ status: 503 });
+    expect(m.calls()).toBe(1);
+  });
+
+  it("still retries POST /usage on 429", async () => {
+    const { api, m } = apiOn((_r, n) => (n < 2 ? problem(429, "RATE_LIMITED") : json({ charged: 0, totalCharged: 0, costCapRemaining: 1 })));
+    await api.usage(1, "page");
+    expect(m.calls()).toBe(2);
+  });
+
   it("does not retry 501", async () => {
     const { api, m } = apiOn(() => problem(501, "NOT_IMPLEMENTED"));
     await expect(api.heartbeat()).rejects.toBeInstanceOf(AgentStoreApiError);

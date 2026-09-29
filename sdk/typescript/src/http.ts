@@ -9,9 +9,14 @@ export interface RetryOptions {
   fetchImpl?: typeof fetch;
 }
 
-const retryable = (status: number) => status === 429 || (status >= 500 && status !== 501);
+// POST /usage charges on every call and has no idempotency key, so a 5xx whose response was lost after the server
+// committed would double-charge on retry. 429 is safe: the rate limiter rejects before the request is handled.
+const NO_5XX_RETRY_PATHS = ["/runtime/v1/usage"];
 
-/** fetch with one shared 429/5xx retry policy; a final >=400 response becomes a typed error. */
+const retryable = (status: number, request: Request) =>
+  status === 429 || (status >= 500 && status !== 501 && !NO_5XX_RETRY_PATHS.includes(new URL(request.url).pathname));
+
+/** fetch with one shared 429/5xx retry policy (429 only for POST /usage); a final >=400 response becomes a typed error. */
 export function createFetch(opts: RetryOptions = {}): typeof fetch {
   const {
     maxRetries = 3, baseDelayMs = 500, maxDelayMs = 8000, jitter = Math.random,
@@ -29,7 +34,7 @@ export function createFetch(opts: RetryOptions = {}): typeof fetch {
       const response = await fetchImpl(request.clone());
       if (response.status < 400) return response;
       const retryAfterHeader = response.headers.get("retry-after");
-      if (retryable(response.status) && attempt < maxRetries) {
+      if (retryable(response.status, request) && attempt < maxRetries) {
         await response.body?.cancel();
         await sleep(delay(attempt + 1, parseRetryAfter(retryAfterHeader)));
         continue;
