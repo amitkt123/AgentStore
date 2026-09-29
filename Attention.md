@@ -45,6 +45,9 @@ by `contracts/runtime-v1.yaml` as the API contract of record.
   filtering). `npm run sync-schema` pulls the schema down from
   `contracts/runtime-v1.yaml` before every build — the CLI's validation is
   generated from the contract, never hand-maintained.
+- **SDKs** (`sdk/python/`, later `sdk/typescript/`): agent-side clients generated
+  from `contracts/runtime-v1.yaml`. Only `_api.py` may import generated code; never
+  hand-edit `_generated/`. Python >=3.10, Node >=22.
 - **Contract**: `contracts/runtime-v1.yaml` is the single source of truth for the
   runtime API surface. Backend, runner, and CLI all take their shape from it, not
   the other way around.
