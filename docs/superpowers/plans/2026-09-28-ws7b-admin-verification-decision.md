@@ -1,6 +1,5 @@
 # WS7b — Admin Verification Decision Flow Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let a platform `ADMIN` review a `PENDING` developer-verification submission, record a manual PASS/FAIL per identity check, and decide the outcome (`VERIFIED`/`FIX_REQUESTED`/`REJECTED`) — a `VERIFIED` decision is what finally sets `Org.developerVerifiedAt`, unblocking BYOK and the verified sandbox-quota tier.
 

@@ -1,40 +1,12 @@
 #!/usr/bin/env bash
+# Re-stamps ONTOLOGY.md's source hash. Run this only after ONTOLOGY.md reflects the code changes.
 set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
 
 FILE="${1:-ONTOLOGY.md}"
+[[ -f "$FILE" ]] || { echo "error: $FILE not found" >&2; exit 1; }
 
-if [[ ! -f "$FILE" ]]; then
-  echo "error: $FILE not found" >&2
-  exit 1
-fi
-
-TRACKED_LINE=$(grep -m1 '^ontology-tracked-files:' "$FILE" || true)
-if [[ -z "$TRACKED_LINE" ]]; then
-  echo "error: no 'ontology-tracked-files:' line found in $FILE header" >&2
-  exit 1
-fi
-
-TRACKED_FILES=${TRACKED_LINE#ontology-tracked-files:}
-TRACKED_FILES=$(echo "$TRACKED_FILES" | xargs)
-IFS=',' read -ra FILES <<< "$TRACKED_FILES"
-
-MISSING=0
-for f in "${FILES[@]}"; do
-  if [[ ! -f "$f" ]]; then
-    echo "warning: tracked file missing: $f" >&2
-    MISSING=1
-  fi
-done
-
-HASH=$(
-  for f in "${FILES[@]}"; do
-    if [[ -f "$f" ]]; then
-      printf '%s:' "$f"
-      sha256sum "$f" | cut -d' ' -f1
-    fi
-  done | sort | sha256sum | cut -d' ' -f1
-)
-
+HASH=$(scripts/ontology-hash.sh)
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 sed -i.bak \
@@ -44,8 +16,6 @@ sed -i.bak \
 rm -f "${FILE}.bak"
 
 echo "Stamped $FILE"
-echo "  hash: $HASH"
-echo "  at:   $TIMESTAMP"
-if [[ "$MISSING" -eq 1 ]]; then
-  echo "  note: some tracked files were missing (see warnings above)." >&2
-fi
+echo "  files: $(scripts/ontology-tracked-files.sh | wc -l | tr -d ' ')"
+echo "  hash:  $HASH"
+echo "  at:    $TIMESTAMP"

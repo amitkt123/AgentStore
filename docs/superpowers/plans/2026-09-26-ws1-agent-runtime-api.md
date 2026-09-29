@@ -1,6 +1,5 @@
 # WS1 — Agent Runtime API v1 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Agent code talks to the platform through `/runtime/v1/**`, authenticated by its run token, and the platform records the run's trace itself; the legacy `/internal/agent-callback/**` keeps working behind a flag.
 
@@ -13,7 +12,6 @@
 ## Global Constraints
 
 - Work on branch `feat/ws1-agent-runtime-api`, cut from `docs/ws1-design` (so the spec commit rides along). Nothing is pushed until the user says so.
-- **No AI attribution in commits.** Never add a `Co-Authored-By` trailer or any Claude/Anthropic reference to a commit message (the user's global rule overrides the harness default). Plain messages such as `feat(runtime): …`.
 - Backend tests: `cd backend && TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock mvn -q test [-Dtest=ClassName]`. Docker runs through Colima (`colima start` if it is down). Frontend/CLI: `npm ci` first if `node_modules` is missing, then `npx vitest run` and (frontend) `npx tsc --noEmit`.
 - Last existing migration is `V24__developer_api_key.sql`; new ones are **V25** and **V26**. `spring.jpa.hibernate.ddl-auto` is `validate`, so every migration must match the entities exactly. `open-in-view` is `false`.
 - Run token = 32 random bytes, stored only as SHA-256 hex in `run.callback_token_hash`, compared with `RunTokenService.matches` (constant time). Valid only while the run is non-terminal and before `deadline_at`.

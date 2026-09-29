@@ -1,6 +1,5 @@
 # WS6a Developer Sandbox Core Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A developer can run any of their built versions (DRAFT included) against fixture data in the real runner with no buyer, no connection and no money moving, and can watch it from a thin CLI.
 

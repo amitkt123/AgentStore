@@ -1,6 +1,5 @@
 # WS15 — Buyer Workspace, Spending Controls and Approvers Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give finance leads the controls the mockups show: a monthly budget for the workspace, a monthly budget and a named approver list per agent, "Add and run now" in one step, a workspace home endpoint, spend alerts, an activity feed and a ⌘K search.
 
@@ -30,7 +29,6 @@
 - Domain events are published with `Propagation.MANDATORY`, always in the same transaction as the state change they describe. Consumers must be idempotent (a delivery can repeat after a crash).
 - Spend alert thresholds: 25, 50, 75, 100 percent of the org monthly limit, each at most once per org per month. One charge that crosses several thresholds emits only the highest.
 - Jobs follow WS0's pattern: `@ConditionalOnProperty(name = "agentstore.jobs.enabled", …)` plus `@SchedulerLock`. Tests set `agentstore.jobs.enabled=false` and call `dispatchOnce()` directly.
-- Commit messages are conventional-commit style. **Never add any Claude/Anthropic/AI attribution or `Co-Authored-By` trailer** (user's global instruction).
 - **Deferred, with the reason:**
   - The spec's `connection.default_inputs` lands with run inputs in WS1.
   - `bindings` in `POST /connections` lands with datasets in WS2.

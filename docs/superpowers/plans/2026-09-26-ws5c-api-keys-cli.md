@@ -1,6 +1,5 @@
 # WS5c — Developer API keys and CLI Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A developer creates an org-scoped API key in the portal, then goes from an empty directory to a built agent version with `agentstore login`, `init`, `validate` and `push --wait`.
 

@@ -1,42 +1,22 @@
 #!/usr/bin/env bash
+# Fails if any tracked source file changed since ONTOLOGY.md was last stamped.
 set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
 
 FILE="${1:-ONTOLOGY.md}"
-
-if [[ ! -f "$FILE" ]]; then
-  echo "error: $FILE not found" >&2
-  exit 1
-fi
+[[ -f "$FILE" ]] || { echo "error: $FILE not found" >&2; exit 1; }
 
 STORED_HASH=$(grep -m1 '^ontology-source-hash:' "$FILE" | sed 's/^ontology-source-hash:[[:space:]]*//')
-TRACKED_LINE=$(grep -m1 '^ontology-tracked-files:' "$FILE" | sed 's/^ontology-tracked-files:[[:space:]]*//')
-
 if [[ -z "$STORED_HASH" || "$STORED_HASH" == "PLACEHOLDER" ]]; then
-  echo "error: $FILE has no stamped hash yet — run stamp-ontology-hash.sh once after generating it." >&2
+  echo "error: $FILE has no stamped hash yet - run scripts/stamp-ontology-hash.sh" >&2
   exit 1
 fi
 
-IFS=',' read -ra FILES <<< "$TRACKED_LINE"
-
-CURRENT_HASH=$(
-  for f in "${FILES[@]}"; do
-    if [[ -f "$f" ]]; then
-      printf '%s:' "$f"
-      sha256sum "$f" | cut -d' ' -f1
-    fi
-  done | sort | sha256sum | cut -d' ' -f1
-)
-
+CURRENT_HASH=$(scripts/ontology-hash.sh)
 if [[ "$CURRENT_HASH" != "$STORED_HASH" ]]; then
-  echo "STALE: $FILE no longer matches its tracked source files." >&2
-  echo "  One or more of these have changed since the last stamp:" >&2
-  for f in "${FILES[@]}"; do
-    echo "    - $f" >&2
-  done
-  echo "" >&2
-  echo "  Re-run the ontology generation prompt, then:" >&2
-  echo "    scripts/stamp-ontology-hash.sh $FILE" >&2
+  echo "STALE: $FILE does not match the source files it documents ($(scripts/ontology-tracked-files.sh | wc -l | tr -d ' ') tracked)." >&2
+  echo "  1. Update the affected sections of $FILE to match your code changes." >&2
+  echo "  2. Run: scripts/stamp-ontology-hash.sh" >&2
   exit 1
 fi
-
 echo "OK: $FILE is in sync with its tracked source files."

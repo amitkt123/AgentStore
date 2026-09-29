@@ -1,6 +1,5 @@
 # WS6c — PII Scan, Trial Profiles, REPO Sync, CLI Profile/Fixture Commands Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a PII scanner for developer fixture uploads, a trial-profile attestation flow gated on that scan, a computed `sandbox_profile.status`, REPO-sourced profile sync on `agentstore push`, and the CLI commands (`fixtures push/list`, `profile list/pull`) that use it.
 

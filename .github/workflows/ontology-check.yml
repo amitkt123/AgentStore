@@ -1,34 +1,33 @@
-name: Ontology staleness check
+name: Ontology check
 
 on:
   pull_request:
-    paths:
-      - "**.java"
-      - "**.ts"
-      - "**.json"
-      - "**.yml"
-      - "ONTOLOGY.md"
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [master]
 
 jobs:
   check-ontology:
     runs-on: ubuntu-latest
+    # Escape hatch for changes that genuinely don't affect the domain model: add the `skip-ontology` label.
+    if: >-
+      github.event_name == 'push' ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-ontology')
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check ONTOLOGY.md is up to date
-        run: |
-          chmod +x scripts/check-ontology-staleness.sh
-          scripts/check-ontology-staleness.sh ONTOLOGY.md
-        continue-on-error: true
-
-      - name: Comment on PR if stale
-        if: failure()
-        uses: actions/github-script@v7
         with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: "⚠️ `ONTOLOGY.md` appears stale relative to files it tracks. Consider re-running the ontology generation prompt and re-stamping before merge."
-            })
+          fetch-depth: 0
+
+      - name: Code changes must come with an ONTOLOGY.md change
+        if: github.event_name == 'pull_request'
+        run: |
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          code=$(printf '%s\n' "$changed" | grep -E '^(backend|runner|cli|contracts|sdk|frontend/src/lib)/' | grep -v -E '(/_generated/|/generated/|\.md$|/tests?/|/src/test/|node_modules/)' || true)
+          if [[ -n "$code" ]] && ! printf '%s\n' "$changed" | grep -qx 'ONTOLOGY.md'; then
+            echo "::error::Code changed but ONTOLOGY.md was not updated. Update it, run scripts/stamp-ontology-hash.sh, or add the 'skip-ontology' label."
+            printf 'Changed code files:\n%s\n' "$code"
+            exit 1
+          fi
+
+      - name: ONTOLOGY.md hash matches the source files
+        run: scripts/check-ontology-staleness.sh ONTOLOGY.md

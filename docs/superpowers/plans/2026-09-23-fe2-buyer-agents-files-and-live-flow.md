@@ -1,6 +1,5 @@
 # FE-2 — Buyer Agents, Files and the Live Flow Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the buyer screens that show an agent as a flow of blocks:
 - the store's agent page, with its flow, track record and versions (including agreeing to an update ahead of time);
