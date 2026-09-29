@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentstore"
+version = "0.1.0"
+description = "AgentStore agent SDK"
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.27", "attrs>=23.1", "python-dateutil>=2.8"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "openapi-python-client>=0.21,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentstore"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
