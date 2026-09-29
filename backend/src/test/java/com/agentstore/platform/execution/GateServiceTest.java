@@ -199,7 +199,7 @@ class GateServiceTest extends AbstractIntegrationTest {
             });
             Future<?> expire = pool.submit(() -> {
                 start.await();
-                gateService.expire(run.getId(), RunStatus.AWAITING_APPROVAL, Map.of("summary", "expired"));
+                gateService.expire(run.getId(), RunStatus.AWAITING_APPROVAL, TerminalReason.GATE_EXPIRED, Map.of("summary", "expired"));
                 return null;
             });
             start.countDown();
@@ -221,7 +221,7 @@ class GateServiceTest extends AbstractIntegrationTest {
         GateRequest gate = open(run, 1);
         gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null);
 
-        boolean expired = gateService.expire(run.getId(), RunStatus.AWAITING_APPROVAL, Map.of());
+        boolean expired = gateService.expire(run.getId(), RunStatus.AWAITING_APPROVAL, TerminalReason.GATE_EXPIRED, Map.of());
 
         assertThat(expired).isFalse();
         assertThat(reload(run).getStatus()).isEqualTo(RunStatus.RUNNING);

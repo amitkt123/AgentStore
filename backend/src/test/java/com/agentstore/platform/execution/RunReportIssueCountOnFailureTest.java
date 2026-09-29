@@ -29,7 +29,7 @@ class RunReportIssueCountOnFailureTest extends AbstractIntegrationTest {
         Run run = sandboxFixtures.sandboxRun(dev, null, RunStatus.RUNNING);
 
         lifecycle.recordViolation(run.getId(), Map.of("summary", "x", "attempted", "read", "target", "payroll"));
-        lifecycle.terminate(run.getId(), RunStatus.RUNNING, RunStatus.TIMED_OUT, RunStepKind.TIMEOUT,
+        lifecycle.terminate(run.getId(), RunStatus.RUNNING, RunStatus.TIMED_OUT, TerminalReason.TIMED_OUT, RunStepKind.TIMEOUT,
                 Map.of("summary", "no heartbeat"));
 
         RunReport report = reports.findById(run.getId()).orElseThrow();

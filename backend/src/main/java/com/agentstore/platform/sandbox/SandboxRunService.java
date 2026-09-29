@@ -9,6 +9,7 @@ import com.agentstore.platform.data.SandboxBindingService;
 import com.agentstore.platform.execution.PendingBuildRuns;
 import com.agentstore.platform.execution.Run;
 import com.agentstore.platform.execution.RunController;
+import com.agentstore.platform.execution.TerminalReason;
 import com.agentstore.platform.execution.RunLauncher;
 import com.agentstore.platform.execution.RunLifecycleService;
 import com.agentstore.platform.execution.RunLlmMode;
@@ -98,7 +99,7 @@ public class SandboxRunService {
 
     public void cancel(UUID orgId, UUID runId) {
         owned(orgId, runId);
-        if (!lifecycle.terminate(runId, RunStatus.CANCELLED, RunStepKind.CANCELLED,
+        if (!lifecycle.terminate(runId, RunStatus.CANCELLED, TerminalReason.CANCELLED, RunStepKind.CANCELLED,
                 Map.of("summary", "Cancelled by the developer"))) {
             throw new SandboxApiException(HttpStatus.CONFLICT, "RUN_ALREADY_ENDED", "The run has already ended");
         }
@@ -124,7 +125,7 @@ public class SandboxRunService {
             try {
                 rebuild.queueRebuild(version);
             } catch (RuntimeException e) {
-                lifecycle.terminate(run.getId(), RunStatus.PENDING_BUILD, RunStatus.FAILED, RunStepKind.FAILED,
+                lifecycle.terminate(run.getId(), RunStatus.PENDING_BUILD, RunStatus.FAILED, TerminalReason.AGENT_FAILED, RunStepKind.FAILED,
                         Map.of("summary", "Could not queue a rebuild for this version"));
                 throw e;
             }

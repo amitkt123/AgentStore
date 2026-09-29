@@ -122,8 +122,8 @@ public class GateService {
 
     /** Ends a run whose gate went unanswered (or whose deadline passed) and marks its pending gate EXPIRED. */
     @Transactional
-    public boolean expire(UUID runId, RunStatus expectedStatus, Map<String, Object> detail) {
-        boolean ended = runLifecycleService.terminate(runId, expectedStatus, RunStatus.EXPIRED, RunStepKind.TIMEOUT, detail);
+    public boolean expire(UUID runId, RunStatus expectedStatus, TerminalReason reason, Map<String, Object> detail) {
+        boolean ended = runLifecycleService.terminate(runId, expectedStatus, RunStatus.EXPIRED, reason, RunStepKind.TIMEOUT, detail);
         if (ended) {
             gateRequestRepository.findFirstByRunIdAndStatusOrderByCreatedAtAsc(runId, GateStatus.PENDING).ifPresent(gate -> {
                 gate.setStatus(GateStatus.EXPIRED);

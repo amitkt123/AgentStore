@@ -123,12 +123,12 @@ public class RunLauncher {
                     .map(runtime -> runtime.runCommand(manifest.entrypoint()))
                     .orElse(List.of("sh", "-c", fallbackCommand));
         } catch (LlmKeyMissingException e) {
-            runLifecycleService.terminate(runId, RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
+            runLifecycleService.terminate(runId, RunStatus.PENDING, RunStatus.FAILED, TerminalReason.AGENT_FAILED, RunStepKind.FAILED,
                     Map.of("summary", "The agent cannot start because its LLM key is not configured",
                             "code", "LLM_KEY_MISSING"));
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "LLM_KEY_MISSING", e);
         } catch (RuntimeException e) {
-            runLifecycleService.terminate(runId, RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
+            runLifecycleService.terminate(runId, RunStatus.PENDING, RunStatus.FAILED, TerminalReason.AGENT_FAILED, RunStepKind.FAILED,
                     Map.of("summary", "Run could not be launched"));
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Run could not be launched", e);
         }
@@ -139,11 +139,11 @@ public class RunLauncher {
                     allowOut, RunController.SANDBOX_CPU, RunController.SANDBOX_MEMORY_MB,
                     RunController.SANDBOX_TIMEOUT_SECONDS));
         } catch (SandboxCapacityException e) {
-            runLifecycleService.terminate(runId, RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
+            runLifecycleService.terminate(runId, RunStatus.PENDING, RunStatus.FAILED, TerminalReason.AGENT_FAILED, RunStepKind.FAILED,
                     Map.of("summary", RunController.capacitySummary(e.code()), "code", e.code()));
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.code(), e);
         } catch (RuntimeException e) {
-            runLifecycleService.terminate(runId, RunStatus.PENDING, RunStatus.FAILED, RunStepKind.FAILED,
+            runLifecycleService.terminate(runId, RunStatus.PENDING, RunStatus.FAILED, TerminalReason.AGENT_FAILED, RunStepKind.FAILED,
                     Map.of("summary", "Sandbox could not be started"));
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Sandbox could not be started", e);
         }

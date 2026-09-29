@@ -34,6 +34,8 @@ public class RunLifecycleService {
 
     /** A PRODUCTION run that keeps calling outside its granted scopes is stopped at this many violations. */
     static final int MAX_PRODUCTION_VIOLATIONS = 3;
+    private static final Set<RunStepKind> CLOSING_KINDS = EnumSet.of(RunStepKind.COMPLETE, RunStepKind.FAILED,
+            RunStepKind.TIMEOUT, RunStepKind.COST_CAP_REACHED, RunStepKind.CANCELLED);
     private static final Set<RunStepKind> AGENT_REPORTABLE = EnumSet.of(
             RunStepKind.READ, RunStepKind.WRITE, RunStepKind.GATE, RunStepKind.COST,
             RunStepKind.COMPLETE, RunStepKind.FAILED);
@@ -119,11 +121,11 @@ public class RunLifecycleService {
             case COST -> recordCost(run, safeDetail);
             case COMPLETE -> {
                 step(run, kind, safeDetail);
-                finish(run, RunStatus.COMPLETED);
+                finish(run, RunStatus.COMPLETED, TerminalReason.FINISHED);
             }
             case FAILED -> {
                 step(run, kind, safeDetail);
-                finish(run, RunStatus.FAILED);
+                finish(run, RunStatus.FAILED, TerminalReason.AGENT_FAILED);
             }
             default -> {
                 step(run, kind, safeDetail);
@@ -145,14 +147,15 @@ public class RunLifecycleService {
     public Run rejectGate(UUID runId) {
         Run run = lock(runId);
         requireAwaitingApproval(run);
-        finish(run, RunStatus.CANCELLED);
+        finish(run, RunStatus.CANCELLED, TerminalReason.GATE_REJECTED);
         return run;
     }
 
     /** Moves a run to a terminal status. Returns false (and changes nothing) if it was already terminal. */
     @Transactional
-    public boolean terminate(UUID runId, RunStatus terminalStatus, RunStepKind stepKind, Map<String, Object> detail) {
-        return terminate(runId, null, terminalStatus, stepKind, detail);
+    public boolean terminate(UUID runId, RunStatus terminalStatus, TerminalReason reason, RunStepKind stepKind,
+                             Map<String, Object> detail) {
+        return terminate(runId, null, terminalStatus, reason, stepKind, detail);
     }
 
     /**
@@ -163,8 +166,8 @@ public class RunLifecycleService {
      * {@code expectedStatus} as null falls back to the old check: refuse only if already terminal.
      */
     @Transactional
-    public boolean terminate(UUID runId, RunStatus expectedStatus, RunStatus terminalStatus, RunStepKind stepKind,
-                             Map<String, Object> detail) {
+    public boolean terminate(UUID runId, RunStatus expectedStatus, RunStatus terminalStatus, TerminalReason reason,
+                             RunStepKind stepKind, Map<String, Object> detail) {
         if (!terminalStatus.isTerminal()) {
             throw new IllegalArgumentException("Not a terminal status: " + terminalStatus);
         }
@@ -176,7 +179,7 @@ public class RunLifecycleService {
         if (stepKind != null) {
             step(run, stepKind, detail == null ? Map.of() : detail);
         }
-        finish(run, terminalStatus);
+        finish(run, terminalStatus, reason);
         return true;
     }
 
@@ -220,7 +223,7 @@ public class RunLifecycleService {
         if (stop) {
             step(run, RunStepKind.FAILED, RunStepSource.PLATFORM, Map.of(
                     "summary", "Run stopped after repeated calls outside its permissions", "code", "SCOPE_VIOLATIONS"));
-            finish(run, RunStatus.FAILED);
+            finish(run, RunStatus.FAILED, TerminalReason.SCOPE_VIOLATIONS);
         } else {
             runRepository.save(run);
         }
@@ -245,14 +248,14 @@ public class RunLifecycleService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A gate is awaiting approval; the run cannot complete yet");
         }
         step(run, RunStepKind.COMPLETE, RunStepSource.PLATFORM, detail == null ? Map.of() : detail);
-        finish(run, RunStatus.COMPLETED);
+        finish(run, RunStatus.COMPLETED, TerminalReason.FINISHED);
     }
 
     @Transactional
     public void fail(UUID runId, Map<String, Object> detail) {
         Run run = lockOpen(runId);
         step(run, RunStepKind.FAILED, RunStepSource.PLATFORM, detail == null ? Map.of() : detail);
-        finish(run, RunStatus.FAILED);
+        finish(run, RunStatus.FAILED, TerminalReason.AGENT_FAILED);
     }
 
     private Run lockOpen(UUID runId) {
@@ -297,7 +300,7 @@ public class RunLifecycleService {
             step(run, RunStepKind.COST_CAP_REACHED, Map.of(
                     "summary", "Spend limit reached; run stopped",
                     "requested", requested, "charged", charged, "costCap", run.getCostCap()));
-            finish(run, RunStatus.FAILED);
+            finish(run, RunStatus.FAILED, TerminalReason.COST_CAP_REACHED);
         } else {
             runRepository.save(run);
         }
@@ -317,12 +320,13 @@ public class RunLifecycleService {
         }
     }
 
-    private void finish(Run run, RunStatus status) {
+    private void finish(Run run, RunStatus status, TerminalReason reason) {
         if (run.getConnection() != null && run.getReservedAmount().signum() > 0) {
             walletReservationService.release(run.getConnection().getBuyerOrg().getId(), run.getReservedAmount());
             run.setReservedAmount(BigDecimal.ZERO);
         }
         run.setStatus(status);
+        run.setTerminalReason(reason);
         run.setCompletedAt(Instant.now());
         run.setAwaitingSince(null);
         runRepository.save(run);
@@ -371,6 +375,12 @@ public class RunLifecycleService {
             RunStep step = new RunStep(null, run, kind, objectMapper.writeValueAsString(detail), source);
             step.setBlock(RunStepBlocks.of(kind, detail));
             runStepRepository.save(step);
+            if (step.getBlock() != null) {
+                run.setReachedBlock(step.getBlock());
+            }
+            if (CLOSING_KINDS.contains(kind) && detail.get("summary") != null) {
+                run.setSummary(String.valueOf(detail.get("summary")));
+            }
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid detail payload");
         }

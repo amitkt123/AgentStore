@@ -204,7 +204,7 @@ class RunReaperTest extends AbstractIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         // The reaper now acts on its (stale) snapshot; the conditional terminate must be a no-op.
-        boolean reaped = runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.EXPIRED,
+        boolean reaped = runLifecycleService.terminate(run.getId(), snapshotStatus, RunStatus.EXPIRED, TerminalReason.GATE_EXPIRED,
                 RunStepKind.TIMEOUT, Map.of("summary", "No approval decision in time; run stopped"));
 
         assertThat(reaped).isFalse();

@@ -64,7 +64,7 @@ class RunReportServiceTest extends AbstractIntegrationTest {
         var dev = sandboxFixtures.developer("valid-runtime-agent.json");
         Run run = sandboxFixtures.sandboxRun(dev, null, RunStatus.RUNNING);
 
-        lifecycle.terminate(run.getId(), RunStatus.RUNNING, RunStatus.TIMED_OUT, RunStepKind.TIMEOUT,
+        lifecycle.terminate(run.getId(), RunStatus.RUNNING, RunStatus.TIMED_OUT, TerminalReason.TIMED_OUT, RunStepKind.TIMEOUT,
                 Map.of("summary", "no heartbeat"));
 
         RunReport report = reports.findById(run.getId()).orElseThrow();
