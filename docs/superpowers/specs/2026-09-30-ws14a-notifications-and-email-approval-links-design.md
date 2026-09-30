@@ -20,6 +20,7 @@ The consumer only writes `notification` rows, in the recipient's workspace. Each
 - `notification`: `id`, `user_id`, `org_id`, `category`, `title`, `body`, `run_id`, `gate_id` (nullable), `source_event_id`, `created_at`, `read_at`, `resolved_at`, `email_due_at`, `email_sent_at`, `email_attempts`, `email_error`, `email_skipped`, `email_no_link`. Unique on `(user_id, source_event_id)`, which makes the consumer idempotent under redelivery.
 - `notification_preference`: `(user_id, category)` with `web` and `email` booleans. Missing rows fall back to the defaults below.
 - Quiet hours columns on `app_user`: `quiet_enabled` (default false), `quiet_start` (20:00), `quiet_end` (08:00), `quiet_tz` (`Asia/Kolkata`).
+- `run.started_by_user_id` (nullable): the buyer user who started a production run, set by `RunController.trigger` and `rerun`. A run with no starter produces no `RUN_FINISHED` or `RUN_STOPPED_EARLY` notification.
 
 `V43__approval_link.sql`
 - `approval_link`: `id`, `notification_id`, `user_id`, `gate_id`, `token_hash` (unique), `expires_at`, `used_at`, `decided_ip`, `decided_user_agent`.
@@ -33,7 +34,7 @@ Default channels (web / email): `APPROVAL_NEEDED` on/on, `RUN_STOPPED_EARLY` on/
 Handles `GATE_OPENED`, `RUN_FINISHED`, `GATE_DECIDED`, `GATE_EXPIRED`. It never sends email.
 
 - `GATE_OPENED`: recipients are the payload's `eligibleApproverIds`. When that is null (a buyer org with no approver members), recipients are the org's `BUYER_ADMIN` members and the row is flagged `email_no_link`. Category `APPROVAL_NEEDED`; `email_due_at` is now when the preference allows email, ignoring quiet hours.
-- `RUN_FINISHED`: recipient is the run's starter. COMPLETED gives `RUN_FINISHED`; a stopped-early status gives `RUN_STOPPED_EARLY`. `email_due_at` is `QuietHours.nextAllowed(...)` when email is on.
+- `RUN_FINISHED`: recipient is `run.started_by_user_id`; a null starter notifies nobody. COMPLETED gives `RUN_FINISHED`; a stopped-early status gives `RUN_STOPPED_EARLY`. `email_due_at` is `QuietHours.nextAllowed(...)` when email is on.
 - `GATE_DECIDED`, `GATE_EXPIRED`: set `resolved_at` on the matching `APPROVAL_NEEDED` rows. Nobody is notified.
 - A user whose web and email preferences for the category are both off gets no row, except `APPROVAL_NEEDED`, whose web channel is always on.
 
