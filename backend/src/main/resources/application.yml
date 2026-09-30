@@ -1,3 +1,5 @@
+server:
+  forward-headers-strategy: ${AGENTSTORE_FORWARD_HEADERS:none}   # set to native behind a trusted proxy so client IPs are real
 spring:
   application:
     name: agent-store-platform

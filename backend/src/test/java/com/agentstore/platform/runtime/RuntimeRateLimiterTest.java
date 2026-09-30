@@ -46,4 +46,14 @@ class RuntimeRateLimiterTest extends AbstractIntegrationTest {
         assertThat(limiter.tryAcquire(run, Kind.LOGS)).isEmpty();
         assertThat(limiter.tryAcquire(run, Kind.LOGS)).isPresent();
     }
+
+    @Test
+    void aCallerChosenKeyHasItsOwnLimit() {
+        String subject = "approvals:" + UUID.randomUUID();
+
+        assertThat(limiter.tryAcquire(subject, 2)).isEmpty();
+        assertThat(limiter.tryAcquire(subject, 2)).isEmpty();
+        assertThat(limiter.tryAcquire(subject, 2)).isPresent();
+        assertThat(limiter.tryAcquire("approvals:" + UUID.randomUUID(), 2)).isEmpty();
+    }
 }

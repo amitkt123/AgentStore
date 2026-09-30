@@ -48,6 +48,11 @@ public class RuntimeRateLimiter {
 
     /** Empty when the call is allowed; otherwise how long until the next token. */
     public Optional<Duration> tryAcquire(UUID runId, Kind kind) {
+        return tryAcquire(kind + ":" + runId, perMinute.get(kind));
+    }
+
+    /** Same, for a caller-chosen key such as a client IP, with its own per-minute limit. */
+    public Optional<Duration> tryAcquire(String subject, int limit) {
         if (Instant.now().isBefore(skipRedisUntil)) {
             return Optional.empty();
         }
@@ -56,11 +61,10 @@ public class RuntimeRateLimiter {
             if (manager == null) {
                 return Optional.empty();
             }
-            int limit = perMinute.get(kind);
             BucketConfiguration configuration = BucketConfiguration.builder()
                     .addLimit(Bandwidth.builder().capacity(limit).refillGreedy(limit, Duration.ofMinutes(1)).build())
                     .build();
-            byte[] key = ("agentstore:rl:" + kind + ":" + runId).getBytes(StandardCharsets.UTF_8);
+            byte[] key = ("agentstore:rl:" + subject).getBytes(StandardCharsets.UTF_8);
             ConsumptionProbe probe = manager.builder().build(key, () -> configuration).tryConsumeAndReturnRemaining(1);
             return probe.isConsumed() ? Optional.empty() : Optional.of(Duration.ofNanos(probe.getNanosToWaitForRefill()));
         } catch (RuntimeException e) {

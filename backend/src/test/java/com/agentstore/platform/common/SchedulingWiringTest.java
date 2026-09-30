@@ -3,6 +3,7 @@ package com.agentstore.platform.common;
 import com.agentstore.platform.AbstractIntegrationTest;
 import com.agentstore.platform.events.OutboxDispatcherJob;
 import com.agentstore.platform.execution.RunReaperJob;
+import com.agentstore.platform.retention.RetentionJob;
 import net.javacrumbs.shedlock.core.LockProvider;
 import org.junit.jupiter.api.Test;
 import com.agentstore.platform.notifications.EmailDeliveryJob;
@@ -22,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DirtiesContext
 @TestPropertySource(properties = {"agentstore.jobs.enabled=true", "agentstore.runs.reaper-interval=PT1H",
         "agentstore.builds.poll-interval=PT1H", "agentstore.outbox.dispatch-interval=PT1H",
-        "agentstore.notifications.email-interval=PT1H"})
+        "agentstore.notifications.email-interval=PT1H", "agentstore.retention.interval=PT1H"})
 class SchedulingWiringTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -33,6 +34,8 @@ class SchedulingWiringTest extends AbstractIntegrationTest {
     OutboxDispatcherJob outboxDispatcherJob;
     @Autowired
     EmailDeliveryJob emailDeliveryJob;
+    @Autowired
+    RetentionJob retentionJob;
     @Autowired
     JdbcTemplate jdbcTemplate;
 
@@ -59,6 +62,15 @@ class SchedulingWiringTest extends AbstractIntegrationTest {
         emailDeliveryJob.run();
 
         Integer locks = jdbcTemplate.queryForObject("select count(*) from shedlock where name = 'emailDelivery'",
+                Integer.class);
+        assertThat(locks).isEqualTo(1);
+    }
+
+    @Test
+    void retentionJobRunsUnderAShedLock() {
+        retentionJob.run();
+
+        Integer locks = jdbcTemplate.queryForObject("select count(*) from shedlock where name = 'retention'",
                 Integer.class);
         assertThat(locks).isEqualTo(1);
     }
