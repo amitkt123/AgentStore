@@ -1,5 +1,6 @@
 package com.agentstore.platform.execution;
 
+import com.agentstore.platform.events.DomainEventPublisher;
 import com.agentstore.platform.ledger.LedgerService;
 import com.agentstore.platform.ledger.UsageEvent;
 import com.agentstore.platform.ledger.UsageEventRepository;
@@ -49,15 +50,18 @@ public class RunLifecycleService {
     private final WalletReservationService walletReservationService;
     private final GateRequestRepository gateRequestRepository;
     private final ApplicationEventPublisher events;
+    private final DomainEventPublisher domainEvents;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RunLifecycleService(RunRepository runRepository, RunStepRepository runStepRepository,
                                UsageEventRepository usageEventRepository, LedgerService ledgerService,
                                ManifestParser manifestParser, SandboxProvider sandboxProvider,
                                WalletReservationService walletReservationService,
-                               GateRequestRepository gateRequestRepository, ApplicationEventPublisher events) {
+                               GateRequestRepository gateRequestRepository, ApplicationEventPublisher events,
+                               DomainEventPublisher domainEvents) {
         this.gateRequestRepository = gateRequestRepository;
         this.events = events;
+        this.domainEvents = domainEvents;
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.usageEventRepository = usageEventRepository;
@@ -350,11 +354,22 @@ public class RunLifecycleService {
             gateRequestRepository.save(gate);
             events.publishEvent(new GateOutcomeEvent(run.getId(), gate.getId(), GateStatus.EXPIRED, gate.affected(),
                     gate.getCreatedAt()));
+            domainEvents.publish("GATE_EXPIRED", buyerOrgId(run), gate.getId(),
+                    Map.of("runId", run.getId().toString(), "gateId", gate.getId().toString()));
         });
         events.publishEvent(new RunFinishedEvent(run.getId()));
+        Map<String, Object> finished = new java.util.HashMap<>();
+        finished.put("runId", run.getId().toString());
+        finished.put("status", status.name());
+        finished.put("terminalReason", reason == null ? null : reason.name());
+        domainEvents.publish("RUN_FINISHED", buyerOrgId(run), run.getId(), finished);
         if (run.getSandboxId() != null) {
             killQuietly(run.getSandboxId());
         }
+    }
+
+    private static UUID buyerOrgId(Run run) {
+        return run.getConnection() == null ? null : run.getConnection().getBuyerOrg().getId();
     }
 
     private void killQuietly(String sandboxId) {

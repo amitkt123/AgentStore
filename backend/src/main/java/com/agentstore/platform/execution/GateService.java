@@ -1,5 +1,6 @@
 package com.agentstore.platform.execution;
 
+import com.agentstore.platform.events.DomainEventPublisher;
 import com.agentstore.platform.identity.OrgMembershipId;
 import com.agentstore.platform.identity.OrgMembershipRepository;
 import com.agentstore.platform.identity.UserRole;
@@ -34,12 +35,13 @@ public class GateService {
     private final ApplicationEventPublisher events;
     private final EligibleApprovers eligibleApprovers;
     private final OrgMembershipRepository memberships;
+    private final DomainEventPublisher domainEvents;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public GateService(RunRepository runRepository, GateRequestRepository gateRequestRepository,
                        RunStepRepository runStepRepository, RunLifecycleService runLifecycleService,
                        ApplicationEventPublisher events, EligibleApprovers eligibleApprovers,
-                       OrgMembershipRepository memberships) {
+                       OrgMembershipRepository memberships, DomainEventPublisher domainEvents) {
         this.runRepository = runRepository;
         this.gateRequestRepository = gateRequestRepository;
         this.runStepRepository = runStepRepository;
@@ -47,6 +49,7 @@ public class GateService {
         this.events = events;
         this.eligibleApprovers = eligibleApprovers;
         this.memberships = memberships;
+        this.domainEvents = domainEvents;
     }
 
     @Transactional
@@ -81,6 +84,15 @@ public class GateService {
         detail.put("action", action);
         detail.put("summary", summary);
         step(run, RunStepKind.GATE_REQUESTED, detail);
+        Map<String, Object> openedPayload = new HashMap<>();
+        openedPayload.put("runId", run.getId().toString());
+        openedPayload.put("gateId", gate.getId().toString());
+        openedPayload.put("action", action);
+        openedPayload.put("summary", summary);
+        openedPayload.put("expiresAt", gate.getExpiresAt().toString());
+        List<UUID> eligible = gate.eligibleApproverIds();
+        openedPayload.put("eligibleApproverIds", eligible == null ? null : eligible.stream().map(UUID::toString).toList());
+        domainEvents.publish("GATE_OPENED", buyerOrgId(run), gate.getId(), openedPayload);
         return gate;
     }
 
@@ -119,10 +131,21 @@ public class GateService {
                 detail.put("note", note);
             }
             step(gate.getRun(), RunStepKind.GATE_DECIDED, detail);
+            Map<String, Object> decided = new HashMap<>();
+            decided.put("runId", runId.toString());
+            decided.put("gateId", gate.getId().toString());
+            decided.put("decision", approve ? "APPROVED" : "REJECTED");
+            decided.put("decidedBy", userId == null ? null : userId.toString());   // null for a sandbox auto-policy
+            decided.put("channel", channel.name());
+            domainEvents.publish("GATE_DECIDED", buyerOrgId(run), gate.getId(), decided);
         } else {
             requireApprover(run, null, userId);
         }
         return approve ? runLifecycleService.approveGate(runId) : runLifecycleService.rejectGate(runId);
+    }
+
+    private static UUID buyerOrgId(Run run) {
+        return run.getConnection() == null ? null : run.getConnection().getBuyerOrg().getId();
     }
 
     /**
