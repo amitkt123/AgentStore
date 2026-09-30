@@ -57,6 +57,8 @@ agentstore:
       llm-per-minute: 60
   jobs:
     enabled: ${AGENTSTORE_JOBS_ENABLED:true}
+  notifications:
+    email-interval: PT30S
   runs:
     gate-timeout: PT30M
     reaper-interval: PT30S

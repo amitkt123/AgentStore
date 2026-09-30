@@ -80,7 +80,7 @@ public class RunController {
         if (!connection.getBuyerOrg().getId().equals(claims.orgId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Connection not owned by caller's org");
         }
-        return start(connection);
+        return start(connection, claims.userId());
     }
 
     /** Starts a new run on the run's own connection, at the connection's current pinned version and bindings. */
@@ -90,10 +90,10 @@ public class RunController {
         UUID runId = runLookup.idOf(runRef);
         requireOwnedByCaller(runId);
         Run original = runRepository.findById(runId).orElseThrow();
-        return start(original.getConnection());
+        return start(original.getConnection(), callerUserId());
     }
 
-    private RunResponse start(Connection connection) {
+    private RunResponse start(Connection connection, UUID startedByUserId) {
         if (connection.getStatus() != ConnectionStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Connection not active");
         }
@@ -117,6 +117,7 @@ public class RunController {
         Run pending = new Run(null, connection, version, waitForRebuild ? RunStatus.PENDING_BUILD : RunStatus.PENDING,
                 spendCap, BigDecimal.ZERO, null, RunTokenService.hash(runTokenService.generate()));
         pending.setReservedAmount(spendCap);
+        pending.setStartedByUserId(startedByUserId);
         pending.setStartedAt(now);
         pending.setDeadlineAt(waitForRebuild ? now.plus(PENDING_BUILD_TIMEOUT) : now.plusSeconds(SANDBOX_TIMEOUT_SECONDS));
         if (waitForRebuild) {
