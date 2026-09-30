@@ -42,4 +42,3 @@ Cross-cutting inconsistencies, unenforced declarations and open risks. Moved fro
 - **Clock skew in tests:** `EmailDeliveryTest` and `ApprovalLinkTest` fail when the Colima VM's Postgres clock is a few ms behind the host, because `email_due_at` is written from the JVM clock and compared to `now()`.
 - **WS14a approval emails can repeat once:** delivery is at least once. A crash between sending and recording `email_sent_at` resends after the 5-minute lease. A row that fails 5 times is left with `email_error` set and is not retried; nothing alerts on it yet.
 - **WS14a run-finished notifications need a starter:** only runs started from the buyer web API record `started_by_user_id`. API-key-started and rebuild-launched runs notify nobody until those paths record their starter.
-- **WS14a link page is not built:** emails link to `{agentstore.web.base-url}/approve/{token}`, which FE-3 must serve using `GET`/`POST /api/v1/approvals/{token}`.
