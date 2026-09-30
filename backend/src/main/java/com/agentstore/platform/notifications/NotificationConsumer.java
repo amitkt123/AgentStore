@@ -75,6 +75,10 @@ public class NotificationConsumer implements DomainEventConsumer {
             insert(user, event.orgId(), NotificationCategory.APPROVAL_NEEDED, title, body, runId, gateId, event.id(),
                     preferences.emailDueAt(user, NotificationCategory.APPROVAL_NEEDED, now), noLink);
         }
+        // A late-delivered GATE_OPENED may find the gate already decided; its GATE_DECIDED found no rows to resolve.
+        jdbc.update("update notification set resolved_at = now() where gate_id = ? and category = 'APPROVAL_NEEDED' "
+                + "and resolved_at is null and exists (select 1 from gate_request where id = ? and status <> 'PENDING')",
+                gateId, gateId);
     }
 
     private void runFinished(DomainEvent event) {

@@ -73,7 +73,7 @@ JWT-authenticated. A person only ever sees their own rows in their current works
 
 ## Configuration
 
-`agentstore.notifications.email-interval` (default `PT30S`), `agentstore.public-base-url` (base for links in emails). The job also honours `agentstore.jobs.enabled`; tests disable it and call the job directly.
+`agentstore.notifications.email-interval` (default `PT30S`), `agentstore.web.base-url` (existing setting; base for links in emails, `{base}/approve/{token}`). The job also honours `agentstore.jobs.enabled`; tests disable it and call the job directly.
 
 ## Testing
 

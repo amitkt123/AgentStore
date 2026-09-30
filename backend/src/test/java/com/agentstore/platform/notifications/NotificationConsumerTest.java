@@ -233,4 +233,18 @@ class NotificationConsumerTest extends AbstractIntegrationTest {
 
         assertThat(rows(approver2)).singleElement().satisfies(row -> assertThat(row.get("resolved_at")).isNotNull());
     }
+
+    @Test
+    void aGateOpenedEventDeliveredAfterTheGateWasDecidedCreatesAnAlreadyResolvedRow() {
+        var s = scenario();
+        UUID approver = fixtures.approver(s).getId();
+        Run run = runningRun(s);
+        GateRequest gate = gateService.open(run.getId(), "a", 5, "s", "{}", "[]");
+        gateService.decide(run.getId(), gate.getId(), true, approver, null, DecisionChannel.WEB);
+        consumer.handle(eventOf(gate.getId(), "GATE_DECIDED"));
+
+        consumer.handle(eventOf(gate.getId(), "GATE_OPENED"));
+
+        assertThat(rows(approver)).singleElement().satisfies(row -> assertThat(row.get("resolved_at")).isNotNull());
+    }
 }
