@@ -1,0 +1,9 @@
+.wrap { display: flex; flex-direction: column; gap: 16px; }
+.create { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.create > div { flex: 1 1 240px; max-width: 360px; }
+.err { color: var(--bad); margin: 0; }
+.reveal { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border-radius: 16px; background: var(--okS); color: var(--ink); }
+.reveal strong { color: var(--ok); font-size: 15px; }
+.reveal p { margin: 0; color: var(--ink2); }
+.key { display: block; padding: 12px 14px; border-radius: 10px; background: var(--s); border: 1px solid var(--l); word-break: break-all; font-size: 13px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
