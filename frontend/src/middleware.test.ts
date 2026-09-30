@@ -47,3 +47,34 @@ it("lets an emailed approval link through without a session, but not the signed-
   const gated = await middleware(req("/approve/R-1/g1"));
   expect(gated.status).toBe(307);
 });
+
+function jwtAs(role: string, exp: number) {
+  const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64({ alg: "HS256" })}.${b64({ sub: "u", orgId: "o", role, exp })}.sig`;
+}
+
+it("redirects a developer from a buyer route to verification", async () => {
+  const res = await middleware(req("/runs", { karya_session: jwtAs("DEVELOPER", nowSec() + 900) }));
+  expect(res.status).toBe(307);
+  expect(res.headers.get("location")).toBe("http://app/developer/verification");
+});
+
+it("redirects a buyer from a developer route to home", async () => {
+  const res = await middleware(req("/developer/api-keys", { karya_session: jwtAs("BUYER_ADMIN", nowSec() + 900) }));
+  expect(res.status).toBe(307);
+  expect(res.headers.get("location")).toBe("http://app/home");
+});
+
+it("lets a developer into developer routes", async () => {
+  expect((await middleware(req("/developer/verification", { karya_session: jwtAs("DEVELOPER", nowSec() + 900) }))).status).toBe(200);
+});
+
+it("gates on the refreshed token's role and still sets the new cookies", async () => {
+  const fresh = jwtAs("DEVELOPER", nowSec() + 900);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ token: fresh, refreshToken: "r2" }), { status: 200 })));
+  const res = await middleware(req("/home", { karya_session: jwtAs("DEVELOPER", nowSec() - 5), karya_refresh: "r1" }));
+  expect(res.status).toBe(307);
+  expect(res.headers.get("location")).toBe("http://app/developer/verification");
+  expect(res.cookies.get("karya_session")?.value).toBe(fresh);
+  expect(res.cookies.get("karya_refresh")?.value).toBe("r2");
+});

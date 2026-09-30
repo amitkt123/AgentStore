@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { Rail } from "./Rail";
+import { Rail, buyerRailItems, developerRailItems, railItemsFor } from "./Rail";
 
 const items = [
   { href: "/home", label: "Workspace", icon: "home" as const },
@@ -10,4 +10,12 @@ it("marks the active item and shows the badge as text", () => {
   render(<Rail items={items} activePath="/runs/R-2291" />);
   expect(screen.getByRole("link", { name: /Runs, 2 need you/i })).toHaveAttribute("aria-current", "page");
   expect(screen.getByRole("link", { name: /Workspace/ })).not.toHaveAttribute("aria-current");
+});
+
+it("gives developers verification and API keys and leaves the buyer rail alone", () => {
+  expect(developerRailItems().map((i) => i.href)).toEqual(["/developer/verification", "/developer/api-keys"]);
+  expect(railItemsFor("DEVELOPER", 3)).toEqual(developerRailItems());
+  expect(railItemsFor("BUYER_ADMIN", 3)).toEqual(buyerRailItems(3));
+  expect(railItemsFor("BUYER_APPROVER", 0)).toEqual(buyerRailItems(0));
+  expect(railItemsFor("ADMIN", 0).map((i) => i.href)).toEqual(["/home"]);
 });
