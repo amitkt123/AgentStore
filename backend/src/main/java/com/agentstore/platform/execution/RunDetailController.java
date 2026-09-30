@@ -64,7 +64,8 @@ public class RunDetailController {
 
         var steps = runStepRepository.findByRunIdOrderByCreatedAtAsc(runId).stream()
                 .map(RunStepResponse::from).toList();
-        return new RunDetailResponse(run.getId(), run.getDisplayId(), run.getStatus(), run.getTerminalReason(), run.getCostCap(), run.getTotalCharged(), steps);
+        return new RunDetailResponse(run.getId(), run.getDisplayId(), run.getAgentVersion().getAgent().getId(),
+                run.getAgentVersion().getId(), run.getConnection().getId(), run.getStatus(), run.getTerminalReason(), run.getCostCap(), run.getTotalCharged(), steps);
     }
 
     /** Any run the caller can already view — unlike {@link #get}, not restricted to a buyer's own run (spec §4). */

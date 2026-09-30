@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-public record RunDetailResponse(UUID id, String displayId, RunStatus status, TerminalReason terminalReason,
+public record RunDetailResponse(UUID id, String displayId, UUID agentId, UUID agentVersionId, UUID connectionId,
+                                RunStatus status, TerminalReason terminalReason,
                                 BigDecimal costCap, BigDecimal totalCharged, List<RunStepResponse> steps) {
 }
