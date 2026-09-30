@@ -52,7 +52,7 @@ class TerminalReasonTest extends AbstractIntegrationTest {
     void rejectingAGateIsGateRejected() {
         Run run = running("tr-3");
         gateService.open(run.getId(), "post_journal_entries", 5, "Post", "{}", "[]");
-        gateService.decide(run.getId(), null, false, UUID.randomUUID(), "no");
+        gateService.decide(run.getId(), null, false, UUID.randomUUID(), "no", DecisionChannel.WEB);
         Run done = reload(run);
         assertThat(done.getStatus()).isEqualTo(RunStatus.CANCELLED);
         assertThat(done.getTerminalReason()).isEqualTo(TerminalReason.GATE_REJECTED);

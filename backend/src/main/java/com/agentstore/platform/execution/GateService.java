@@ -1,5 +1,8 @@
 package com.agentstore.platform.execution;
 
+import com.agentstore.platform.identity.OrgMembershipId;
+import com.agentstore.platform.identity.OrgMembershipRepository;
+import com.agentstore.platform.identity.UserRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -30,17 +33,20 @@ public class GateService {
     private final RunLifecycleService runLifecycleService;
     private final ApplicationEventPublisher events;
     private final EligibleApprovers eligibleApprovers;
+    private final OrgMembershipRepository memberships;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public GateService(RunRepository runRepository, GateRequestRepository gateRequestRepository,
                        RunStepRepository runStepRepository, RunLifecycleService runLifecycleService,
-                       ApplicationEventPublisher events, EligibleApprovers eligibleApprovers) {
+                       ApplicationEventPublisher events, EligibleApprovers eligibleApprovers,
+                       OrgMembershipRepository memberships) {
         this.runRepository = runRepository;
         this.gateRequestRepository = gateRequestRepository;
         this.runStepRepository = runStepRepository;
         this.runLifecycleService = runLifecycleService;
         this.events = events;
         this.eligibleApprovers = eligibleApprovers;
+        this.memberships = memberships;
     }
 
     @Transactional
@@ -83,8 +89,9 @@ public class GateService {
      * legacy callback) takes the old status-flip path unchanged.
      */
     @Transactional
-    public Run decide(UUID runId, UUID gateId, boolean approve, UUID userId, String note) {
-        runRepository.findByIdForUpdate(runId)
+    public Run decide(UUID runId, UUID gateId, boolean approve, UUID userId, String note,
+                     DecisionChannel channel) {
+        Run run = runRepository.findByIdForUpdate(runId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Run not found"));
         Optional<GateRequest> found = gateId != null
                 ? Optional.of(gateRequestRepository.findByIdAndRunId(gateId, runId)
@@ -95,15 +102,12 @@ public class GateService {
             if (gate.getStatus() != GateStatus.PENDING) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Gate already " + gate.getStatus());
             }
-            List<UUID> eligible = gate.eligibleApproverIds();
-            if (eligible != null && !eligible.contains(userId)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not an approver for this gate");
-            }
+            requireApprover(run, gate, userId);
             gate.setStatus(approve ? GateStatus.APPROVED : GateStatus.REJECTED);
             gate.setDecidedByUserId(userId);
             gate.setDecisionNote(note);
             gate.setDecidedAt(Instant.now());
-            gate.setDecidedVia(DecidedVia.WEB);
+            gate.setDecidedVia(channel.decidedVia());
             gateRequestRepository.save(gate);
             events.publishEvent(new GateOutcomeEvent(runId, gate.getId(), gate.getStatus(),
                     gate.affected(), gate.getCreatedAt()));
@@ -115,8 +119,35 @@ public class GateService {
                 detail.put("note", note);
             }
             step(gate.getRun(), RunStepKind.GATE_DECIDED, detail);
+        } else {
+            requireApprover(run, null, userId);
         }
         return approve ? runLifecycleService.approveGate(runId) : runLifecycleService.rejectGate(runId);
+    }
+
+    /**
+     * The decider must be a current BUYER_APPROVER of the run's buyer org (checked against the database, not the
+     * token, which can outlive a membership) and, when the gate carries an approver snapshot, be on it. A sandbox run
+     * has no buyer org and is unrestricted; so is a gate with no snapshot (an org with no approver members), which
+     * would otherwise deadlock. A run with no gate row is restricted only when its org has an approver member.
+     */
+    private void requireApprover(Run run, GateRequest gate, UUID userId) {
+        if (run.getConnection() == null) {
+            return;
+        }
+        UUID orgId = run.getConnection().getBuyerOrg().getId();
+        List<UUID> eligible = gate != null ? gate.eligibleApproverIds() : null;
+        boolean restricted = gate != null
+                ? eligible != null
+                : memberships.countByIdOrgIdAndRole(orgId, UserRole.BUYER_APPROVER) > 0;
+        if (!restricted) {
+            return;
+        }
+        boolean currentApprover = memberships.findById(new OrgMembershipId(userId, orgId))
+                .map(m -> m.getRole() == UserRole.BUYER_APPROVER).orElse(false);
+        if (!currentApprover || (eligible != null && !eligible.contains(userId))) {
+            throw new NotAnApproverException();
+        }
     }
 
     /** Waits up to {@code wait} for the gate to leave PENDING. Not transactional: each read is its own short transaction. */

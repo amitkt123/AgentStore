@@ -3,10 +3,13 @@ package com.agentstore.platform.execution;
 import com.agentstore.platform.build.*;
 import com.agentstore.platform.catalog.*;
 import com.agentstore.platform.identity.Org;
+import com.agentstore.platform.identity.OrgMembership;
+import com.agentstore.platform.identity.OrgMembershipRepository;
 import com.agentstore.platform.identity.OrgRepository;
 import com.agentstore.platform.identity.OrgType;
 import com.agentstore.platform.identity.User;
 import com.agentstore.platform.identity.UserRepository;
+import com.agentstore.platform.identity.UserRole;
 import com.agentstore.platform.ledger.Wallet;
 import com.agentstore.platform.ledger.WalletRepository;
 import org.springframework.stereotype.Component;
@@ -33,12 +36,14 @@ public class ExecutionFixtures {
     private final UserRepository userRepository;
     private final AgentBundleRepository agentBundleRepository;
     private final TemplateBuildRepository templateBuildRepository;
+    private final OrgMembershipRepository membershipRepository;
 
     public ExecutionFixtures(OrgRepository orgRepository, AgentRepository agentRepository,
                              AgentVersionRepository agentVersionRepository, ConnectionRepository connectionRepository,
                              WalletRepository walletRepository, RunRepository runRepository,
                              UserRepository userRepository, AgentBundleRepository agentBundleRepository,
-                             TemplateBuildRepository templateBuildRepository) {
+                             TemplateBuildRepository templateBuildRepository,
+                             OrgMembershipRepository membershipRepository) {
         this.orgRepository = orgRepository;
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
@@ -48,6 +53,14 @@ public class ExecutionFixtures {
         this.userRepository = userRepository;
         this.agentBundleRepository = agentBundleRepository;
         this.templateBuildRepository = templateBuildRepository;
+        this.membershipRepository = membershipRepository;
+    }
+
+    /** A new user who is a BUYER_APPROVER member of the scenario's buyer org. */
+    public User approver(Scenario scenario) {
+        User user = userRepository.save(new User(null, "approver-" + UUID.randomUUID() + "@example.com", null, "Approver"));
+        membershipRepository.save(new OrgMembership(user, scenario.buyer(), UserRole.BUYER_APPROVER, "Approver"));
+        return user;
     }
 
     public record Scenario(Org buyer, AgentVersion version, Connection connection) {}

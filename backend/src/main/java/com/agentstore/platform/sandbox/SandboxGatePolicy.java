@@ -33,7 +33,8 @@ public class SandboxGatePolicy {
         if (mode == GateMode.MANUAL) {
             return gate;
         }
-        gates.decide(runId, gate.getId(), mode == GateMode.AUTO_APPROVE, null, "auto policy");
+        gates.decide(runId, gate.getId(), mode == GateMode.AUTO_APPROVE, null, "auto policy",
+                com.agentstore.platform.execution.DecisionChannel.WEB);
         return gates.await(runId, gate.getId(), Duration.ZERO);
     }
 }
