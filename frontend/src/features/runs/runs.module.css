@@ -1,0 +1,13 @@
+.wrap { display: flex; flex-direction: column; gap: 20px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--l); background: var(--s); font: inherit; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--sky); color: var(--b); border-color: var(--b3); font-weight: 600; }
+.note { color: var(--ink3); margin: 0; }
+.timeline { background: var(--s); border: 1px solid var(--l); border-radius: var(--radius); padding: 16px; }
+.sub { margin: 4px 0 12px; color: var(--ink3); font-size: 13px; }
+.lane { display: grid; grid-template-columns: 160px 1fr; align-items: center; gap: 12px; margin-bottom: 8px; }
+.laneName { font-size: 13px; color: var(--ink2); }
+.track { position: relative; height: 22px; background: var(--l2); border-radius: 6px; }
+.bar { position: absolute; top: 3px; bottom: 3px; background: var(--b); border-radius: 4px; min-width: 6px; }
+.axis { display: flex; justify-content: space-between; margin-left: 172px; font-size: 11px; color: var(--ink3); }
+@media (max-width: 767px) { .lane { grid-template-columns: 1fr; gap: 4px; } .axis { margin-left: 0; } }

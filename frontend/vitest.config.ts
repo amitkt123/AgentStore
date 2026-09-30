@@ -10,7 +10,5 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     exclude: ["**/node_modules/**", "**/.git/**", "e2e/**"],
   },
-  resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
-  },
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
 });

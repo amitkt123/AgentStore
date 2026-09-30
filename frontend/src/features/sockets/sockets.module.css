@@ -1,0 +1,8 @@
+.wrap { display: flex; flex-direction: column; gap: 16px; max-width: 720px; }
+.socket { display: flex; flex-direction: column; gap: 10px; background: var(--s); border: 1px solid var(--l); border-radius: var(--radius); padding: 16px; }
+.kind { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--ink3); }
+.sub { margin: 2px 0 0; color: var(--ink3); font-size: 13px; }
+.pick select { width: 100%; min-height: 44px; border: 1px solid var(--l); border-radius: 10px; padding: 0 10px; font: inherit; background: var(--s); }
+.limits { background: var(--s); border: 1px solid var(--l); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.limits input { min-height: 44px; width: 160px; border: 1px solid var(--l); border-radius: 10px; padding: 0 10px; font: inherit; }
+.err { color: var(--bad); margin: 0; }

@@ -1,0 +1,6 @@
+.box { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 24px; border: 1px dashed var(--l); border-radius: var(--radius); background: var(--s); }
+.box p { margin: 0; color: var(--ink2); }
+.error { border-style: solid; border-color: var(--badS); background: var(--badS); }
+.error p { color: var(--bad); }
+.skel { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.line { height: 14px; border-radius: 6px; background: linear-gradient(90deg, var(--l2), var(--l), var(--l2)); }
