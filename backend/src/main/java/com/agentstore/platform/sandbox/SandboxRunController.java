@@ -95,7 +95,8 @@ public class SandboxRunController {
         UUID id = runLookup.idOf(runRef);
         var claims = Caller.current();
         Run run = service.owned(claims.orgId(), id);
-        gateService.decide(run.getId(), gateId, body.approve(), claims.userId(), body.note());
+        gateService.decide(run.getId(), gateId, body.approve(), claims.userId(), body.note(),
+                com.agentstore.platform.execution.DecisionChannel.WEB);
         return views.summary(service.owned(claims.orgId(), id));
     }
 }

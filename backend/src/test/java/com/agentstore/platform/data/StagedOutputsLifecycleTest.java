@@ -2,6 +2,7 @@ package com.agentstore.platform.data;
 
 import com.agentstore.platform.AbstractStorageIntegrationTest;
 import com.agentstore.platform.execution.GateRequest;
+import com.agentstore.platform.execution.DecisionChannel;
 import com.agentstore.platform.execution.GateService;
 import com.agentstore.platform.execution.RunLifecycleService;
 import com.agentstore.platform.execution.TerminalReason;
@@ -63,7 +64,7 @@ class StagedOutputsLifecycleTest extends AbstractStorageIntegrationTest {
         stage("journal_entries");
         GateRequest gate = openGate("journal_entries");
 
-        gateService.decide(agent.run().getId(), gate.getId(), true, UUID.randomUUID(), "ok");
+        gateService.decide(agent.run().getId(), gate.getId(), true, UUID.randomUUID(), "ok", DecisionChannel.WEB);
 
         assertThat(statuses()).containsExactly(OutputStatus.COMMITTED);
         assertThat(outputRepository.findByRunIdOrderByCreatedAtAsc(agent.run().getId()).get(0).getGateRequestId())
@@ -76,7 +77,7 @@ class StagedOutputsLifecycleTest extends AbstractStorageIntegrationTest {
         stage("journal_entries");
         GateRequest gate = openGate("journal_entries");
 
-        gateService.decide(agent.run().getId(), gate.getId(), false, UUID.randomUUID(), "no");
+        gateService.decide(agent.run().getId(), gate.getId(), false, UUID.randomUUID(), "no", DecisionChannel.WEB);
 
         assertThat(statuses()).containsExactly(OutputStatus.DISCARDED);
         assertThat(runRepository.findById(agent.run().getId()).orElseThrow().getStatus()).isEqualTo(RunStatus.CANCELLED);
@@ -121,7 +122,7 @@ class StagedOutputsLifecycleTest extends AbstractStorageIntegrationTest {
         stage("journal_entries");
         GateRequest gate = openGate();
 
-        gateService.decide(agent.run().getId(), gate.getId(), true, UUID.randomUUID(), "ok");
+        gateService.decide(agent.run().getId(), gate.getId(), true, UUID.randomUUID(), "ok", DecisionChannel.WEB);
 
         assertThat(statuses()).containsExactly(OutputStatus.STAGED);
         lifecycle.complete(agent.run().getId(), Map.of());
@@ -138,7 +139,7 @@ class StagedOutputsLifecycleTest extends AbstractStorageIntegrationTest {
         Thread.sleep(5);
         stage("journal_entries");                                    // after the gate was requested
 
-        gateService.decide(agent.run().getId(), gate.getId(), true, UUID.randomUUID(), "ok");
+        gateService.decide(agent.run().getId(), gate.getId(), true, UUID.randomUUID(), "ok", DecisionChannel.WEB);
 
         List<RunOutput> rows = outputRepository.findByRunIdOrderByCreatedAtAsc(agent.run().getId());
         assertThat(rows).extracting(RunOutput::getResourceName, RunOutput::getStatus).containsExactly(

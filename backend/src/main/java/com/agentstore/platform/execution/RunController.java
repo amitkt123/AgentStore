@@ -153,7 +153,8 @@ public class RunController {
     public RunResponse approve(@PathVariable("runId") String runRef, @RequestBody ApproveRunRequest request) {
         UUID runId = runLookup.idOf(runRef);
         requireOwnedByCaller(runId);
-        return RunResponse.from(gateService.decide(runId, null, true, callerUserId(), request.notes()));
+        return RunResponse.from(gateService.decide(runId, null, true, callerUserId(), request.notes(),
+                DecisionChannel.WEB));
     }
 
     @PostMapping("/{runId}/reject")
@@ -161,7 +162,8 @@ public class RunController {
     public RunResponse reject(@PathVariable("runId") String runRef, @RequestBody ApproveRunRequest request) {
         UUID runId = runLookup.idOf(runRef);
         requireOwnedByCaller(runId);
-        return RunResponse.from(gateService.decide(runId, null, false, callerUserId(), request.notes()));
+        return RunResponse.from(gateService.decide(runId, null, false, callerUserId(), request.notes(),
+                DecisionChannel.WEB));
     }
 
     @PostMapping("/{runId}/gates/{gateId}/decision")
@@ -171,7 +173,8 @@ public class RunController {
         UUID runId = runLookup.idOf(runRef);
         requireOwnedByCaller(runId);
         return RunResponse.from(gateService.decide(runId, gateId, request.decision() == GateDecision.APPROVE,
-                callerUserId(), request.note()));
+                callerUserId(), request.note(),
+                DecisionChannel.WEB));
     }
 
     private UUID callerUserId() {

@@ -94,7 +94,7 @@ class GateServiceTest extends AbstractIntegrationTest {
         GateRequest gate = open(run, 5);
         UUID approver = UUID.randomUUID();
 
-        Run result = gateService.decide(run.getId(), gate.getId(), true, approver, "looks fine");
+        Run result = gateService.decide(run.getId(), gate.getId(), true, approver, "looks fine", DecisionChannel.WEB);
 
         assertThat(result.getStatus()).isEqualTo(RunStatus.RUNNING);
         GateRequest decided = gateRepository.findById(gate.getId()).orElseThrow();
@@ -111,7 +111,7 @@ class GateServiceTest extends AbstractIntegrationTest {
         Run run = running("tok-gs-5");
         GateRequest gate = open(run, 5);
 
-        Run result = gateService.decide(run.getId(), gate.getId(), false, UUID.randomUUID(), "too risky");
+        Run result = gateService.decide(run.getId(), gate.getId(), false, UUID.randomUUID(), "too risky", DecisionChannel.WEB);
 
         assertThat(result.getStatus()).isEqualTo(RunStatus.CANCELLED);
         assertThat(gateRepository.findById(gate.getId()).orElseThrow().getStatus()).isEqualTo(GateStatus.REJECTED);
@@ -124,7 +124,7 @@ class GateServiceTest extends AbstractIntegrationTest {
         run.setStatus(RunStatus.AWAITING_APPROVAL);
         runRepository.save(run);
 
-        Run result = gateService.decide(run.getId(), null, true, UUID.randomUUID(), null);
+        Run result = gateService.decide(run.getId(), null, true, UUID.randomUUID(), null, DecisionChannel.WEB);
 
         assertThat(result.getStatus()).isEqualTo(RunStatus.RUNNING);
         assertThat(gateRepository.findAll().stream().filter(g -> g.getRun().getId().equals(run.getId()))).isEmpty();
@@ -137,12 +137,12 @@ class GateServiceTest extends AbstractIntegrationTest {
         Run other = running("tok-gs-7b");
         GateRequest gate = open(run, 5);
 
-        assertThatThrownBy(() -> gateService.decide(other.getId(), gate.getId(), true, UUID.randomUUID(), null))
+        assertThatThrownBy(() -> gateService.decide(other.getId(), gate.getId(), true, UUID.randomUUID(), null, DecisionChannel.WEB))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
 
-        gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null);
-        assertThatThrownBy(() -> gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null))
+        gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null, DecisionChannel.WEB);
+        assertThatThrownBy(() -> gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null, DecisionChannel.WEB))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
     }
@@ -157,7 +157,7 @@ class GateServiceTest extends AbstractIntegrationTest {
         assertThat(stillPending.getStatus()).isEqualTo(GateStatus.PENDING);
         assertThat(Duration.ofNanos(System.nanoTime() - started)).isGreaterThanOrEqualTo(Duration.ofMillis(250));
 
-        gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null);
+        gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null, DecisionChannel.WEB);
         started = System.nanoTime();
         assertThat(gateService.await(run.getId(), gate.getId(), Duration.ofSeconds(20)).getStatus()).isEqualTo(GateStatus.APPROVED);
         assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(2));
@@ -191,7 +191,7 @@ class GateServiceTest extends AbstractIntegrationTest {
             Future<?> decide = pool.submit(() -> {
                 start.await();
                 try {
-                    gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null);
+                    gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null, DecisionChannel.WEB);
                 } catch (ResponseStatusException expected) {
                     // lost the race to the expiry
                 }
@@ -219,7 +219,7 @@ class GateServiceTest extends AbstractIntegrationTest {
     void anExpiryThatLostToADecisionChangesNothing() {
         Run run = running("tok-gs-10");
         GateRequest gate = open(run, 1);
-        gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null);
+        gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null, DecisionChannel.WEB);
 
         boolean expired = gateService.expire(run.getId(), RunStatus.AWAITING_APPROVAL, TerminalReason.GATE_EXPIRED, Map.of());
 

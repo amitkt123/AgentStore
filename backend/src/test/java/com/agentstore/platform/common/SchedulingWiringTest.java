@@ -1,6 +1,7 @@
 package com.agentstore.platform.common;
 
 import com.agentstore.platform.AbstractIntegrationTest;
+import com.agentstore.platform.events.OutboxDispatcherJob;
 import com.agentstore.platform.execution.RunReaperJob;
 import net.javacrumbs.shedlock.core.LockProvider;
 import org.junit.jupiter.api.Test;
@@ -19,13 +20,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @DirtiesContext
 @TestPropertySource(properties = {"agentstore.jobs.enabled=true", "agentstore.runs.reaper-interval=PT1H",
-        "agentstore.builds.poll-interval=PT1H"})
+        "agentstore.builds.poll-interval=PT1H", "agentstore.outbox.dispatch-interval=PT1H"})
 class SchedulingWiringTest extends AbstractIntegrationTest {
 
     @Autowired
     LockProvider lockProvider;
     @Autowired
     RunReaperJob runReaperJob;
+    @Autowired
+    OutboxDispatcherJob outboxDispatcherJob;
     @Autowired
     JdbcTemplate jdbcTemplate;
 
@@ -34,6 +37,15 @@ class SchedulingWiringTest extends AbstractIntegrationTest {
         runReaperJob.run();
 
         Integer locks = jdbcTemplate.queryForObject("select count(*) from shedlock where name = 'runReaper'",
+                Integer.class);
+        assertThat(locks).isEqualTo(1);
+    }
+
+    @Test
+    void outboxJobRunsUnderAShedLock() {
+        outboxDispatcherJob.run();
+
+        Integer locks = jdbcTemplate.queryForObject("select count(*) from shedlock where name = 'outboxDispatcher'",
                 Integer.class);
         assertThat(locks).isEqualTo(1);
     }

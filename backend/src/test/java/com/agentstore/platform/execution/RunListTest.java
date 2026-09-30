@@ -130,7 +130,7 @@ class RunListTest extends AbstractIntegrationTest {
 
         User decider = users.save(new User(null, "decider-" + System.nanoTime() + "@example.com", null, "Dana Decider"));
         gateService.open(run.getId(), "post_journal_entries", 5, "Post", "{}", "[]");
-        gateService.decide(run.getId(), null, true, decider.getId(), "ok");
+        gateService.decide(run.getId(), null, true, decider.getId(), "ok", DecisionChannel.WEB);
         assertThat(get(s, "").get("items").get(0).get("decidedBy").get("name").asText()).isEqualTo("Dana Decider");
     }
 }

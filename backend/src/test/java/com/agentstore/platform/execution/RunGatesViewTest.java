@@ -87,7 +87,7 @@ class RunGatesViewTest extends AbstractIntegrationTest {
         var s = fixtures.liveTierA(new BigDecimal("500.00"), new BigDecimal("1000.00"));
         Run run = fixtures.run(s, RunStatus.RUNNING, "sbx-gn", "tok-gn");
         var first = gateService.open(run.getId(), "post_journal_entries", 5, "first", "{}", "[]");
-        gateService.decide(run.getId(), null, true, UUID.randomUUID(), "ok");
+        gateService.decide(run.getId(), null, true, UUID.randomUUID(), "ok", DecisionChannel.WEB);
         var second = gateService.open(run.getId(), "post_journal_entries", 5, "second", "{}", "[]");
 
         JsonNode list = rest.exchange("http://localhost:" + port + "/api/v1/runs/" + run.getId() + "/gates",
