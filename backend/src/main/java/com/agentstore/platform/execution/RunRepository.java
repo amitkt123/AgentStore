@@ -67,4 +67,13 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
     @Query(value = "UPDATE run SET llm_tokens_reserved = llm_tokens_reserved - :reserved, "
             + "llm_tokens_used = llm_tokens_used + :used WHERE id = :id", nativeQuery = true)
     int settleLlmTokens(@Param("id") UUID id, @Param("reserved") int reserved, @Param("used") int used);
+
+    /**
+     * What a connection's production runs have cost since {@code since}: the charge for a finished run, the whole
+     * reservation for one still in flight (which already covers what it has charged).
+     */
+    @Query(value = "SELECT COALESCE(SUM(CASE WHEN status IN ('COMPLETED','FAILED','CANCELLED','TIMED_OUT','EXPIRED') "
+            + "THEN total_charged ELSE reserved_amount END), 0) FROM run "
+            + "WHERE connection_id = :connectionId AND mode = 'PRODUCTION' AND started_at >= :since", nativeQuery = true)
+    BigDecimal spendSince(@Param("connectionId") UUID connectionId, @Param("since") Instant since);
 }

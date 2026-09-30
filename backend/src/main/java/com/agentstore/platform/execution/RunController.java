@@ -13,6 +13,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -42,12 +44,15 @@ public class RunController {
     private final PendingBuildRuns pendingBuildRuns;
     private final BindingResolver bindingResolver;
     private final RunLookup runLookup;
+    private final ConnectionLimits connectionLimits;
+    private final TransactionTemplate transactions;
 
     public RunController(ConnectionRepository connectionRepository, RunRepository runRepository,
                          ManifestParser manifestParser, RunTokenService runTokenService,
                          WalletReservationService walletReservationService, GateService gateService,
                          RunLauncher runLauncher, RebuildService rebuildService, PendingBuildRuns pendingBuildRuns,
-                         BindingResolver bindingResolver, RunLookup runLookup) {
+                         BindingResolver bindingResolver, RunLookup runLookup, ConnectionLimits connectionLimits,
+                         PlatformTransactionManager transactionManager) {
         this.connectionRepository = connectionRepository;
         this.runRepository = runRepository;
         this.manifestParser = manifestParser;
@@ -59,6 +64,8 @@ public class RunController {
         this.pendingBuildRuns = pendingBuildRuns;
         this.bindingResolver = bindingResolver;
         this.runLookup = runLookup;
+        this.connectionLimits = connectionLimits;
+        this.transactions = new TransactionTemplate(transactionManager);
     }
 
     /** How long a run may wait for its agent to be rebuilt before the reaper times it out. */
@@ -103,11 +110,6 @@ public class RunController {
 
         UUID buyerOrgId = connection.getBuyerOrg().getId();
         BigDecimal spendCap = connection.getSpendCap();
-        try {
-            walletReservationService.reserve(buyerOrgId, spendCap);
-        } catch (InsufficientFundsException e) {
-            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, e.getMessage());
-        }
 
         boolean waitForRebuild = rebuildService.needsRebuild(version);
         Instant now = Instant.now();
@@ -117,16 +119,20 @@ public class RunController {
         pending.setReservedAmount(spendCap);
         pending.setStartedAt(now);
         pending.setDeadlineAt(waitForRebuild ? now.plus(PENDING_BUILD_TIMEOUT) : now.plusSeconds(SANDBOX_TIMEOUT_SECONDS));
-        Run run;
-        try {
-            if (waitForRebuild) {
-                rebuildService.queueRebuild(version);
-            }
-            run = bindingResolver.saveWithPins(pending, pins);
-        } catch (RuntimeException e) {
-            walletReservationService.release(buyerOrgId, spendCap);
-            throw e;
+        if (waitForRebuild) {
+            rebuildService.queueRebuild(version);
         }
+        // One transaction: the monthly limit is checked under the connection's row lock, then the wallet is held and the
+        // run saved, so concurrent triggers see each other's runs and any failure rolls the reservation back.
+        Run run = transactions.execute(status -> {
+            connectionLimits.enforce(connection.getId(), spendCap);
+            try {
+                walletReservationService.reserve(buyerOrgId, spendCap);
+            } catch (InsufficientFundsException e) {
+                throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, e.getMessage());
+            }
+            return bindingResolver.saveWithPins(pending, pins);
+        });
         if (waitForRebuild) {
             // The build we joined may have finished before this run existed, so the listener never saw it.
             pendingBuildRuns.settle(version.getId(), null);

@@ -14,7 +14,9 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -48,6 +50,15 @@ public class Connection {
     private String grantedScopesJson;
 
     private BigDecimal spendCap;
+
+    /** Most this agent may cost in a UTC calendar month, counting charges and reservations; null means no limit. */
+    private BigDecimal monthlyLimit;
+
+    /** Who may decide this agent's gates. Empty means every BUYER_APPROVER in the org. */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "connection_approver", joinColumns = @JoinColumn(name = "connection_id"))
+    @Column(name = "user_id")
+    private Set<UUID> approverUserIds = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
     private ConnectionStatus status;

@@ -6,12 +6,16 @@ import com.agentstore.platform.catalog.AgentVersionRepository;
 import com.agentstore.platform.catalog.VersionStatus;
 import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.identity.Org;
+import com.agentstore.platform.identity.OrgMembershipId;
+import com.agentstore.platform.identity.OrgMembershipRepository;
 import com.agentstore.platform.identity.OrgRepository;
+import com.agentstore.platform.identity.UserRole;
 import com.agentstore.platform.manifest.ManifestParser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -29,16 +33,21 @@ public class ConnectionController {
     private final OrgRepository orgRepository;
     private final ManifestParser manifestParser;
     private final SecretService secretService;
+    private final OrgMembershipRepository memberships;
+    private final ConnectionLimits connectionLimits;
 
     public ConnectionController(ConnectionRepository connectionRepository, AgentRepository agentRepository,
                                  AgentVersionRepository agentVersionRepository, OrgRepository orgRepository,
-                                 ManifestParser manifestParser, SecretService secretService) {
+                                 ManifestParser manifestParser, SecretService secretService,
+                                 OrgMembershipRepository memberships, ConnectionLimits connectionLimits) {
         this.connectionRepository = connectionRepository;
         this.agentRepository = agentRepository;
         this.agentVersionRepository = agentVersionRepository;
         this.orgRepository = orgRepository;
         this.manifestParser = manifestParser;
         this.secretService = secretService;
+        this.memberships = memberships;
+        this.connectionLimits = connectionLimits;
     }
 
     @PostMapping
@@ -66,7 +75,47 @@ public class ConnectionController {
         Connection connection = new Connection(null, buyerOrg, agent, request.grantedScopes(), request.spendCap(),
                 ConnectionStatus.ACTIVE);
         connection.setAgentVersion(liveVersion);
+        connection.setMonthlyLimit(request.monthlyLimit());
+        if (request.approverUserIds() != null) {
+            connection.setApproverUserIds(validatedApprovers(claims.orgId(), request.approverUserIds()));
+        }
         return ConnectionResponse.from(connectionRepository.save(connection));
+    }
+
+    @PatchMapping("/{connectionId}")
+    @PreAuthorize("hasRole('BUYER_ADMIN')")
+    @Transactional
+    public ConnectionResponse update(@PathVariable java.util.UUID connectionId,
+                                     @Valid @RequestBody UpdateConnectionRequest request) {
+        Connection connection = connectionRepository.findById(connectionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Connection not found"));
+        var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!connection.getBuyerOrg().getId().equals(claims.orgId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Connection not owned by caller's org");
+        }
+        if (Boolean.TRUE.equals(request.clearMonthlyLimit())) {
+            connection.setMonthlyLimit(null);
+        } else if (request.monthlyLimit() != null) {
+            connection.setMonthlyLimit(request.monthlyLimit());
+        }
+        if (request.approverUserIds() != null) {
+            connection.setApproverUserIds(validatedApprovers(claims.orgId(), request.approverUserIds()));
+        }
+        return ConnectionResponse.from(connectionRepository.save(connection));
+    }
+
+    /** Each approver must be a BUYER_APPROVER member of the org: the decision endpoints require that role. */
+    private Set<java.util.UUID> validatedApprovers(java.util.UUID orgId, List<java.util.UUID> userIds) {
+        Set<java.util.UUID> approvers = new java.util.HashSet<>(userIds);
+        for (java.util.UUID userId : approvers) {
+            boolean approver = memberships.findById(new OrgMembershipId(userId, orgId))
+                    .map(m -> m.getRole() == UserRole.BUYER_APPROVER).orElse(false);
+            if (!approver) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Not an approver in this workspace: " + userId);
+            }
+        }
+        return approvers;
     }
 
     @PostMapping("/{connectionId}/secrets")
@@ -86,7 +135,7 @@ public class ConnectionController {
     public List<ConnectionSummaryResponse> mine() {
         var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return connectionRepository.findByBuyerOrgId(claims.orgId()).stream()
-                .map(ConnectionSummaryResponse::from)
+                .map(c -> ConnectionSummaryResponse.from(c, connectionLimits.monthToDate(c.getId())))
                 .toList();
     }
 
