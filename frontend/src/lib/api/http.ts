@@ -5,10 +5,12 @@ import { SESSION_COOKIE } from "../session";
 export class ApiError extends Error {
   status: number;
   code: string | null;
-  constructor(status: number, code: string | null, message: string) {
+  details: Record<string, unknown>;
+  constructor(status: number, code: string | null, message: string, details: Record<string, unknown> = {}) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -24,8 +26,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await apiFetch(path, init);
   if (res.status === 401) redirect("/login");
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { code?: string; message?: string } | null;
-    throw new ApiError(res.status, body?.code ?? null, body?.message || `Request failed (${res.status})`);
+    const body = (await res.json().catch(() => null)) as ({ code?: string; message?: string } & Record<string, unknown>) | null;
+    throw new ApiError(res.status, body?.code ?? null, body?.message || `Request failed (${res.status})`, body ?? {});
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;

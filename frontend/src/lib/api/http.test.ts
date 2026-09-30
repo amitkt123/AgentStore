@@ -48,3 +48,15 @@ it("does not force a JSON content type on FormData", async () => {
   await api("/api/v1/datasets", { method: "POST", body: fd });
   expect(fetchMock.mock.calls[0][1].headers["Content-Type"]).toBeUndefined();
 });
+
+it("keeps the extra fields of the error body on ApiError.details", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: "VERIFICATION_INCOMPLETE", message: "Complete all steps", missingSteps: ["PHONE"] }), { status: 400 })));
+  const err = (await api("/api/v1/x").catch((e) => e)) as ApiError;
+  expect(err.details.missingSteps).toEqual(["PHONE"]);
+});
+
+it("leaves details empty when the body is not JSON", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 500 })));
+  const err = (await api("/api/v1/x").catch((e) => e)) as ApiError;
+  expect(err.details).toEqual({});
+});

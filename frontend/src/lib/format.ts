@@ -23,3 +23,8 @@ export function formatTime(iso: string | null): string {
   if (!iso) return "–";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 }
+
+export function formatDate(iso: string | null): string {
+  if (!iso) return "–";
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
