@@ -1,0 +1,3 @@
+.kv { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 13px; padding: 8px 0; border-top: 1px solid var(--l2); }
+.kv span:first-child { color: var(--ink2); }
+.kv span:last-child { text-align: right; font-weight: 500; }

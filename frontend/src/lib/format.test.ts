@@ -1,4 +1,4 @@
-import { formatBytes, formatMoney, humanize } from "./format";
+import { formatBytes, formatMoney, humanize, formatDate } from "./format";
 
 it("formats rupees with Indian grouping", () => {
   expect(formatMoney(500)).toBe("₹500");
@@ -14,4 +14,9 @@ it("humanizes resource names", () => {
   expect(humanize("bank_statement")).toBe("Bank statement");
   expect(humanize("open-invoices")).toBe("Open invoices");
   expect(humanize("BASIC_PERSONAL")).toBe("Basic personal");
+});
+
+it("formats a date with day, month and year", () => {
+  expect(formatDate("2026-09-30T12:00:00Z")).toMatch(/30 Sep(t)? 2026/);
+  expect(formatDate(null)).toBe("–");
 });

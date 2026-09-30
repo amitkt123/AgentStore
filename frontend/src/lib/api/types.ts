@@ -54,3 +54,31 @@ export interface ApprovalGateDecl { trigger: string; description: string; timeou
 export interface Manifest { name: string; version: string; scopes: Scope[]; networkAllowlist: string[]; costEnvelope: CostEnvelope; approvalGates: ApprovalGateDecl[]; dataClasses: string[]; resources: ResourceDecl[] | null; llm: unknown | null }
 export interface VersionDetail { id: string; agentId: string; agentName: string; versionNumber: string; status: string; manifest: Manifest }
 export interface RunResponse { id: string; displayId: string; status: RunStatus; terminalReason: TerminalReason | null }
+
+export type VerificationStatus = "DRAFT" | "PENDING" | "VERIFIED" | "FIX_REQUESTED" | "REJECTED";
+export type VerificationStep = "ABOUT" | "TAX_IDS" | "PHONE" | "AGREEMENT";
+export type VerificationEntityType = "INDIVIDUAL" | "LLP" | "PRIVATE_LIMITED" | "PARTNERSHIP" | "OTHER";
+
+// Masked values only: the API never returns the raw PAN, GSTIN or phone.
+// decisionNote is stored by the backend but not yet returned (docs/frontend-gaps.md G14), so it is optional.
+export interface DeveloperVerification {
+  status: VerificationStatus;
+  currentStep: VerificationStep;
+  entityType: VerificationEntityType | null;
+  legalName: string | null;
+  displayName: string | null;
+  country: string | null;
+  city: string | null;
+  panMasked: string | null;
+  gstinMasked: string | null;
+  panDocumentUploaded: boolean;
+  phoneMasked: string | null;
+  agreementVersion: string | null;
+  agreementAcceptedAt: string | null;
+  resubmissionCount: number;
+  submittedAt: string | null;
+  decisionNote?: string | null;
+}
+
+export interface DeveloperApiKey { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null; revokedAt: string | null }
+export interface CreatedApiKey { id: string; name: string; prefix: string; key: string; createdAt: string }

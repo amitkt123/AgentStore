@@ -1,6 +1,7 @@
 import Link from "next/link";
 import styles from "./Rail.module.css";
 import { Icon, type IconName } from "./Icon";
+import { railFor, type UserRole } from "@/lib/roles";
 
 export type RailItem = { href: string; label: string; icon: IconName; badge?: number };
 
@@ -11,6 +12,22 @@ export function buyerRailItems(needsYou: number): RailItem[] {
     { href: "/runs", label: "Runs", icon: "runs", badge: needsYou > 0 ? needsYou : undefined },
     { href: "/files", label: "Files", icon: "files" },
   ];
+}
+
+export function developerRailItems(): RailItem[] {
+  return [
+    { href: "/developer/verification", label: "Get verified", icon: "shield" },
+    { href: "/developer/api-keys", label: "API keys", icon: "key" },
+  ];
+}
+
+// Studio, Sandbox runs and Test files join developerRailItems in P3b/P3c; the admin rail arrives in P4.
+export function railItemsFor(role: UserRole, needsYou: number): RailItem[] {
+  switch (railFor(role)) {
+    case "developer": return developerRailItems();
+    case "buyer": return buyerRailItems(needsYou);
+    default: return [{ href: "/home", label: "Workspace", icon: "home" }];
+  }
 }
 
 export function Rail({ items, activePath }: { items: RailItem[]; activePath: string }) {
