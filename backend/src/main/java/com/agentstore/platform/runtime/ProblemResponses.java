@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.time.Duration;
 
 /** Writes a problem+json response from inside a servlet filter, where controller advice cannot reach. */
-final class ProblemResponses {
+public final class ProblemResponses {
 
     static final String PROBLEM_JSON = "application/problem+json";
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -17,7 +17,7 @@ final class ProblemResponses {
     private ProblemResponses() {
     }
 
-    static void write(HttpServletResponse response, HttpStatus status, String code, String detail, Duration retryAfter)
+    public static void write(HttpServletResponse response, HttpStatus status, String code, String detail, Duration retryAfter)
             throws IOException {
         response.setStatus(status.value());
         response.setContentType(PROBLEM_JSON);
