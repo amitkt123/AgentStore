@@ -75,6 +75,9 @@ public class Run {
 
     private UUID replayRunId;
 
+    /** The buyer user who started a production run; null for API-started, legacy and rebuild-launched runs. */
+    private UUID startedByUserId;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "llm_mock_json", columnDefinition = "jsonb")
     private String llmMockJson;

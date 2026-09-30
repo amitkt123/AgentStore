@@ -112,4 +112,20 @@ class RunRerunTest extends AbstractIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYMENT_REQUIRED);
     }
+
+    @Test
+    void aRerunRecordsWhoStartedIt() {
+        var s = fixtures.liveTierA(new BigDecimal("500.00"), new BigDecimal("1000.00"));
+        Run original = finishedRun(s);
+        UUID starter = UUID.randomUUID();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtService.issue(starter, s.buyer().getId(), UserRole.BUYER_APPROVER));
+
+        var response = rest.exchange(url("/api/v1/runs/" + original.getId() + "/rerun"), HttpMethod.POST,
+                new HttpEntity<>(headers), RunResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(runRepository.findById(response.getBody().id()).orElseThrow().getStartedByUserId())
+                .isEqualTo(starter);
+    }
 }
