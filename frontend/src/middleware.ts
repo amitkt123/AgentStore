@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { REFRESH_COOKIE, SESSION_COOKIE, cookieOptions, needsRefresh } from "@/lib/session";
 
 const PUBLIC = ["/login", "/signup", "/verify", "/forgot", "/reset"];
+// An emailed approval link is /approve/{token}. The signed-in gate page is /approve/{run}/{gate}, which stays gated.
+const APPROVAL_LINK = /^\/approve\/[^/]+$/;
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  if (PUBLIC.some((p) => path === p || path.startsWith(p + "/"))) return NextResponse.next();
+  if (APPROVAL_LINK.test(path) || PUBLIC.some((p) => path === p || path.startsWith(p + "/"))) return NextResponse.next();
 
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const refresh = req.cookies.get(REFRESH_COOKIE)?.value;

@@ -41,3 +41,9 @@ it("sends the user to login and clears cookies when refresh fails", async () => 
   expect(res.status).toBe(307);
   expect(res.cookies.get("karya_session")?.value).toBe("");
 });
+
+it("lets an emailed approval link through without a session, but not the signed-in gate route", async () => {
+  expect((await middleware(req("/approve/abc123"))).status).toBe(200);
+  const gated = await middleware(req("/approve/R-1/g1"));
+  expect(gated.status).toBe(307);
+});
