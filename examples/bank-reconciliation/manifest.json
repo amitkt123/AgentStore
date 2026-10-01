@@ -1,0 +1,31 @@
+{
+  "scopes": [
+    { "type": "READ", "resource": "bank_statement", "description": "Bank statement lines" },
+    { "type": "WRITE", "resource": "ledger", "description": "Post journal entries", "requiresApproval": true }
+  ],
+  "resources": [
+    {
+      "name": "bank_statement",
+      "format": "csv",
+      "schema": {
+        "required": ["date", "narration", "amount"],
+        "properties": {
+          "date": { "type": "date" },
+          "narration": { "type": "string" },
+          "amount": { "type": "number" }
+        }
+      }
+    },
+    { "name": "ledger", "format": "json" }
+  ],
+  "costEnvelope": { "currency": "INR", "maxPerRun": 500, "pricingUnit": "METERED", "unitPrice": 2, "unitLabel": "reconciled_transaction" },
+  "approvalGates": [
+    {
+      "trigger": "post_entries",
+      "description": "Before anything is posted",
+      "timeoutMinutes": 30,
+      "preview": { "columns": ["date", "account", "narration", "debit", "credit"], "totalField": "debit" }
+    }
+  ],
+  "dataClasses": ["FINANCIAL"]
+}

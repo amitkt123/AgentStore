@@ -7,6 +7,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEV="$ROOT/.dev"; mkdir -p "$DEV"
 [ -f "$DEV/env" ] && set -a && . "$DEV/env" && set +a
 RUNNER_SECRET="${RUNNER_SECRET:-dev-runner-secret}"
+ADMIN_EMAILS="${ADMIN_EMAILS:-demo-admin@example.com}"   # sign up on the developer side with this address to review versions
 
 die() { echo "dev-up: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null || die "$1 is not installed. $2"; }
@@ -44,7 +45,7 @@ echo "runner..."
 start runner "$ROOT/runner" env RUNNER_SECRET="$RUNNER_SECRET" E2B_API_KEY="$E2B_API_KEY" SPRING_BASE_URL=http://localhost:8080 mvn -q spring-boot:run
 
 echo "backend... (profile runner swaps the fake build and sandbox clients for the real runner)"
-start backend "$ROOT/backend" env CALLBACK_BASE_URL="$URL" RUNNER_SECRET="$RUNNER_SECRET" RUNNER_BASE_URL=http://localhost:8090 mvn -q spring-boot:run -Dspring-boot.run.profiles=dev,runner
+start backend "$ROOT/backend" env ADMIN_EMAILS="$ADMIN_EMAILS" CALLBACK_BASE_URL="$URL" RUNNER_SECRET="$RUNNER_SECRET" RUNNER_BASE_URL=http://localhost:8090 mvn -q spring-boot:run -Dspring-boot.run.profiles=dev,runner
 wait_for http://localhost:8080/actuator/health backend "$DEV/backend.log"
 
 echo "frontend..."
