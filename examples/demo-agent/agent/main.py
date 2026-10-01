@@ -31,7 +31,7 @@ def main():
     for number, step in enumerate(steps, start=1):
         log(step, step=number, of=len(steps))
         time.sleep(2)
-    call("usage", {"quantity": len(steps), "unit": "step"})
+    call("usage", {"quantity": len(steps), "unit": "unit"})
     call("complete", {
         "summary": "Demo agent finished all %d steps." % len(steps),
         "outputs": {"steps": len(steps), "status": "ok"},
