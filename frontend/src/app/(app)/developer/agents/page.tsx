@@ -14,7 +14,7 @@ export default async function Page() {
       </>
     );
   } catch (e) {
-    if (e instanceof ApiError) return <ErrorState message={e.message} />;
+    if (e instanceof ApiError) return <ErrorState message={e.status >= 500 ? "Something went wrong on our side. Try again in a moment." : e.message} />;
     throw e;
   }
 }

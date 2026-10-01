@@ -1,6 +1,7 @@
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field label { font-size: 13px; font-weight: 600; color: var(--ink2); }
 .field textarea { min-height: 180px; padding: 10px 12px; border: 1px solid var(--l); border-radius: 10px; font: inherit; background: var(--s); color: var(--ink); resize: vertical; }
+.field textarea:global(.mono) { font-family: var(--font-mono); }
 .field textarea[aria-invalid="true"] { border-color: var(--bad); }
 .err { color: var(--bad); font-size: 12px; }
 .hint { color: var(--ink3); font-size: 12px; }

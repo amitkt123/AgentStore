@@ -34,7 +34,7 @@ export default async function Page({ params }: { params: { agentId: string; vers
           </p>
         </header>
         <FeedbackBanner />
-        <ReadinessBanner readiness={readiness} build={detail.build ?? null} />
+        {draft && <ReadinessBanner readiness={readiness} build={detail.build ?? null} />}
         <Declared manifest={detail.manifest} editable={draft ? { agentId, versionId } : undefined} />
         <p className={styles.note}>What the agent actually did will appear here once sandbox runs are available.</p>
         {draft && <PatchForms agentId={agentId} versionId={versionId} />}
@@ -45,7 +45,7 @@ export default async function Page({ params }: { params: { agentId: string; vers
     if (e instanceof ApiError) {
       // The backend answers 403 or 404 for a version that is not yours; both look like "not found".
       if (e.status === 403 || e.status === 404) notFound();
-      return <ErrorState message={e.message} />;
+      return <ErrorState message={e.status >= 500 ? "Something went wrong on our side. Try again in a moment." : e.message} />;
     }
     throw e;
   }
