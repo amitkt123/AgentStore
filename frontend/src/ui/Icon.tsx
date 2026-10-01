@@ -1,4 +1,4 @@
-export type IconName = "home" | "store" | "runs" | "files" | "search" | "bell" | "check" | "x" | "upload" | "lock" | "key" | "shield";
+export type IconName = "home" | "store" | "runs" | "files" | "search" | "bell" | "check" | "x" | "upload" | "lock" | "key" | "shield" | "agents";
 
 const paths: Record<IconName, string> = {
   home: "M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10",
@@ -13,6 +13,7 @@ const paths: Record<IconName, string> = {
   lock: "M6 11h12v9H6zM8 11V8a4 4 0 118 0v3",
   key: "M12 9a4 4 0 11-1 2.6L3 19.5V21h2.5v-2H8v-2h2l1-1M15.5 9.5h.01",
   shield: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5",
+  agents: "M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z",
 };
 
 export function Icon({ name }: { name: IconName }) {

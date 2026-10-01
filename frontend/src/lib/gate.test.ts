@@ -22,3 +22,10 @@ it("only matches whole path segments", () => {
 it("does nothing without a role", () => {
   expect(gateTarget(undefined, "/home")).toBeNull();
 });
+
+it("lets a developer, and only a developer, into the agents screens", () => {
+  expect(gateTarget("DEVELOPER", "/developer/agents")).toBeNull();
+  expect(gateTarget("DEVELOPER", "/developer/agents/a1/versions/v1")).toBeNull();
+  expect(gateTarget("BUYER_ADMIN", "/developer/agents/a1/versions/v1")).toBe("/home");
+  expect(gateTarget("BUYER_APPROVER", "/developer/agents")).toBe("/home");
+});
