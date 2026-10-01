@@ -6,7 +6,7 @@ import type { VersionDetail } from "@/lib/api/types";
 const detail: VersionDetail = {
   id: "v1", agentId: "a1", agentName: "Bank Reconciliation", versionNumber: "1.3.0", status: "LIVE",
   manifest: {
-    name: "Bank Reconciliation", version: "1.3.0", networkAllowlist: [], dataClasses: ["FINANCIAL", "BASIC_PERSONAL"], llm: {}, resources: null,
+    name: "Bank Reconciliation", version: "1.3.0", networkAllowlist: [], dataClasses: ["FINANCIAL", "BASIC_PERSONAL"], llm: { mode: "PLATFORM", models: ["m"], maxTokensPerRun: 1000, provider: null }, resources: null,
     costEnvelope: { currency: "INR", maxPerRun: 500, pricingUnit: "METERED", unitPrice: 2, unitLabel: "match" },
     scopes: [{ type: "READ", resource: "bank_statement", description: "Your statement lines, CSV", requiresApproval: false }],
     approvalGates: [{ trigger: "post", description: "Before anything is posted", timeoutMinutes: 30, preview: null }],

@@ -7,7 +7,7 @@ const manifest: Manifest = {
     { type: "READ", resource: "bank_statement", description: "Your statement lines, CSV", requiresApproval: false },
     { type: "WRITE", resource: "ledger", description: "Post to your ledger", requiresApproval: true },
   ],
-  networkAllowlist: [], dataClasses: ["FINANCIAL"], resources: null, llm: {},
+  networkAllowlist: [], dataClasses: ["FINANCIAL"], resources: null, llm: { mode: "PLATFORM", models: ["m"], maxTokensPerRun: 1000, provider: null },
   costEnvelope: { currency: "INR", maxPerRun: 500, pricingUnit: "METERED", unitPrice: 2, unitLabel: "match" },
   approvalGates: [{ trigger: "post_entries", description: "Before anything is posted", timeoutMinutes: 30, preview: null }],
 };
