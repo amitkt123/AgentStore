@@ -4,6 +4,8 @@ import { getReadiness, getVersion, listMyAgents } from "@/lib/api/agents";
 import { ApiError } from "@/lib/api/http";
 import { Declared } from "@/features/studio/Declared";
 import { ReadinessBanner } from "@/features/studio/ReadinessBanner";
+import { FeedbackBanner, FeedbackProvider } from "@/features/studio/feedback";
+import { PatchForms, SubmitBar } from "@/features/studio/StudioActions";
 import { statusLabel, statusTone } from "@/features/agents/model";
 import styles from "@/features/studio/studio.module.css";
 import { ErrorState } from "@/ui/ErrorState";
@@ -19,8 +21,9 @@ export default async function Page({ params }: { params: { agentId: string; vers
       listMyAgents().catch((e) => { if (e instanceof ApiError) return []; throw e; }),
     ]);
     const category = agents.find((a) => a.agentId === agentId)?.category;
+    const draft = detail.status === "DRAFT";
     return (
-      <>
+      <FeedbackProvider>
         <Link href="/developer/agents" className={styles.back}>← Agents</Link>
         <header className={styles.head}>
           <h1>{detail.agentName}</h1>
@@ -30,10 +33,13 @@ export default async function Page({ params }: { params: { agentId: string; vers
             <Pill tone={statusTone[detail.status]}>{statusLabel[detail.status]}</Pill>
           </p>
         </header>
+        <FeedbackBanner />
         <ReadinessBanner readiness={readiness} build={detail.build ?? null} />
-        <Declared manifest={detail.manifest} />
+        <Declared manifest={detail.manifest} editable={draft ? { agentId, versionId } : undefined} />
         <p className={styles.note}>What the agent actually did will appear here once sandbox runs are available.</p>
-      </>
+        {draft && <PatchForms agentId={agentId} versionId={versionId} />}
+        <SubmitBar agentId={agentId} versionId={versionId} status={detail.status} ready={readiness.ready} />
+      </FeedbackProvider>
     );
   } catch (e) {
     if (e instanceof ApiError) {

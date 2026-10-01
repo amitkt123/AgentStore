@@ -3,6 +3,7 @@ import { KeyValue } from "@/ui/KeyValue";
 import { Pill } from "@/ui/Pill";
 import { formatMoney } from "@/lib/format";
 import type { Manifest } from "@/lib/api/types";
+import { RemoveScopeButton } from "./StudioActions";
 
 const PRICING: Record<string, string> = { METERED: "Pay per use", OUTCOME: "Pay per outcome", SUBSCRIPTION: "Subscription" };
 const LLM: Record<string, string> = { PLATFORM: "Karya's models", BYOK_PROXY: "Your key, through Karya", BYOK_DIRECT: "Your key, direct" };
@@ -21,7 +22,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 const NotDeclared = () => <p className={styles.muted}>Not declared</p>;
 
-export function Declared({ manifest: m }: { manifest: Manifest }) {
+export function Declared({ manifest: m, editable }: { manifest: Manifest; editable?: { agentId: string; versionId: string } }) {
   const resources = m.resources ?? [];
   return (
     <div className={styles.grid}>
@@ -34,7 +35,10 @@ export function Declared({ manifest: m }: { manifest: Manifest }) {
                   {s.type === "READ" ? "Read" : "Write"} <span className="mono">{s.resource}</span>
                   {s.description && <span className={styles.sub}>{s.description}</span>}
                 </span>
-                {s.requiresApproval && <Pill tone="warn">Needs approval</Pill>}
+                <span className={styles.actions}>
+                  {s.requiresApproval && <Pill tone="warn">Needs approval</Pill>}
+                  {editable && <RemoveScopeButton agentId={editable.agentId} versionId={editable.versionId} scope={s} />}
+                </span>
               </li>
             ))}
           </ul>
