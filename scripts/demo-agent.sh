@@ -9,6 +9,13 @@ NAME="${DEMO_AGENT_NAME:-Demo Agent}"
 mkdir -p "$DIR" && cd "$DIR"
 agentstore init --python --name "$NAME" --category demo --description "A small demo agent that logs three steps and completes."
 cp "$ROOT/examples/demo-agent/agent/main.py" agent/main.py
+# keep the generated name, version, runtime and entrypoint; take the scopes and resources from the example
+python3 - "$ROOT/examples/demo-agent/manifest.json" <<'PY'
+import json, sys
+mine = json.load(open("manifest.json"))
+mine.update(json.load(open(sys.argv[1])))
+json.dump(mine, open("manifest.json", "w"), indent=2)
+PY
 agentstore validate
 agentstore push --wait
 echo "Pushed from $DIR. Next: agentstore sandbox run --follow, then submit the version in the portal Studio."
