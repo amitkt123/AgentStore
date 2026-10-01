@@ -16,12 +16,13 @@ export function buyerRailItems(needsYou: number): RailItem[] {
 
 export function developerRailItems(): RailItem[] {
   return [
+    { href: "/developer/agents", label: "Agents", icon: "agents" },
     { href: "/developer/verification", label: "Get verified", icon: "shield" },
     { href: "/developer/api-keys", label: "API keys", icon: "key" },
   ];
 }
 
-// Studio, Sandbox runs and Test files join developerRailItems in P3b/P3c; the admin rail arrives in P4.
+// Sandbox runs and Test files join developerRailItems in P3c; the admin rail arrives in P4.
 export function railItemsFor(role: UserRole, needsYou: number): RailItem[] {
   switch (railFor(role)) {
     case "developer": return developerRailItems();

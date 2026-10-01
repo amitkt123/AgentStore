@@ -1,0 +1,15 @@
+.wrap { display: flex; flex-direction: column; gap: 16px; }
+.bar { display: flex; }
+.panel { background: var(--s); border: 1px solid var(--l); border-radius: 16px; padding: 20px; max-width: 640px; }
+.h { font-size: 14px; font-weight: 600; margin: 0 0 12px; }
+.form { display: flex; flex-direction: column; gap: 14px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.err { color: var(--bad); font-size: 13px; margin: 0; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--s); border: 1px solid var(--l); border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cat { margin-left: 10px; color: var(--ink3); font-size: 13px; }
+.muted { margin: 0; color: var(--ink3); font-size: 13px; }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid var(--l); border-radius: 12px; color: var(--ink); text-decoration: none; font-size: 13px; }
+.chip:hover { border-color: var(--b3); background: var(--sky); }

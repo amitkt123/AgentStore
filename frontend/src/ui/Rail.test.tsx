@@ -13,9 +13,14 @@ it("marks the active item and shows the badge as text", () => {
 });
 
 it("gives developers verification and API keys and leaves the buyer rail alone", () => {
-  expect(developerRailItems().map((i) => i.href)).toEqual(["/developer/verification", "/developer/api-keys"]);
+  expect(developerRailItems().map((i) => i.href)).toEqual(["/developer/agents", "/developer/verification", "/developer/api-keys"]);
   expect(railItemsFor("DEVELOPER", 3)).toEqual(developerRailItems());
   expect(railItemsFor("BUYER_ADMIN", 3)).toEqual(buyerRailItems(3));
   expect(railItemsFor("BUYER_APPROVER", 0)).toEqual(buyerRailItems(0));
   expect(railItemsFor("ADMIN", 0).map((i) => i.href)).toEqual(["/home"]);
+});
+
+it("keeps Agents active inside a Studio route", () => {
+  render(<Rail items={developerRailItems()} activePath="/developer/agents/a1/versions/v1" />);
+  expect(screen.getByRole("link", { name: "Agents" })).toHaveAttribute("aria-current", "page");
 });

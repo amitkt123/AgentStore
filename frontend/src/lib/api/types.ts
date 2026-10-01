@@ -1,4 +1,6 @@
 import type { UserRole } from "../roles";
+import type { BuildStatus, LlmMode, VersionStatus } from "./enums";
+export type { BuildStatus, LlmMode, VersionStatus } from "./enums";
 
 export type OrgType = "BUYER" | "DEVELOPER";
 export type SignupSide = "BUYER" | "DEVELOPER";
@@ -51,8 +53,10 @@ export interface Scope { type: "READ" | "WRITE"; resource: string; description: 
 export interface ResourceDecl { name: string; format: DataFormat; schema: { required: string[]; properties: Record<string, string> } | null }
 export interface CostEnvelope { currency: string; maxPerRun: number; pricingUnit: "METERED" | "OUTCOME" | "SUBSCRIPTION"; unitPrice: number; unitLabel: string }
 export interface ApprovalGateDecl { trigger: string; description: string; timeoutMinutes: number; preview: { columns?: string[]; totalField?: string } | null }
-export interface Manifest { name: string; version: string; scopes: Scope[]; networkAllowlist: string[]; costEnvelope: CostEnvelope; approvalGates: ApprovalGateDecl[]; dataClasses: string[]; resources: ResourceDecl[] | null; llm: unknown | null }
-export interface VersionDetail { id: string; agentId: string; agentName: string; versionNumber: string; status: string; manifest: Manifest }
+export interface LlmDecl { mode: LlmMode; models: string[]; maxTokensPerRun: number; provider: string | null }
+export interface Manifest { name: string; version: string; scopes: Scope[]; networkAllowlist: string[]; costEnvelope: CostEnvelope; approvalGates: ApprovalGateDecl[]; dataClasses: string[]; resources: ResourceDecl[] | null; llm: LlmDecl | null; runtime?: string | null; entrypoint?: string | null }
+export interface BuildSummary { buildId: string; status: BuildStatus; failureCode: string | null; failureReason: string | null; logUrl: string | null }
+export interface VersionDetail { id: string; agentId: string; agentName: string; versionNumber: string; status: VersionStatus; manifest: Manifest; build?: BuildSummary | null }
 export interface RunResponse { id: string; displayId: string; status: RunStatus; terminalReason: TerminalReason | null }
 
 export type VerificationStatus = "DRAFT" | "PENDING" | "VERIFIED" | "FIX_REQUESTED" | "REJECTED";
@@ -82,3 +86,12 @@ export interface DeveloperVerification {
 
 export interface DeveloperApiKey { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null; revokedAt: string | null }
 export interface CreatedApiKey { id: string; name: string; prefix: string; key: string; createdAt: string }
+export interface VersionSummary { id: string; versionNumber: string; status: VersionStatus }
+export interface MyAgent { agentId: string; agentName: string; category: string; versions: VersionSummary[] }
+export interface CreatedAgent { id: string; name: string; category: string; description: string | null }
+export type BlockerCode = "BUILD_NOT_READY" | "UNDECLARED_ACCESS" | "COST_ENVELOPE_EXCEEDED";
+export interface Blocker { code: BlockerCode; message: string; runId: string | null }
+export interface Readiness { ready: boolean; blockers: Blocker[] }
+export type ManifestPatchOp = "add_read_scope" | "add_resource" | "add_allowlist_host" | "remove_scope";
+export interface ManifestPatchRequest { op: ManifestPatchOp; resource?: string; description?: string; requiresApproval?: boolean; name?: string; format?: string; schema?: unknown; host?: string; type?: string }
+export interface ManifestPatchResult { manifestRevision: number; diff: { addedScopes: string[]; removedScopes: string[]; addedHosts: string[] } }

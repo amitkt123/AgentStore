@@ -19,9 +19,13 @@ Mockup elements omitted because the backend has no data or route for them. Updat
 | G13 | "Payout account" step | Bank fields are deferred to WS10, so the flow is four steps, not five |
 | G14 | Reviewer's note on a fix-requested or rejected verification | `DeveloperVerification.decisionNote` is stored but `DeveloperVerificationView` does not return it. The UI reads an optional `decisionNote` and falls back to a plain sentence |
 | G15 | "What changes when you're verified" comparison panel | Not in the P3a spec; limits shown in it (sandbox minutes, builds a day) have no backend read endpoint |
+| G16 | Studio "what it did" half and flow canvas | Need sandbox run endpoints that are not on master; deferred to P3c. The Studio shows a note instead |
+| G17 | Validator and submit-failure reasons | `POST /agents/{a}/versions` 400 and `POST …/submit` 403/409 carry no message (the app hides `ResponseStatusException` reasons). The UI shows fixed sentences per status; a `{code, message}` body from the backend would let it show the real reason |
+| G18 | "What this patch changed" | `ManifestPatchResponse.diff` is computed against the LIVE version, not the previous draft, so the UI builds its confirmation from the request. A diff against the prior draft would let it show real before/after |
 
 ## Known visual differences
 - Files "Added" shows a time only; a date is needed for files older than today.
 - Runs history "Started" shows a time only for the same reason.
 - Live run block descriptions are missing (G11).
 - Get verified has two panels (steps and form); the mockup's third "What changes when you're verified" panel is omitted (G15).
+- The Studio has no flow canvas and no observed-behaviour half (G16).
