@@ -2,6 +2,8 @@ package com.agentstore.platform.payments;
 
 import com.agentstore.platform.ledger.BillingMode;
 import com.agentstore.platform.ledger.BillingModeService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,8 @@ import java.util.UUID;
 
 @Service
 public class TopUpService {
+
+    private static final Logger log = LoggerFactory.getLogger(TopUpService.class);
 
     private final PaymentProvider provider;
     private final PaymentProperties props;
@@ -104,12 +108,13 @@ public class TopUpService {
             po = provider.createOrder(id.toString(), amount, method,
                     Map.of("orgId", orgId.toString(), "purpose", purpose));
         } catch (PaymentProviderRejectedException | PaymentProviderUnavailableException e) {
+            log.warn("Provider createOrder failed for payment order {}: {}", id, e.getMessage());
             tx.executeWithoutResult(s -> orders.findById(id).ifPresent(o -> {
                 o.setStatus(PaymentOrder.Status.FAILED);
                 orders.save(o);
             }));
             throw new PaymentApiException(HttpStatus.BAD_GATEWAY, "PROVIDER_UNAVAILABLE",
-                    "The payment provider is unavailable; try again shortly");
+                    "The payment provider is unavailable; try again shortly", e);
         }
         PaymentOrder updated = tx.execute(s -> {
             PaymentOrder o = orders.findById(id).orElseThrow();

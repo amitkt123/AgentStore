@@ -29,6 +29,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public class FakePaymentProvider implements PaymentProvider {
 
+    private volatile boolean failNextCreateOrder;
+
+    /** Makes the next {@link #createOrder} throw {@link PaymentProviderUnavailableException}; cleared by use or {@link #reset()}. */
+    public void failNextCreateOrder() {
+        failNextCreateOrder = true;
+    }
+
     public static final String SIGNATURE_HEADER = "X-Fake-Signature";
     public static final String EVENT_ID_HEADER = "X-Fake-Event-Id";
 
@@ -96,6 +103,10 @@ public class FakePaymentProvider implements PaymentProvider {
 
     @Override
     public ProviderOrder createOrder(String receipt, BigDecimal amount, PaymentMethod method, Map<String, String> notes) {
+        if (failNextCreateOrder) {
+            failNextCreateOrder = false;
+            throw new PaymentProviderUnavailableException("fake provider: injected createOrder failure");
+        }
         FakeOrder o = new FakeOrder();
         o.setOrderId("fake_order_" + UUID.randomUUID().toString().replace("-", ""));
         o.setReceipt(receipt);
@@ -229,6 +240,7 @@ public class FakePaymentProvider implements PaymentProvider {
 
     /** Clears every record; the bean is shared across a Spring context, so tests call this when they need a clean slate. */
     public void reset() {
+        failNextCreateOrder = false;
         orders.clear();
         payments.clear();
         refunds.clear();

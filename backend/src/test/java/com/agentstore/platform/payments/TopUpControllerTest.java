@@ -163,6 +163,24 @@ class TopUpControllerTest extends AbstractIntegrationTest {
         assertThat(topUp(org.getId(), h, 100, "UPI").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
+    @Autowired
+    FakePaymentProvider fake;
+
+    @Test
+    void providerFailureMarksOrderFailed() {
+        Org org = buyer();
+        fake.failNextCreateOrder();
+        try {
+            var r = topUp(org.getId(), auth(org.getId(), UserRole.BUYER_ADMIN), 500, "UPI");
+            assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+            assertThat(r.getBody().get("code")).isEqualTo("PROVIDER_UNAVAILABLE");
+            assertThat(jdbc.queryForList("select status from payment_order where org_id = ?", String.class,
+                    org.getId())).containsExactly("FAILED");
+        } finally {
+            fake.reset();
+        }
+    }
+
     @Test
     void postpaidOrgHasNoWallet() {
         Org org = new Org(null, "PostpaidCo-" + UUID.randomUUID(), OrgType.BUYER);
