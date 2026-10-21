@@ -51,7 +51,7 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | P3c Studio "what it did" half and flow canvas | Not started | — | none | All (G16) |
 | Buyer Billing page `/billing` | Done (WS10a) | this PR | plan `2026-10-21-ws10a-…` | Add money, Get money back, bills (WS10b) |
 | Developer Earnings page `/developer/earnings` | Done (WS10a) | this PR | plan `2026-10-21-ws10a-…` | Withdraw, payout account (WS10c) |
-| Admin Money page `/admin/money` (fee, credit limit, billing mode, wallet adjustments, platform accounts) | Done (WS10a) | this PR | plan `2026-10-21-ws10a-…` | Withdrawals, freezes, reconciliation (WS10c) |
+| Admin Money page `/admin/money` (fee, credit limit, billing mode, wallet adjustments, platform accounts, ledger checks) | Done (WS10a) | this PR | plan `2026-10-21-ws10a-…` | Withdrawals, freezes, reconciliation (WS10c) |
 | FE-3 developer money (earnings, payouts) | Partly superseded by the Earnings page above | — | plan `2026-09-23-fe3-…` | Payouts (WS10c) |
 | FE-4 admin consoles | Not started | — | plan `2026-09-23-fe4-…` | All |
 
