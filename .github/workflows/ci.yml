@@ -1,13 +1,11 @@
 name: CI Pipeline
 
 on:
-  push:
-    # Every branch, master included
-    branches: ['**']
+  # PRs only: runs when a PR is opened, reopened or gets new commits; not on merges or plain branch pushes
   pull_request:
     branches: [master]
 
-# A newer push to the same branch or PR cancels the older run
+# A newer push to the same PR cancels the older run
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
