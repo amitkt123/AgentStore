@@ -14,4 +14,8 @@ public interface OrgRepository extends JpaRepository<Org, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Org o where o.id = :id")
     Optional<Org> findByIdForUpdate(@Param("id") UUID id);
+
+    /** The org's own billing mode as stored, not as an Org already loaded in this persistence context has it. */
+    @Query("select o.billingMode from Org o where o.id = :id")
+    Optional<com.agentstore.platform.ledger.BillingMode> billingModeOf(@Param("id") UUID id);
 }

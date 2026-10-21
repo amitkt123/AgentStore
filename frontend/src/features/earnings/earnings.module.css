@@ -1,0 +1,13 @@
+.wrap { display: flex; flex-direction: column; gap: 24px; }
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 0; }
+.figure { padding: 16px 18px; border-radius: 16px; background: var(--s); border: 1px solid var(--l); display: flex; flex-direction: column; gap: 4px; }
+.figure dt { color: var(--ink3); font-size: 13px; }
+.figure dd { margin: 0; font-size: 22px; font-weight: 600; color: var(--ink); }
+.earned dd { color: var(--b); }
+.available { padding: 16px 18px; border-radius: 16px; border: 1px solid var(--l); display: flex; flex-direction: column; gap: 4px; }
+.available h2 { margin: 0; font-size: 13px; font-weight: 400; color: var(--ink3); }
+.availableValue { font-size: 26px; font-weight: 600; color: var(--ink); margin: 0; }
+.owe { color: var(--wa); margin: 0; }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.download { color: var(--b); text-decoration: none; }
+.download:hover { text-decoration: underline; }

@@ -30,6 +30,17 @@ spring:
       mail.smtp.starttls.enable: true
 
 agentstore:
+  money:
+    platform-fee-percent: 20
+    billing-mode: PREPAID
+    postpaid-default-credit-limit: 50000.00
+    tds:
+      enabled: false
+      rate: 0.001
+      rate-no-pan: 0.05
+    gst-tcs:
+      enabled: false
+      rate: 0.01
   data:
     retention-interval: PT1H
   jwt:

@@ -11,23 +11,32 @@ export function buyerRailItems(needsYou: number): RailItem[] {
     { href: "/store", label: "Agent store", icon: "store" },
     { href: "/runs", label: "Runs", icon: "runs", badge: needsYou > 0 ? needsYou : undefined },
     { href: "/files", label: "Files", icon: "files" },
+    { href: "/billing", label: "Billing", icon: "wallet" },
   ];
 }
 
 export function developerRailItems(): RailItem[] {
   return [
     { href: "/developer/agents", label: "Agents", icon: "agents" },
+    { href: "/developer/earnings", label: "Earnings", icon: "wallet" },
     { href: "/developer/verification", label: "Get verified", icon: "shield" },
     { href: "/developer/api-keys", label: "API keys", icon: "key" },
   ];
 }
 
-// Sandbox runs and Test files join developerRailItems in P3c; the admin rail arrives in P4.
+export function adminRailItems(): RailItem[] {
+  return [{ href: "/admin/money", label: "Money", icon: "wallet" }];
+}
+
+// Sandbox runs and Test files join developerRailItems in P3c.
 export function railItemsFor(role: UserRole, needsYou: number): RailItem[] {
   switch (railFor(role)) {
     case "developer": return developerRailItems();
-    case "buyer": return buyerRailItems(needsYou);
-    default: return [{ href: "/home", label: "Workspace", icon: "home" }];
+    // Billing is for buyer admins; approvers cannot open it.
+    case "buyer": return role === "BUYER_APPROVER"
+      ? buyerRailItems(needsYou).filter((item) => item.href !== "/billing")
+      : buyerRailItems(needsYou);
+    case "admin": return adminRailItems();
   }
 }
 

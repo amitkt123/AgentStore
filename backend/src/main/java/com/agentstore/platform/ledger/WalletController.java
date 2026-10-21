@@ -15,12 +15,13 @@ import java.util.UUID;
 @RestController
 public class WalletController {
 
-    private final WalletRepository walletRepository;
+    private final WalletView walletView;
 
-    public WalletController(WalletRepository walletRepository) {
-        this.walletRepository = walletRepository;
+    public WalletController(WalletView walletView) {
+        this.walletView = walletView;
     }
 
+    /** Read-only: creates no wallet row and no ledger account, and takes no lock. */
     @GetMapping("/api/v1/orgs/{orgId}/wallet")
     @PreAuthorize("hasAnyRole('BUYER_ADMIN','ADMIN')")
     public WalletResponse wallet(@PathVariable UUID orgId) {
@@ -28,8 +29,6 @@ public class WalletController {
         if (!orgId.equals(claims.orgId()) && claims.role() != UserRole.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot read another org's wallet");
         }
-        Wallet wallet = walletRepository.findByOrgId(orgId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No wallet for org " + orgId));
-        return WalletResponse.from(wallet);
+        return walletView.of(orgId);
     }
 }

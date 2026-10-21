@@ -1,4 +1,4 @@
-import { formatBytes, formatMoney, humanize, formatDate } from "./format";
+import { formatInr, formatBytes, formatMoney, humanize, formatDate } from "./format";
 
 it("formats rupees with Indian grouping", () => {
   expect(formatMoney(500)).toBe("₹500");
@@ -19,4 +19,10 @@ it("humanizes resource names", () => {
 it("formats a date with day, month and year", () => {
   expect(formatDate("2026-09-30T12:00:00Z")).toMatch(/30 Sep(t)? 2026/);
   expect(formatDate(null)).toBe("–");
+});
+
+it("formatInr puts the minus sign before the rupee symbol", () => {
+  expect(formatInr(-1500.5)).toBe("-₹1,500.50");
+  expect(formatInr(1500)).toBe("₹1,500.00");
+  expect(formatInr(0)).toBe("₹0.00");
 });

@@ -37,6 +37,9 @@ public interface LlmCallRepository extends JpaRepository<LlmCall, UUID> {
     @Query("select coalesce(sum(c.cost), 0) from LlmCall c where c.runId = :runId")
     java.math.BigDecimal sumCostByRunId(@Param("runId") java.util.UUID runId);
 
+    @Query("select coalesce(sum(c.cost), 0) from LlmCall c where c.runId = :runId and c.source = :source")
+    java.math.BigDecimal sumCostByRunIdAndSource(@Param("runId") java.util.UUID runId, @Param("source") LlmSource source);
+
     @Query(value = "SELECT COALESCE(SUM(c.cost), 0) FROM llm_call c JOIN run r ON r.id = c.run_id "
             + "WHERE r.mode = 'SANDBOX' AND r.initiated_by_org_id = :orgId AND c.created_at >= :since", nativeQuery = true)
     java.math.BigDecimal sandboxSpendSince(@Param("orgId") java.util.UUID orgId, @Param("since") Instant since);

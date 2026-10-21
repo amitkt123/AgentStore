@@ -28,3 +28,9 @@ export function formatDate(iso: string | null): string {
   if (!iso) return "–";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
+
+/** Rupees with Indian digit grouping and always two decimals: 100000 -> ₹1,00,000.00. */
+export function formatInr(n: number): string {
+  const text = Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 && text !== "0.00" ? "-₹" : "₹") + text;
+}
