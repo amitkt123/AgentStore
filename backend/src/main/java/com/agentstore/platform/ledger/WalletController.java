@@ -38,6 +38,11 @@ public class WalletController {
         if (!orgId.equals(claims.orgId()) && claims.role() != UserRole.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot read another org's wallet");
         }
+        return responseFor(orgId);
+    }
+
+    /** The org's wallet view, shared with the admin adjustment endpoint. */
+    public WalletResponse responseFor(UUID orgId) {
         BillingMode mode = billingModeService.modeFor(orgId);
         Wallet wallet = walletRepository.findByOrgId(orgId).orElse(null);
         if (wallet == null && mode == BillingMode.PREPAID) {

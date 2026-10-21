@@ -26,4 +26,8 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
     @Query(value = "insert into wallet (id, org_id, balance, reserved) values (gen_random_uuid(), :orgId, 0, 0) "
             + "on conflict (org_id) do nothing", nativeQuery = true)
     int insertEmptyIfMissing(@Param("orgId") UUID orgId);
+
+    /** The org's balance without locking its row, for read-only views. */
+    @Query("select w.balance from Wallet w where w.orgId = :orgId")
+    Optional<java.math.BigDecimal> balanceOfOrg(@Param("orgId") UUID orgId);
 }

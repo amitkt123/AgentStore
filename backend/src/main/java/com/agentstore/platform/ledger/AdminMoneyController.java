@@ -1,0 +1,190 @@
+package com.agentstore.platform.ledger;
+
+import com.agentstore.platform.data.Caller;
+import com.agentstore.platform.identity.Org;
+import com.agentstore.platform.identity.OrgRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@RestController
+@PreAuthorize("hasRole('ADMIN')")
+public class AdminMoneyController {
+
+    public record PlatformAccountsResponse(List<PlatformAccountResponse> accounts, boolean totalsCheck) {}
+
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
+
+    private final OrgRepository orgRepository;
+    private final WalletRepository walletRepository;
+    private final BillingModeService billingModeService;
+    private final MoneyProperties props;
+    private final LedgerService ledgerService;
+    private final LedgerAccounts ledgerAccounts;
+    private final LedgerAccountRepository accountRepository;
+    private final LedgerAccountBalanceRepository balanceRepository;
+    private final LedgerTransactionRepository transactionRepository;
+    private final WalletController walletController;
+    private final TransactionTemplate tx;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    public AdminMoneyController(OrgRepository orgRepository, WalletRepository walletRepository,
+                                BillingModeService billingModeService, MoneyProperties props,
+                                LedgerService ledgerService, LedgerAccounts ledgerAccounts,
+                                LedgerAccountRepository accountRepository,
+                                LedgerAccountBalanceRepository balanceRepository,
+                                LedgerTransactionRepository transactionRepository,
+                                WalletController walletController, PlatformTransactionManager transactionManager) {
+        this.orgRepository = orgRepository;
+        this.walletRepository = walletRepository;
+        this.billingModeService = billingModeService;
+        this.props = props;
+        this.ledgerService = ledgerService;
+        this.ledgerAccounts = ledgerAccounts;
+        this.accountRepository = accountRepository;
+        this.balanceRepository = balanceRepository;
+        this.transactionRepository = transactionRepository;
+        this.walletController = walletController;
+        this.tx = new TransactionTemplate(transactionManager);
+    }
+
+    @GetMapping("/api/v1/admin/orgs/{orgId}/money")
+    public OrgMoneySettingsResponse money(@PathVariable UUID orgId) {
+        return settings(orgId);
+    }
+
+    @PatchMapping("/api/v1/admin/orgs/{orgId}/money")
+    public OrgMoneySettingsResponse update(@PathVariable UUID orgId, @RequestBody OrgMoneySettingsRequest request) {
+        BigDecimal fee = request.feePercent();
+        if (fee != null && (fee.signum() < 0 || fee.compareTo(HUNDRED) > 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "feePercent must be between 0 and 100");
+        }
+        BigDecimal limit = request.creditLimit();
+        if (limit != null && limit.signum() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "creditLimit must not be negative");
+        }
+        if (!orgRepository.existsById(orgId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Org not found");
+        }
+        if (request.billingMode() != null) {
+            billingModeService.setMode(orgId, request.billingMode());
+        }
+        if (fee != null || limit != null) {
+            Org org = orgRepository.findById(orgId).orElseThrow();
+            if (fee != null) org.setPlatformFeePercent(fee);
+            if (limit != null) org.setCreditLimit(limit);
+            orgRepository.save(org);
+        }
+        return settings(orgId);
+    }
+
+    @GetMapping("/api/v1/admin/ledger/accounts")
+    public PlatformAccountsResponse platformAccounts() {
+        List<PlatformAccountResponse> accounts = balanceRepository.platformBalances().stream()
+                .map(row -> new PlatformAccountResponse((LedgerAccountKind) row[0], (BigDecimal) row[1]))
+                .toList();
+        return new PlatformAccountsResponse(accounts, balanceRepository.totalOfAllBalances().signum() == 0);
+    }
+
+    /**
+     * Credits (or, if negative, debits) a prepaid wallet against EXTERNAL, once per {@code requestId}. A repeat of
+     * the same request, sequential or concurrent, returns the current wallet without posting again.
+     */
+    @PostMapping("/api/v1/admin/orgs/{orgId}/wallet/adjustments")
+    public WalletResponse adjust(@PathVariable UUID orgId, @RequestBody AdjustmentRequest request) {
+        if (request.requestId() == null || request.requestId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "requestId is required");
+        }
+        BigDecimal amount = request.amount();
+        if (amount == null || amount.signum() == 0 || amount.stripTrailingZeros().scale() > 2) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "amount must be non-zero with at most 2 decimal places");
+        }
+        if (!orgRepository.existsById(orgId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Org not found");
+        }
+        UUID adminUserId = Caller.current().userId();
+        // Created outside the transaction so no second connection is needed while the wallet is locked.
+        UUID external = ledgerAccounts.platformAccount(LedgerAccountKind.EXTERNAL);
+        try {
+            tx.executeWithoutResult(status -> applyAdjustment(orgId, external, request, adminUserId));
+        } catch (DataIntegrityViolationException e) {
+            // Lost a race on the idempotency key: the winner's adjustment stands. Read it back in a new transaction.
+            requireSameOrg(orgId, request.requestId());
+        }
+        return walletController.responseFor(orgId);
+    }
+
+    private void applyAdjustment(UUID orgId, UUID external, AdjustmentRequest request, UUID adminUserId) {
+        if (billingModeService.modeFor(orgId) == BillingMode.POSTPAID) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Postpaid orgs have no wallet to adjust");
+        }
+        walletRepository.insertEmptyIfMissing(orgId);
+        Wallet wallet = walletRepository.findByOrgId(orgId).orElseThrow();
+        entityManager.refresh(wallet, LockModeType.PESSIMISTIC_WRITE);
+
+        String key = "adjustment:" + request.requestId();
+        var existing = transactionRepository.findByIdempotencyKey(key);
+        if (existing.isPresent()) {
+            if (!orgId.equals(existing.get().getOrgId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "requestId was already used for another org");
+            }
+            return;
+        }
+        BigDecimal amount = request.amount();
+        BigDecimal available = wallet.getBalance().subtract(wallet.getReserved());
+        if (amount.signum() < 0 && amount.negate().compareTo(available) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Debit exceeds the available balance of " + available.setScale(2));
+        }
+        UUID walletAccount = ledgerAccounts.buyerWallet(wallet);   // before the balance changes: it seeds the opening
+        Map<String, Object> reference = new java.util.HashMap<>();
+        reference.put("note", request.note());
+        reference.put("adminUserId", adminUserId.toString());
+        ledgerService.post(LedgerTransactionType.ADJUSTMENT, key, null, orgId, reference,
+                List.of(new Posting(walletAccount, amount), new Posting(external, amount.negate())));
+        wallet.setBalance(wallet.getBalance().add(amount));
+        wallet.setUpdatedAt(Instant.now());
+        walletRepository.save(wallet);
+    }
+
+    private void requireSameOrg(UUID orgId, String requestId) {
+        var existing = tx.execute(status -> transactionRepository.findByIdempotencyKey("adjustment:" + requestId));
+        if (existing == null || existing.isEmpty() || !orgId.equals(existing.get().getOrgId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "requestId was already used for another org");
+        }
+    }
+
+    private OrgMoneySettingsResponse settings(UUID orgId) {
+        Org org = orgRepository.findById(orgId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Org not found"));
+        BigDecimal effectiveFee = org.getPlatformFeePercent() != null
+                ? org.getPlatformFeePercent() : props.platformFeePercent();
+        BigDecimal wallet = walletRepository.balanceOfOrg(orgId).orElse(BigDecimal.ZERO);
+        BigDecimal payable = accountRepository.findByOrgIdAndKind(orgId, LedgerAccountKind.DEVELOPER_PAYABLE)
+                .map(a -> ledgerService.balanceOf(a.getId())).orElse(BigDecimal.ZERO);
+        return new OrgMoneySettingsResponse(orgId, org.getName(), org.getType(), org.getPlatformFeePercent(),
+                effectiveFee, org.getBillingMode(), billingModeService.modeFor(orgId), org.getCreditLimit(),
+                wallet, payable);
+    }
+}

@@ -13,4 +13,12 @@ public interface LedgerAccountBalanceRepository extends JpaRepository<LedgerAcco
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select b from LedgerAccountBalance b where b.accountId = :accountId")
     Optional<LedgerAccountBalance> findForUpdate(@Param("accountId") UUID accountId);
+
+    /** Balance of each existing platform (org-less) account, as {kind, balance} rows. */
+    @Query("select a.kind, b.balance from LedgerAccount a, LedgerAccountBalance b "
+            + "where b.accountId = a.id and a.orgId is null order by a.kind")
+    java.util.List<Object[]> platformBalances();
+
+    @Query("select coalesce(sum(b.balance), 0) from LedgerAccountBalance b")
+    java.math.BigDecimal totalOfAllBalances();
 }

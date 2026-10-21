@@ -28,7 +28,10 @@ Do not start the backend without the `runner` profile: Spring then uses a fake b
 
 ## Buyer
 
-1. Sign up as a buyer and fund the wallet: `scripts/demo-fund-wallet.sh you@example.com 10000` (no top-up exists yet).
+1. Sign up as a buyer and fund the wallet: `scripts/demo-fund-wallet.sh you@example.com 10000` (no top-up exists yet). The script logs in as the demo admin
+   (`ADMIN_EMAIL`/`ADMIN_PASSWORD`, default `demo-admin@example.com` / `Demo-pass-12345`, so run
+   `demo-make-admin.sh` first) and adds the amount through `POST /api/v1/admin/orgs/{orgId}/wallet/adjustments`; it prints
+   the new balance. Running it again adds again.
 2. Files, upload `examples/demo-agent/expenses.csv`.
 3. Store, open Expense Totaller, connect it (grant `expenses`), bind the file, run.
 4. The run page shows the steps (reading, 5 rows, summary), the usage and the charge.
