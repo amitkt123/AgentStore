@@ -18,6 +18,7 @@ export function buyerRailItems(needsYou: number): RailItem[] {
 export function developerRailItems(): RailItem[] {
   return [
     { href: "/developer/agents", label: "Agents", icon: "agents" },
+    { href: "/developer/earnings", label: "Earnings", icon: "wallet" },
     { href: "/developer/verification", label: "Get verified", icon: "shield" },
     { href: "/developer/api-keys", label: "API keys", icon: "key" },
   ];

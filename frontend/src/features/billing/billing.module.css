@@ -3,10 +3,6 @@
 .figure { padding: 16px 18px; border-radius: 16px; background: var(--s); border: 1px solid var(--l); display: flex; flex-direction: column; gap: 4px; }
 .figure dt { color: var(--ink3); font-size: 13px; }
 .figure dd { margin: 0; font-size: 22px; font-weight: 600; color: var(--ink); }
-.months { display: flex; align-items: center; gap: 16px; }
-.months a { color: var(--b); text-decoration: none; }
-.months a:hover { text-decoration: underline; }
-.month { font-weight: 600; }
 .agent { display: flex; flex-direction: column; gap: 8px; }
 .agent h2 { margin: 0; font-size: 16px; display: flex; justify-content: space-between; gap: 12px; }
 .flag { color: var(--wa); background: var(--waS); border-radius: 999px; padding: 2px 10px; font-size: 12px; white-space: nowrap; }

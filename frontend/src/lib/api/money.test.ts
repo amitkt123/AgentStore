@@ -33,7 +33,7 @@ it("reads earnings and builds the statement path", async () => {
   await getEarnings();
   expect(f.mock.calls[0][0]).toBe("http://be/api/v1/developer/earnings?month=2026-09");
   expect(f.mock.calls[1][0]).toBe("http://be/api/v1/developer/earnings");
-  expect(statementUrl("2026-09")).toBe("/api/v1/developer/statements/2026-09/download");
+  expect(statementUrl("2026-09")).toBe("/api/developer/statements/2026-09");
 });
 
 it("reads and patches org money settings", async () => {

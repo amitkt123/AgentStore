@@ -1,0 +1,4 @@
+.months { display: flex; align-items: center; gap: 16px; }
+.months a { color: var(--b); text-decoration: none; }
+.months a:hover { text-decoration: underline; }
+.month { font-weight: 600; }

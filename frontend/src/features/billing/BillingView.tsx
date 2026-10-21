@@ -1,15 +1,9 @@
-import Link from "next/link";
 import styles from "./billing.module.css";
+import { MonthNav } from "@/ui/MonthNav";
 import { EmptyState } from "@/ui/EmptyState";
 import { ResponsiveTable } from "@/ui/ResponsiveTable";
 import { formatInr } from "@/lib/format";
 import type { BillingLine, BillingSummary, Wallet } from "@/lib/api/types";
-
-function shiftMonth(month: string, delta: number): string {
-  const [y, m] = month.split("-").map(Number);
-  const idx = y * 12 + (m - 1) + delta;
-  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`;
-}
 
 function figures(wallet: Wallet): [string, number][] {
   if (wallet.mode === "POSTPAID") {
@@ -29,11 +23,7 @@ export function BillingView({ wallet, summary }: { wallet: Wallet; summary: Bill
           </div>
         ))}
       </dl>
-      <nav className={styles.months} aria-label="Month">
-        <Link href={`/billing?month=${shiftMonth(summary.month, -1)}`}>Previous month</Link>
-        <span className={styles.month}>{summary.month}</span>
-        <Link href={`/billing?month=${shiftMonth(summary.month, 1)}`}>Next month</Link>
-      </nav>
+      <MonthNav basePath="/billing" month={summary.month} />
       {summary.agents.length === 0 ? (
         <EmptyState title="No charges this month." />
       ) : (

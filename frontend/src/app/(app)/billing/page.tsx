@@ -2,6 +2,7 @@ import { getBillingSummary, getWallet } from "@/lib/api/money";
 import { ApiError } from "@/lib/api/http";
 import { getSession } from "@/lib/session";
 import { BillingView } from "@/features/billing/BillingView";
+import { parseMonth } from "@/lib/month";
 import { ErrorState } from "@/ui/ErrorState";
 
 export default async function Page({ searchParams }: { searchParams: { month?: string } }) {
@@ -15,7 +16,7 @@ export default async function Page({ searchParams }: { searchParams: { month?: s
     );
   }
   try {
-    const month = searchParams.month && /^\d{4}-(0[1-9]|1[0-2])$/.test(searchParams.month) ? searchParams.month : undefined;
+    const month = parseMonth(searchParams.month);
     const [wallet, summary] = await Promise.all([getWallet(session.orgId), getBillingSummary(session.orgId, month)]);
     return (
       <>
