@@ -41,13 +41,13 @@ public class WalletController {
         return responseFor(orgId);
     }
 
-    /** The org's wallet view, shared with the admin adjustment endpoint. */
+    /**
+     * The org's wallet view, shared with the admin adjustment endpoint. A prepaid org that has never been funded
+     * has no wallet row yet and reads as an empty wallet.
+     */
     public WalletResponse responseFor(UUID orgId) {
         BillingMode mode = billingModeService.modeFor(orgId);
-        Wallet wallet = walletRepository.findByOrgId(orgId).orElse(null);
-        if (wallet == null && mode == BillingMode.PREPAID) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No wallet for org " + orgId);
-        }
+        Wallet wallet = walletRepository.findReadOnlyByOrgId(orgId).orElse(null);
         BigDecimal reserved = wallet == null ? BigDecimal.ZERO : wallet.getReserved();
         BigDecimal cap = wallet == null ? null : wallet.getCap();
         Instant monthStart = YearMonth.now(ZoneOffset.UTC).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
@@ -59,7 +59,7 @@ public class WalletController {
             return new WalletResponse(mode, BigDecimal.ZERO, reserved, creditLimit.subtract(owed).subtract(reserved),
                     spent, null, creditLimit, owed, cap, reserved);
         }
-        BigDecimal balance = wallet.getBalance();
+        BigDecimal balance = wallet == null ? BigDecimal.ZERO : wallet.getBalance();
         return new WalletResponse(mode, balance, reserved, balance.subtract(reserved), spent, null, null,
                 BigDecimal.ZERO, cap, reserved);
     }

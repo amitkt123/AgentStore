@@ -38,6 +38,8 @@ class WalletControllerTest extends AbstractIntegrationTest {
     com.agentstore.platform.execution.ExecutionFixtures fixtures;
     @Autowired
     WalletReservationService walletReservationService;
+    @Autowired
+    org.springframework.transaction.support.TransactionTemplate tx;
 
     String url(String path) {
         return "http://localhost:" + port + path;
@@ -78,16 +80,53 @@ class WalletControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void walletNotFoundForOrgWithoutWallet() {
+    void prepaidOrgWithoutWalletReadsAsEmptyAndWritesNothing() {
         Org buyer = orgRepository.save(new Org(null, "BuyerCo3", OrgType.BUYER));
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), buyer.getId(), UserRole.BUYER_ADMIN));
+        WalletResponse wallet = getWallet(buyer.getId());
 
-        var response = rest.exchange(url("/api/v1/orgs/" + buyer.getId() + "/wallet"), HttpMethod.GET,
-                new HttpEntity<>(headers), String.class);
+        assertThat(wallet.mode()).isEqualTo(BillingMode.PREPAID);
+        assertThat(wallet.balance()).isEqualByComparingTo("0");
+        assertThat(wallet.held()).isEqualByComparingTo("0");
+        assertThat(wallet.reserved()).isEqualByComparingTo("0");
+        assertThat(wallet.available()).isEqualByComparingTo("0");
+        assertThat(wallet.spentThisMonth()).isEqualByComparingTo("0");
+        assertThat(wallet.cap()).isNull();
+        assertThat(walletRepository.findReadOnlyByOrgId(buyer.getId())).isEmpty();
+        assertThat(jdbc.queryForObject("select count(*) from ledger_account where org_id = ?", Long.class,
+                buyer.getId())).isZero();
+    }
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    @Test
+    void walletReadDoesNotWaitForTheWalletLock() throws Exception {
+        Org buyer = orgRepository.save(new Org(null, "BuyerCoLocked", OrgType.BUYER));
+        Wallet wallet = new Wallet(null, buyer.getId(), new BigDecimal("75.00"), null);
+        wallet.setUpdatedAt(Instant.now());
+        walletRepository.save(wallet);
+
+        var locked = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var holder = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            var held = holder.submit(() -> tx.executeWithoutResult(s -> {
+                walletRepository.findByOrgId(buyer.getId()).orElseThrow();
+                locked.countDown();
+                try {
+                    release.await(30, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            assertThat(locked.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+
+            var read = java.util.concurrent.CompletableFuture.supplyAsync(() -> getWallet(buyer.getId()));
+            assertThat(read.get(5, java.util.concurrent.TimeUnit.SECONDS).balance()).isEqualByComparingTo("75.00");
+            release.countDown();
+            held.get(10, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+            holder.shutdownNow();
+        }
     }
 
     @Test
@@ -186,7 +225,7 @@ class WalletControllerTest extends AbstractIntegrationTest {
 
         assertThat(wallet.owed()).isEqualByComparingTo("0");
         assertThat(wallet.available()).isEqualByComparingTo("50000.00");
-        assertThat(walletRepository.findByOrgId(orgId)).isEmpty();
+        assertThat(walletRepository.findReadOnlyByOrgId(orgId)).isEmpty();
         assertThat(jdbc.queryForObject("select count(*) from ledger_account where org_id = ?", Long.class, orgId))
                 .isZero();
     }

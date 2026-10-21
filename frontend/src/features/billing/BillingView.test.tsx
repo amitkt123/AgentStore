@@ -36,6 +36,16 @@ it("shows prepaid figures", () => {
   expect(screen.queryByText("Credit limit")).not.toBeInTheDocument();
 });
 
+it("shows zeros for a never-funded prepaid wallet", () => {
+  const unfunded: Wallet = {
+    mode: "PREPAID", balance: 0, held: 0, available: 0, spentThisMonth: 0, monthlyLimit: null,
+    creditLimit: null, owed: 0, cap: null, reserved: 0,
+  };
+  render(<BillingView wallet={unfunded} summary={empty} />);
+  expect(screen.getByText("Balance")).toBeInTheDocument();
+  expect(screen.getAllByText("₹0.00")).toHaveLength(4);
+});
+
 it("shows postpaid labels instead", () => {
   render(<BillingView wallet={postpaid} summary={summary} />);
   expect(screen.getByText("Credit limit")).toBeInTheDocument();

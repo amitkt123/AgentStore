@@ -20,6 +20,10 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
     @Transactional
     Optional<Wallet> findByOrgId(UUID orgId);
 
+    /** The org's wallet without locking its row, for read-only views. */
+    @Query("select w from Wallet w where w.orgId = :orgId")
+    Optional<Wallet> findReadOnlyByOrgId(@Param("orgId") UUID orgId);
+
     /** Creates an empty wallet (balance 0, reserved 0) unless the org has one; a concurrent creator wins quietly. */
     @Modifying
     @Transactional
