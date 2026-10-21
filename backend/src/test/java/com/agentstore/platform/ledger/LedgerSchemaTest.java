@@ -70,10 +70,17 @@ class LedgerSchemaTest extends AbstractIntegrationTest {
 
     @Test
     void platformAccountKindIsUniqueWithNullOrg() {
-        // Other tests in the shared context may already have created PLATFORM_REVENUE; use a kind we own here.
-        jdbc.update("delete from ledger_account where org_id is null and kind = 'PAYOUT_FEES'");
-        account(null, "PAYOUT_FEES");
+        // V45 already created the platform's PAYOUT_FEES account, so a second org-less one must be refused.
         assertThatThrownBy(() -> account(null, "PAYOUT_FEES"))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void everyPlatformAccountExistsWithABalanceRow() {
+        for (LedgerAccountKind kind : LedgerAccountKind.values()) {
+            Long count = jdbc.queryForObject("select count(*) from ledger_account a join ledger_account_balance b "
+                    + "on b.account_id = a.id where a.org_id is null and a.kind = ?", Long.class, kind.name());
+            assertThat(count).as(kind.name()).isEqualTo(kind.isPlatform() ? 1L : 0L);
+        }
     }
 }

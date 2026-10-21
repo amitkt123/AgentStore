@@ -51,6 +51,7 @@ public class LedgerAccounts {
         return find(orgId, kind).orElseGet(() -> createOrReread(orgId, kind));
     }
 
+    /** A platform account. V45 creates them all, so this is normally a plain lookup and takes no lock. */
     public UUID platformAccount(LedgerAccountKind kind) {
         if (!kind.isPlatform()) {
             throw new IllegalArgumentException(kind + " is an org account; use orgAccount");
