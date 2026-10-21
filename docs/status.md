@@ -2,13 +2,13 @@
 
 The single place to see what is done and what is next. Update it in the same PR as any change that finishes, starts or reshapes a workstream. Gaps and risks stay in `docs/frontend-gaps.md` and `docs/known-issues.md`; this file links to them, it does not copy them.
 
-Last updated: 2026-10-21 (master `9213afa`, PR #37)
+Last updated: 2026-10-21 (branch `feat/ws10a-ledger`, WS10a)
 
 Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-and-sandbox-design.md` (workstreams in §5, milestones in §7). Specs and plans named below live in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
 
 ## Next up
 
-1. Pick the next workstream (candidates: WS10 money, WS8 automated review, small backend fixes below).
+1. WS10b money in and back: Razorpay top-ups, refunds to the original payments, postpaid bills, reconciliation (spec `2026-10-21-ws10-money-in-and-out-design.md` §2).
 
 ## Backend workstreams
 
@@ -18,7 +18,7 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | WS1 Agent Runtime API v1 | Done | #10 | `2026-09-26-ws1-…` | — |
 | WS1b buyer run API | Done | #24, #25, #27 | `2026-09-29-ws1b-…` | — |
 | WS2 data plane | Done | #11 | `2026-09-26-ws2-…` | Connection revoke not wired (`unbindAll` unused) |
-| WS3 LLM gateway | Done | #12 | `2026-09-26-ws3-…` | LLM cost recorded, not charged (WS10) |
+| WS3 LLM gateway | Done | #12 | `2026-09-26-ws3-…` | — |
 | WS4a SDKs (Python, TypeScript) | Done | #19, #20, #22 | `2026-09-29-ws4a-…` | — |
 | WS4b base images, conformance suite, publishing to PyPI/npm | Not started | — | none | All |
 | WS5a/b/c runner, build pipeline, API keys + CLI | Done | #6, #7, #8, #9 | `2026-09-25-ws5…`, `2026-09-26-ws5c-…` | — |
@@ -27,7 +27,9 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | WS7a/b developer verification | Done | #17, #18 | `2026-09-28-ws7…` | Reviewer note not returned to developer (G14) |
 | WS8 automated review (evals, red-team, cost profiling, CLI `submit`) | Not started | — | parent spec §5 | All |
 | WS9 buyer trial runs | Not started | — | parent spec §5 | All |
-| WS10 revenue split, earnings, payouts, wallet top-up, buyer statement | Not started | — | parent spec §5 | All; wallets are funded by `scripts/demo-fund-wallet` today |
+| WS10a double-entry ledger, revenue split, LLM cost deduction, postpaid mode, buyer statement, earnings | Done | this PR | spec `2026-10-21-ws10-money-in-and-out-design.md` §1, plan `2026-10-21-ws10a-…` | `wallet.balance` and `ledger_entry` still dual-written (`known-issues.md`) |
+| WS10b money in and back (top-up, refunds, postpaid bills, reconciliation) | Not started | — | spec `2026-10-21-ws10-…` §2 | All; wallets are funded by `scripts/demo-fund-wallet` or admin adjustments today |
+| WS10c money out (payout accounts, withdrawals, admin payout console) | Not started | — | spec `2026-10-21-ws10-…` §3 | All |
 | WS11 release management (pinning UX, updates, rollout, delisting) | Not started | — | parent spec §5 | All |
 | WS12 platform infrastructure and operations | Partial | #33, #37 | parent spec §5 | Docs site, deploy, observability |
 | WS13 identity, workspaces, teams | Done | #4, #5 | `2026-09-23-ws13-…` | SSO; Google sign-in needs a client id (G10) |
@@ -47,7 +49,10 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | P3a developer shell, Get verified, API keys | Done | #35 | `2026-09-30-p3a-…` | — |
 | P3b agents list and Studio | Done | #36 | `2026-10-01-p3b-…` | — |
 | P3c Studio "what it did" half and flow canvas | Not started | — | none | All (G16) |
-| FE-3 developer money (earnings, payouts) | Not started (needs WS10) | — | plan `2026-09-23-fe3-…` | All |
+| Buyer Billing page `/billing` | Done (WS10a) | this PR | plan `2026-10-21-ws10a-…` | Add money, Get money back, bills (WS10b) |
+| Developer Earnings page `/developer/earnings` | Done (WS10a) | this PR | plan `2026-10-21-ws10a-…` | Withdraw, payout account (WS10c) |
+| Admin Money page `/admin/money` (fee, credit limit, billing mode, wallet adjustments, platform accounts) | Done (WS10a) | this PR | plan `2026-10-21-ws10a-…` | Withdrawals, freezes, reconciliation (WS10c) |
+| FE-3 developer money (earnings, payouts) | Partly superseded by the Earnings page above | — | plan `2026-09-23-fe3-…` | Payouts (WS10c) |
 | FE-4 admin consoles | Not started | — | plan `2026-09-23-fe4-…` | All |
 
 ## Small fixes waiting
