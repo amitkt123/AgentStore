@@ -43,6 +43,7 @@ echo "callback URL: $URL"
 echo "runner..."
 (cd "$ROOT/runner/e2b-shim" && npm ci --silent)
 start runner "$ROOT/runner" env RUNNER_SECRET="$RUNNER_SECRET" E2B_API_KEY="$E2B_API_KEY" SPRING_BASE_URL=http://localhost:8080 mvn -q spring-boot:run
+wait_for http://localhost:8090/actuator/health runner "$DEV/runner.log"
 
 echo "backend... (profile runner swaps the fake build and sandbox clients for the real runner)"
 start backend "$ROOT/backend" env ADMIN_EMAILS="$ADMIN_EMAILS" CALLBACK_BASE_URL="$URL" RUNNER_SECRET="$RUNNER_SECRET" RUNNER_BASE_URL=http://localhost:8090 mvn -q spring-boot:run -Dspring-boot.run.profiles=dev,runner
