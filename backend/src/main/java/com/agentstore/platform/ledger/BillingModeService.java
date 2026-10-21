@@ -21,14 +21,20 @@ public class BillingModeService {
     private final OrgRepository orgRepository;
     private final WalletRepository walletRepository;
     private final MoneyProperties props;
+    private final LedgerAccountRepository accountRepository;
+    private final LedgerAccountBalanceRepository balanceRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
 
-    public BillingModeService(OrgRepository orgRepository, WalletRepository walletRepository, MoneyProperties props) {
+    public BillingModeService(OrgRepository orgRepository, WalletRepository walletRepository, MoneyProperties props,
+                              LedgerAccountRepository accountRepository,
+                              LedgerAccountBalanceRepository balanceRepository) {
         this.orgRepository = orgRepository;
         this.walletRepository = walletRepository;
         this.props = props;
+        this.accountRepository = accountRepository;
+        this.balanceRepository = balanceRepository;
     }
 
     /** The org's own mode, else the configured default (also for an unknown org). */
@@ -44,25 +50,50 @@ public class BillingModeService {
     }
 
     /**
-     * Switches the org's billing mode. Switching to POSTPAID is refused while the wallet holds a balance or a
-     * reservation, since postpaid charges never touch the wallet and that money would be stranded.
+     * Switches the org's billing mode, checked under the wallet lock (the row is created first if missing, so a
+     * concurrent first reservation or charge cannot slip past the check):
+     * <ul>
+     *   <li>to POSTPAID is refused while the wallet holds a balance or a reservation, since postpaid charges never
+     *       touch the wallet and that money would be stranded;</li>
+     *   <li>from POSTPAID to PREPAID is refused while runs hold reservations or money is owed, since those would
+     *       then be charged against an empty wallet.</li>
+     * </ul>
      */
     @Transactional
     public void setMode(UUID orgId, BillingMode mode) {
         Objects.requireNonNull(mode, "mode");
         Org org = orgRepository.findById(orgId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Org not found"));
-        if (mode == BillingMode.POSTPAID) {
-            // Under the wallet lock, so no reservation or charge can slip in between the check and the switch.
-            walletRepository.findByOrgId(orgId).ifPresent(wallet -> {
-                entityManager.refresh(wallet, LockModeType.PESSIMISTIC_WRITE);
-                if (wallet.getBalance().signum() != 0 || wallet.getReserved().signum() != 0) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT,
-                            "Wallet still holds money; refund or use it first");
-                }
-            });
+        walletRepository.insertEmptyIfMissing(orgId);
+        Wallet wallet = walletRepository.findByOrgId(orgId).orElseThrow();
+        entityManager.refresh(wallet, LockModeType.PESSIMISTIC_WRITE);
+        BillingMode current = org.getBillingMode() != null ? org.getBillingMode() : props.billingMode();
+        if (mode == BillingMode.POSTPAID
+                && (wallet.getBalance().signum() != 0 || wallet.getReserved().signum() != 0)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Wallet still holds money; refund or use it first");
+        }
+        if (mode == BillingMode.PREPAID && current == BillingMode.POSTPAID
+                && (wallet.getReserved().signum() != 0 || owed(orgId).signum() != 0)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Runs are in progress or money is owed; wait for them to finish and the bill to be paid");
         }
         org.setBillingMode(mode);
         orgRepository.save(org);
+    }
+
+    /**
+     * What a postpaid org owes: the negated BUYER_RECEIVABLE balance, or 0 before its first charge (the account is
+     * not created to read it). Stable while the caller holds the org's wallet lock, as charges take it first.
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal owed(UUID orgId) {
+        return accountRepository.findByOrgIdAndKind(orgId, LedgerAccountKind.BUYER_RECEIVABLE)
+                .flatMap(account -> balanceRepository.findById(account.getId()))
+                .map(balance -> {
+                    entityManager.flush();     // refresh would otherwise discard pending changes
+                    entityManager.refresh(balance);
+                    return balance.getBalance().negate();
+                })
+                .orElse(BigDecimal.ZERO);
     }
 }

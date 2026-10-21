@@ -196,6 +196,53 @@ class PostpaidTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void switchToPrepaidWhileOwedIsRefused() {
+        Setup s = postpaid("1000.00");
+        ledgerService.chargeUsageEvent(usageEvent(s, "100.00"));   // owed 100, nothing reserved
+
+        assertPrepaidRefused(s.buyerOrgId());
+    }
+
+    @Test
+    void switchToPrepaidWhileReservedIsRefused() {
+        Setup s = postpaid("1000.00");
+        walletReservationService.reserve(s.buyerOrgId(), new BigDecimal("10.00"));   // reserved 10, nothing owed
+
+        assertPrepaidRefused(s.buyerOrgId());
+    }
+
+    @Test
+    void switchToPrepaidWhenSettledSucceeds() {
+        Setup s = postpaid("1000.00");
+        walletReservationService.reserve(s.buyerOrgId(), new BigDecimal("10.00"));
+        walletReservationService.release(s.buyerOrgId(), new BigDecimal("10.00"));
+
+        billingModeService.setMode(s.buyerOrgId(), BillingMode.PREPAID);
+        assertThat(billingModeService.modeFor(s.buyerOrgId())).isEqualTo(BillingMode.PREPAID);
+    }
+
+    @Test
+    void setModeCreatesTheWalletRowItChecks() {
+        Org org = orgRepository.save(new Org(null, "buyer-" + UUID.randomUUID(), OrgType.BUYER));
+
+        billingModeService.setMode(org.getId(), BillingMode.POSTPAID);
+
+        Wallet wallet = wallet(org.getId());
+        assertThat(wallet.getBalance()).isEqualByComparingTo("0");
+        assertThat(wallet.getReserved()).isEqualByComparingTo("0");
+    }
+
+    private void assertPrepaidRefused(UUID orgId) {
+        assertThatThrownBy(() -> billingModeService.setMode(orgId, BillingMode.PREPAID))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(e.getReason())
+                            .isEqualTo("Runs are in progress or money is owed; wait for them to finish and the bill to be paid");
+                });
+        assertThat(billingModeService.modeFor(orgId)).isEqualTo(BillingMode.POSTPAID);
+    }
+
+    @Test
     void reserveUsesTheLockedWalletNotOneReadEarlierInTheTransaction() {
         UUID orgId = walletFor("100.00");
         UUID walletId = wallet(orgId).getId();

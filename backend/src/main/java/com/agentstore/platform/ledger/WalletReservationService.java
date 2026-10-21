@@ -20,19 +20,13 @@ public class WalletReservationService {
 
     private final WalletRepository walletRepository;
     private final BillingModeService billingModeService;
-    private final LedgerAccountRepository accountRepository;
-    private final LedgerAccountBalanceRepository balanceRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
 
-    public WalletReservationService(WalletRepository walletRepository, BillingModeService billingModeService,
-                                    LedgerAccountRepository accountRepository,
-                                    LedgerAccountBalanceRepository balanceRepository) {
+    public WalletReservationService(WalletRepository walletRepository, BillingModeService billingModeService) {
         this.walletRepository = walletRepository;
         this.billingModeService = billingModeService;
-        this.accountRepository = accountRepository;
-        this.balanceRepository = balanceRepository;
     }
 
     @Transactional
@@ -45,7 +39,7 @@ public class WalletReservationService {
             walletRepository.insertEmptyIfMissing(orgId);
             wallet = lock(orgId).orElseThrow();
             // Charges to the receivable take this wallet lock first, so what is owed cannot move under us.
-            BigDecimal committed = owed(orgId).add(wallet.getReserved()).add(amount);
+            BigDecimal committed = billingModeService.owed(orgId).add(wallet.getReserved()).add(amount);
             if (committed.compareTo(billingModeService.creditLimit(orgId)) > 0) {
                 throw new InsufficientFundsException("Credit limit reached");
             }
@@ -80,16 +74,5 @@ public class WalletReservationService {
         Optional<Wallet> wallet = walletRepository.findByOrgId(orgId);
         wallet.ifPresent(w -> entityManager.refresh(w, LockModeType.PESSIMISTIC_WRITE));
         return wallet;
-    }
-
-    /** What a postpaid org owes: the negated BUYER_RECEIVABLE balance, or 0 before its first charge. */
-    private BigDecimal owed(UUID orgId) {
-        return accountRepository.findByOrgIdAndKind(orgId, LedgerAccountKind.BUYER_RECEIVABLE)
-                .flatMap(account -> balanceRepository.findById(account.getId()))
-                .map(balance -> {
-                    entityManager.refresh(balance);
-                    return balance.getBalance().negate();
-                })
-                .orElse(BigDecimal.ZERO);
     }
 }
