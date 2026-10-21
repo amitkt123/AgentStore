@@ -48,6 +48,10 @@ class AdminMoneyControllerTest extends AbstractIntegrationTest {
     UsageEventRepository usageEvents;
     @Autowired
     ExecutionFixtures fixtures;
+    @Autowired
+    LedgerAccountBalanceRepository balances;
+    @Autowired
+    org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     String url(String path) {
         return "http://localhost:" + port + path;
@@ -129,6 +133,41 @@ class AdminMoneyControllerTest extends AbstractIntegrationTest {
         var ledger = call(HttpMethod.GET, "/api/v1/admin/ledger/accounts", admin(), null, Map.class);
         assertThat(ledger.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(ledger.getBody().get("totalsCheck")).isEqualTo(true);
+        assertThat(ledger.getBody()).containsKeys("balancesMatchPostings", "walletsMatchLedger");
+        assertThat(balances.accountsNotMatchingPostings()).doesNotContain(walletAccount);
+        assertThat(balances.walletsNotMatchingLedger()).doesNotContain(org.getId());
+    }
+
+    @Test
+    void ledgerChecksReportABalanceThatDriftedFromItsPostings() {
+        Org org = buyer();
+        call(HttpMethod.POST, adjustPath(org.getId()), admin(), adjustment(UUID.randomUUID().toString(), "40.00"),
+                WalletResponse.class);
+        UUID walletAccount = accounts.findByOrgIdAndKind(org.getId(), LedgerAccountKind.BUYER_WALLET).orElseThrow().getId();
+        jdbc.update("update ledger_account_balance set balance = balance + 1 where account_id = ?", walletAccount);
+        try {
+            assertThat(balances.accountsNotMatchingPostings()).contains(walletAccount);
+            assertThat(balances.walletsNotMatchingLedger()).contains(org.getId());
+            var ledger = call(HttpMethod.GET, "/api/v1/admin/ledger/accounts", admin(), null, Map.class);
+            assertThat(ledger.getBody().get("balancesMatchPostings")).isEqualTo(false);
+            assertThat(ledger.getBody().get("walletsMatchLedger")).isEqualTo(false);
+        } finally {
+            jdbc.update("update ledger_account_balance set balance = balance - 1 where account_id = ?", walletAccount);
+        }
+        assertThat(balances.accountsNotMatchingPostings()).doesNotContain(walletAccount);
+    }
+
+    @Test
+    void ledgerChecksReportAWalletWithoutItsLedgerAccount() {
+        Org org = buyer();
+        walletRepository.insertEmptyIfMissing(org.getId());
+        assertThat(balances.walletsNotMatchingLedger()).doesNotContain(org.getId());   // empty wallet, no account
+        jdbc.update("update wallet set balance = 5 where org_id = ?", org.getId());
+        try {
+            assertThat(balances.walletsNotMatchingLedger()).contains(org.getId());
+        } finally {
+            jdbc.update("update wallet set balance = 0 where org_id = ?", org.getId());
+        }
     }
 
     @Test

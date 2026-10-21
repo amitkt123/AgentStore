@@ -47,8 +47,9 @@ it("reads and patches org money settings", async () => {
 });
 
 it("reads platform accounts", async () => {
-  const f = stub({ accounts: [], totalsCheck: true });
-  expect(await getPlatformAccounts()).toEqual({ accounts: [], totalsCheck: true });
+  const body = { accounts: [], totalsCheck: true, balancesMatchPostings: true, walletsMatchLedger: false };
+  const f = stub(body);
+  expect(await getPlatformAccounts()).toEqual(body);
   expect(f.mock.calls[0][0]).toBe("http://be/api/v1/admin/ledger/accounts");
 });
 

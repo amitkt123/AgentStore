@@ -39,6 +39,12 @@ export function AdminMoneyView({ accounts, org: initial, orgQuery, lookupError }
       <section className={styles.section}>
         <h2>Platform balances</h2>
         {!accounts.totalsCheck && <p role="alert" className={styles.warn}>Ledger does not balance</p>}
+        {!accounts.balancesMatchPostings && (
+          <p role="alert" className={styles.warn}>Some account balances do not match their postings</p>
+        )}
+        {!accounts.walletsMatchLedger && (
+          <p role="alert" className={styles.warn}>Some wallet balances do not match the ledger</p>
+        )}
         <ResponsiveTable
           rows={accounts.accounts}
           rowKey={(a) => a.kind}

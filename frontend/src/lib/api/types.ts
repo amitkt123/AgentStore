@@ -123,5 +123,10 @@ export interface OrgMoney {
   walletBalance: number; payableBalance: number;
 }
 export interface OrgMoneyPatch { feePercent?: number; billingMode?: BillingMode; creditLimit?: number }
-export interface PlatformAccounts { accounts: { kind: LedgerAccountKind; balance: number }[]; totalsCheck: boolean }
+export interface PlatformAccounts {
+  accounts: { kind: LedgerAccountKind; balance: number }[];
+  totalsCheck: boolean;
+  balancesMatchPostings: boolean;
+  walletsMatchLedger: boolean;
+}
 export interface AdjustmentBody { requestId: string; amount: number; note: string }

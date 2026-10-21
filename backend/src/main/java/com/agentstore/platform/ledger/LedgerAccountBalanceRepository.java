@@ -21,4 +21,20 @@ public interface LedgerAccountBalanceRepository extends JpaRepository<LedgerAcco
 
     @Query("select coalesce(sum(b.balance), 0) from LedgerAccountBalance b")
     java.math.BigDecimal totalOfAllBalances();
+
+    /** Accounts whose stored balance differs from the sum of their postings. */
+    @Query(value = "select b.account_id from ledger_account_balance b "
+            + "left join (select account_id, sum(amount) as total from ledger_posting group by account_id) p "
+            + "on p.account_id = b.account_id where b.balance <> coalesce(p.total, 0)", nativeQuery = true)
+    java.util.List<UUID> accountsNotMatchingPostings();
+
+    /**
+     * Orgs whose {@code wallet.balance} differs from their BUYER_WALLET balance. An org without a BUYER_WALLET
+     * account counts as 0, so it matches only while its wallet is empty.
+     */
+    @Query(value = "select w.org_id from wallet w "
+            + "left join ledger_account a on a.org_id = w.org_id and a.kind = 'BUYER_WALLET' "
+            + "left join ledger_account_balance b on b.account_id = a.id "
+            + "where w.balance <> coalesce(b.balance, 0)", nativeQuery = true)
+    java.util.List<UUID> walletsNotMatchingLedger();
 }

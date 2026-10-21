@@ -15,6 +15,8 @@ const ORG = "11111111-1111-4111-8111-111111111111";
 const accounts: PlatformAccounts = {
   accounts: [{ kind: "PLATFORM_REVENUE", balance: 1500 }, { kind: "EXTERNAL", balance: -1500.5 }],
   totalsCheck: true,
+  balancesMatchPostings: true,
+  walletsMatchLedger: true,
 };
 const org = (over: Partial<OrgMoney> = {}): OrgMoney => ({
   orgId: ORG, name: "Acme Buyers", type: "BUYER", feePercent: null, effectiveFeePercent: 15,
@@ -28,12 +30,22 @@ it("renders platform balances formatted", () => {
   expect(screen.getByText("PLATFORM_REVENUE")).toBeInTheDocument();
   expect(screen.getByText("₹1,500.00")).toBeInTheDocument();
   expect(screen.getByText("-₹1,500.50")).toBeInTheDocument();
-  expect(screen.queryByText("Ledger does not balance")).not.toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 it("warns when the ledger does not balance", () => {
   render(<AdminMoneyView accounts={{ ...accounts, totalsCheck: false }} org={null} />);
   expect(screen.getByRole("alert")).toHaveTextContent("Ledger does not balance");
+});
+
+it("warns when balances drift from their postings", () => {
+  render(<AdminMoneyView accounts={{ ...accounts, balancesMatchPostings: false }} org={null} />);
+  expect(screen.getByRole("alert")).toHaveTextContent("Some account balances do not match their postings");
+});
+
+it("warns when wallets drift from the ledger", () => {
+  render(<AdminMoneyView accounts={{ ...accounts, walletsMatchLedger: false }} org={null} />);
+  expect(screen.getByRole("alert")).toHaveTextContent("Some wallet balances do not match the ledger");
 });
 
 it("shows a lookup message and no forms when the org id is rejected", () => {

@@ -29,7 +29,13 @@ import java.util.UUID;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminMoneyController {
 
-    public record PlatformAccountsResponse(List<PlatformAccountResponse> accounts, boolean totalsCheck) {}
+    /**
+     * Platform balances plus three ledger checks: {@code totalsCheck} (all balances sum to zero),
+     * {@code balancesMatchPostings} (each stored balance equals the sum of its postings) and
+     * {@code walletsMatchLedger} (each wallet balance equals its org's BUYER_WALLET balance).
+     */
+    public record PlatformAccountsResponse(List<PlatformAccountResponse> accounts, boolean totalsCheck,
+                                           boolean balancesMatchPostings, boolean walletsMatchLedger) {}
 
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
@@ -105,7 +111,9 @@ public class AdminMoneyController {
         List<PlatformAccountResponse> accounts = balanceRepository.platformBalances().stream()
                 .map(row -> new PlatformAccountResponse((LedgerAccountKind) row[0], (BigDecimal) row[1]))
                 .toList();
-        return new PlatformAccountsResponse(accounts, balanceRepository.totalOfAllBalances().signum() == 0);
+        return new PlatformAccountsResponse(accounts, balanceRepository.totalOfAllBalances().signum() == 0,
+                balanceRepository.accountsNotMatchingPostings().isEmpty(),
+                balanceRepository.walletsNotMatchingLedger().isEmpty());
     }
 
     /**
