@@ -172,6 +172,104 @@ class WebhookProcessorTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void concurrentSamePaymentUnderDistinctEventIdsCreditsOnce() throws Exception {
+        Org org = buyer();
+        CheckoutResponse c = order(org, "500.00");
+        String paymentId = "pay_" + UUID.randomUUID();
+        int threads = 8;
+        List<byte[]> bodies = new ArrayList<>();
+        for (int i = 0; i < threads; i++) {
+            bodies.add(fake().webhookBody(captured("evt_" + UUID.randomUUID(), c.providerOrderId(), paymentId, "500.00")));
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<WebhookProcessor.Outcome>> futures = new ArrayList<>();
+        try {
+            for (byte[] body : bodies) {
+                Map<String, String> headers = fake().signedHeaders(body);
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    return processor.process("fake", body, headers);
+                }));
+            }
+            start.countDown();
+            for (Future<WebhookProcessor.Outcome> f : futures) {
+                assertThat(f.get(60, TimeUnit.SECONDS)).isEqualTo(WebhookProcessor.Outcome.PROCESSED);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(wallet(org.getId())).isEqualByComparingTo("500.00");
+        assertThat(walletAccount(org.getId())).isEqualByComparingTo("500.00");
+        assertThat(topUpPosts(org.getId())).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("select count(*) from payment_webhook_event where event_id like 'evt_%' "
+                + "and payload ->> 'paymentId' = ?", Long.class, paymentId)).isEqualTo((long) threads);
+        assertThat(jdbc.queryForObject("select count(*) from domain_event where type = 'payment.topup_paid' "
+                + "and org_id = ?", Long.class, org.getId())).isEqualTo(1L);
+    }
+
+    @Test
+    void secondPaymentOnPaidTopUpCreditsAsItsOwnOrder() {
+        Org org = buyer();
+        CheckoutResponse c = order(org, "500.00");
+        String firstPay = "pay_" + UUID.randomUUID();
+        String secondPay = "pay_" + UUID.randomUUID();
+        send(captured("evt_" + UUID.randomUUID(), c.providerOrderId(), firstPay, "500.00"));
+
+        assertThat(send(captured("evt_" + UUID.randomUUID(), c.providerOrderId(), secondPay, "500.00")))
+                .isEqualTo(WebhookProcessor.Outcome.PROCESSED);
+        assertThat(wallet(org.getId())).isEqualByComparingTo("1000.00");
+        assertThat(walletAccount(org.getId())).isEqualByComparingTo("1000.00");
+        assertThat(topUpPosts(org.getId())).isEqualTo(2L);
+        assertThat(stored(c).getProviderPaymentId()).isEqualTo(firstPay);
+
+        PaymentOrder dup = orders.findAll().stream().filter(o -> ("dup:" + secondPay).equals(o.getProviderOrderId()))
+                .findFirst().orElseThrow();
+        assertThat(dup.getOrgId()).isEqualTo(org.getId());
+        assertThat(dup.getPurpose()).isEqualTo(PaymentOrder.Purpose.TOPUP);
+        assertThat(dup.getMethod()).isEqualTo(PaymentMethod.UPI);
+        assertThat(dup.getAmount()).isEqualByComparingTo("500.00");
+        assertThat(dup.getStatus()).isEqualTo(PaymentOrder.Status.PAID);
+        assertThat(dup.getProvider()).isEqualTo("fake");
+        assertThat(dup.getProviderPaymentId()).isEqualTo(secondPay);
+        assertThat(dup.getPaidAt()).isNotNull();
+        assertThat(jdbc.queryForObject("select reference ->> 'paymentOrderId' from ledger_transaction "
+                + "where idempotency_key = ?", String.class, "payment:" + secondPay)).isEqualTo(dup.getId().toString());
+        assertThat(jdbc.queryForObject("select count(*) from domain_event where type = 'payment.topup_paid' "
+                + "and aggregate_id = ?", Long.class, dup.getId())).isEqualTo(1L);
+
+        // the same second payment redelivered under a new event id is not credited again
+        send(captured("evt_" + UUID.randomUUID(), c.providerOrderId(), secondPay, "500.00"));
+        assertThat(wallet(org.getId())).isEqualByComparingTo("1000.00");
+        assertThat(orders.findAll().stream().filter(o -> ("dup:" + secondPay).equals(o.getProviderOrderId()))).hasSize(1);
+    }
+
+    @Test
+    void secondPaymentOnPaidBillIsAnIssueNotACredit() {
+        Org org = buyer();
+        PaymentOrder bill = new PaymentOrder();
+        bill.setOrgId(org.getId());
+        bill.setPurpose(PaymentOrder.Purpose.BILL);
+        bill.setMethod(PaymentMethod.UPI);
+        bill.setAmount(new BigDecimal("700.00"));
+        bill.setStatus(PaymentOrder.Status.PAID);
+        bill.setProvider("fake");
+        bill.setProviderOrderId("fake_order_bill_" + UUID.randomUUID());
+        bill.setProviderPaymentId("pay_" + UUID.randomUUID());
+        bill.setPaidAt(java.time.Instant.now());
+        bill = orders.save(bill);
+        String secondPay = "pay_" + UUID.randomUUID();
+        long postsBefore = jdbc.queryForObject("select count(*) from ledger_transaction", Long.class);
+
+        assertThat(send(captured("evt_" + UUID.randomUUID(), bill.getProviderOrderId(), secondPay, "700.00")))
+                .isEqualTo(WebhookProcessor.Outcome.IGNORED);
+        assertThat(jdbc.queryForObject("select count(*) from reconciliation_issue where kind = 'DUPLICATE_PAYMENT' "
+                + "and provider_ref = ?", Long.class, secondPay)).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("select count(*) from ledger_transaction", Long.class)).isEqualTo(postsBefore);
+        assertThat(wallet(org.getId())).isEqualByComparingTo("0");
+    }
+
+    @Test
     void failedThenCapturedCredits() {
         Org org = buyer();
         CheckoutResponse c = order(org, "500.00");

@@ -36,7 +36,7 @@ public class PaymentCrediting {
         CREDITED,
         /** {@code payment:{paymentId}} was already posted (the same payment under another event id); nothing done. */
         ALREADY_CREDITED,
-        /** The order is already PAID by a different payment; recorded as a reconciliation issue, nothing credited. */
+        /** A bill order already PAID by a different payment; recorded as a reconciliation issue, nothing credited. */
         REFUSED
     }
 
@@ -47,13 +47,15 @@ public class PaymentCrediting {
     private final PaymentOrderRepository orders;
     private final DomainEventPublisher events;
     private final ReconciliationIssues issues;
+    private final PaymentProvider provider;
 
     @PersistenceContext
     private EntityManager entityManager;
 
     public PaymentCrediting(WalletRepository walletRepository, LedgerAccounts ledgerAccounts,
                             LedgerService ledgerService, LedgerTransactionRepository transactions,
-                            PaymentOrderRepository orders, DomainEventPublisher events, ReconciliationIssues issues) {
+                            PaymentOrderRepository orders, DomainEventPublisher events, ReconciliationIssues issues,
+                            PaymentProvider provider) {
         this.walletRepository = walletRepository;
         this.ledgerAccounts = ledgerAccounts;
         this.ledgerService = ledgerService;
@@ -61,6 +63,7 @@ public class PaymentCrediting {
         this.orders = orders;
         this.events = events;
         this.issues = issues;
+        this.provider = provider;
     }
 
     /**
@@ -85,45 +88,86 @@ public class PaymentCrediting {
             log.info("Payment {} already credited; order {} left as is", paymentId, order.getId());
             return Result.ALREADY_CREDITED;
         }
-        if (order.getStatus() == PaymentOrder.Status.PAID && !paymentId.equals(order.getProviderPaymentId())) {
-            log.error("Order {} is already paid by {}; second payment {} of {} not credited", order.getId(),
-                    order.getProviderPaymentId(), paymentId, amount.toPlainString());
-            issues.record("DUPLICATE_PAYMENT", paymentId, Map.<String, Object>of("paymentOrderId", order.getId().toString(),
-                    "paidBy", String.valueOf(order.getProviderPaymentId()), "amount", amount.toPlainString()));
-            return Result.REFUSED;
-        }
+        // A second, distinct payment on an order that is already PAID is real money: credit it as its own top-up
+        // order, so it stays refundable to its own source.
+        boolean secondPayment = order.getStatus() == PaymentOrder.Status.PAID
+                && !paymentId.equals(order.getProviderPaymentId());
+        PaymentOrder target = secondPayment ? duplicateOrder(order, paymentId, amount) : order;
 
         var walletAccount = ledgerAccounts.buyerWallet(wallet);   // before the balance changes: it seeds the opening
         Map<String, Object> reference = new LinkedHashMap<>();
-        reference.put("paymentOrderId", order.getId().toString());
-        reference.put("method", order.getMethod().name());
-        LedgerTransaction posted = ledgerService.post(LedgerTransactionType.TOPUP, key, null, order.getOrgId(),
-                reference, List.of(new Posting(clearing, amount.negate()), new Posting(walletAccount, amount)));
-        if (posted.getType() != LedgerTransactionType.TOPUP || !order.getOrgId().equals(posted.getOrgId())) {
+        reference.put("paymentOrderId", target.getId().toString());
+        reference.put("method", target.getMethod().name());
+        LedgerService.PostResult posted = ledgerService.postWithResult(LedgerTransactionType.TOPUP, key, null,
+                target.getOrgId(), reference,
+                List.of(new Posting(clearing, amount.negate()), new Posting(walletAccount, amount)));
+        LedgerTransaction transaction = posted.transaction();
+        if (transaction.getType() != LedgerTransactionType.TOPUP || !target.getOrgId().equals(transaction.getOrgId())) {
             throw new IllegalStateException("Idempotency key " + key + " belongs to another transaction");
+        }
+        if (!posted.created()) {
+            // Unreachable while the lock-held check above stands; never dual-write on a replayed post.
+            if (secondPayment) {
+                // Roll back the order row just inserted; the provider's retry then takes the ALREADY_CREDITED path.
+                throw new IllegalStateException("Payment " + paymentId + " was posted concurrently; retry");
+            }
+            log.warn("Payment {} replayed inside post; wallet and order {} left as is", paymentId, order.getId());
+            return Result.ALREADY_CREDITED;
         }
 
         wallet.setBalance(wallet.getBalance().add(amount));
         wallet.setUpdatedAt(Instant.now());
         walletRepository.save(wallet);
 
-        order.setStatus(PaymentOrder.Status.PAID);
-        order.setProviderPaymentId(paymentId);
-        order.setPaidAt(Instant.now());
-        orders.save(order);
+        if (!secondPayment) {
+            order.setStatus(PaymentOrder.Status.PAID);
+            order.setProviderPaymentId(paymentId);
+            order.setPaidAt(Instant.now());
+            orders.save(order);
+        } else {
+            log.warn("Order {} already paid by {}; second payment {} of {} credited as order {}", order.getId(),
+                    order.getProviderPaymentId(), paymentId, amount.toPlainString(), target.getId());
+        }
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("paymentOrderId", order.getId().toString());
+        payload.put("paymentOrderId", target.getId().toString());
         payload.put("paymentId", paymentId);
         payload.put("amount", amount.toPlainString());
-        payload.put("method", order.getMethod().name());
-        events.publish("payment.topup_paid", order.getOrgId(), order.getId(), payload);
+        payload.put("method", target.getMethod().name());
+        events.publish("payment.topup_paid", target.getOrgId(), target.getId(), payload);
         return Result.CREDITED;
     }
 
-    /** Bill payments arrive in Task 6; until then the webhook rolls back so the provider retries it later. */
+    /** A PAID top-up order of its own for a second payment that arrived on {@code paid}. */
+    private PaymentOrder duplicateOrder(PaymentOrder paid, String paymentId, BigDecimal amount) {
+        PaymentOrder dup = new PaymentOrder();
+        dup.setOrgId(paid.getOrgId());
+        dup.setPurpose(PaymentOrder.Purpose.TOPUP);
+        dup.setMethod(paid.getMethod());
+        dup.setAmount(amount);
+        dup.setStatus(PaymentOrder.Status.PAID);
+        dup.setProvider(provider.name());
+        dup.setProviderOrderId("dup:" + paymentId);
+        dup.setProviderPaymentId(paymentId);
+        dup.setPaidAt(Instant.now());
+        return orders.saveAndFlush(dup);
+    }
+
+    /**
+     * A second, distinct payment on a PAID bill order is recorded as {@code DUPLICATE_PAYMENT} and not credited
+     * (the money waits in PAYMENT_CLEARING for ops). Bill crediting itself arrives in Task 6, which must redo the
+     * PAID check under its own locks; until then the webhook rolls back so the provider retries it later.
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     public Result creditBill(PaymentOrder order, String paymentId, BigDecimal amount) {
+        if (order.getStatus() == PaymentOrder.Status.PAID && !paymentId.equals(order.getProviderPaymentId())) {
+            log.error("Bill order {} is already paid by {}; second payment {} of {} not credited", order.getId(),
+                    order.getProviderPaymentId(), paymentId, amount.toPlainString());
+            issues.record("DUPLICATE_PAYMENT", paymentId, Map.<String, Object>of("paymentOrderId",
+                    order.getId().toString(), "paidBy", String.valueOf(order.getProviderPaymentId()),
+                    "amount", amount.toPlainString()));
+            return Result.REFUSED;
+        }
         throw new UnsupportedOperationException("Bill payments are not credited yet (order " + order.getId() + ")");
     }
 }
