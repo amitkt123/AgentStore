@@ -1,4 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import { vi } from "vitest";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("@/app/(app)/billing/actions", () => ({}));
 import { BillingView } from "./BillingView";
 import { formatInr } from "@/lib/format";
 import type { BillingSummary, Wallet } from "@/lib/api/types";
@@ -76,4 +79,20 @@ it("links to the previous and next month", () => {
 it("wraps the year at month boundaries", () => {
   render(<BillingView wallet={prepaid} summary={{ ...empty, month: "2026-01" }} />);
   expect(screen.getByRole("link", { name: /Previous month/ })).toHaveAttribute("href", "/billing?month=2025-12");
+});
+
+const options = { provider: "fake", methods: ["UPI" as const], topUpMin: 100, topUpDailyLimit: 1000, topUpRemainingToday: 1000 };
+const none = { options: null, topUps: null, refundable: null, refunds: null, bills: null };
+
+it("shows the prepaid payment panels that loaded and hides the rest", () => {
+  render(<BillingView wallet={prepaid} summary={empty} payments={{ ...none, options, topUps: [] }} />);
+  expect(screen.getByRole("button", { name: "Add money" })).toBeInTheDocument();
+  expect(screen.getByText("No top-ups yet.")).toBeInTheDocument();
+  expect(screen.queryByText("Get money back")).not.toBeInTheDocument();
+});
+
+it("shows bills, not top-ups, for postpaid", () => {
+  render(<BillingView wallet={postpaid} summary={empty} payments={{ ...none, options, topUps: [], bills: [] }} />);
+  expect(screen.getByText("No bills yet.")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Add money" })).not.toBeInTheDocument();
 });
