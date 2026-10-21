@@ -7,3 +7,7 @@ spring:
     url: jdbc:postgresql://localhost:${DB_PORT:5433}/agentstore
     username: agentstore
     password: ${DB_PASSWORD:agentstore}
+agentstore:
+  secrets:
+    # dev-only all-zero key; real environments must set SECRET_ENCRYPTION_KEY
+    encryption-key-base64: ${SECRET_ENCRYPTION_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
