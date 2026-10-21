@@ -5,6 +5,7 @@ import com.agentstore.platform.execution.Run;
 import com.agentstore.platform.execution.RunRepository;
 import com.agentstore.platform.verification.DeveloperVerificationRepository;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class LedgerService {
     private final DeveloperVerificationRepository developerVerificationRepository;
     private final FeePolicy feePolicy;
     private final LedgerAccounts ledgerAccounts;
+    private final BillingModeService billingModeService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -45,7 +47,7 @@ public class LedgerService {
                           LedgerPostingRepository ledgerPostingRepository,
                           LedgerAccountBalanceRepository ledgerAccountBalanceRepository, RunRepository runRepository,
                           DeveloperVerificationRepository developerVerificationRepository, FeePolicy feePolicy,
-                          @Lazy LedgerAccounts ledgerAccounts) {
+                          @Lazy LedgerAccounts ledgerAccounts, BillingModeService billingModeService) {
         this.usageEventRepository = usageEventRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.walletRepository = walletRepository;
@@ -56,12 +58,14 @@ public class LedgerService {
         this.developerVerificationRepository = developerVerificationRepository;
         this.feePolicy = feePolicy;
         this.ledgerAccounts = ledgerAccounts;   // lazy: LedgerAccounts itself depends on this service
+        this.billingModeService = billingModeService;
     }
 
     /**
-     * Charges a usage event to its buyer, once: writes the {@code ledger_entry}, debits {@code wallet.balance}, and
-     * posts a RUN_CHARGE {@code usage:{usageEventId}} that moves the charge from the buyer's wallet into the
-     * developer's payable, the platform fee and any withheld taxes.
+     * Charges a usage event to its buyer, once: writes the {@code ledger_entry} and posts a RUN_CHARGE
+     * {@code usage:{usageEventId}} that moves the charge into the developer's payable, the platform fee and any
+     * withheld taxes. A prepaid buyer pays from BUYER_WALLET and {@code wallet.balance} is debited; a postpaid buyer's
+     * BUYER_RECEIVABLE goes negative by the charge (what it owes) and {@code wallet.balance} is untouched.
      */
     @Transactional
     public LedgerEntry chargeUsageEvent(UUID usageEventId) {
@@ -95,23 +99,40 @@ public class LedgerService {
             lines.add(new Posting(ledgerAccounts.platformAccount(LedgerAccountKind.TAX_TCS_PAYABLE), split.gstTcs()));
         }
 
+        boolean postpaid = billingModeService.modeFor(event.getOrgId()) == BillingMode.POSTPAID;
+        UUID receivable = null;
+        if (postpaid) {
+            receivable = ledgerAccounts.orgAccount(event.getOrgId(), LedgerAccountKind.BUYER_RECEIVABLE);
+        } else {
+            // buyerWallet may post an opening balance against EXTERNAL; have it exist before the wallet is locked.
+            ledgerAccounts.platformAccount(LedgerAccountKind.EXTERNAL);
+        }
+
         LedgerEntry entry = ledgerEntryRepository.save(new LedgerEntry(null, event.getId(), event.getRunId(),
                 event.getOrgId(), event.getAmount(), LedgerEntryType.CHARGE));
 
-        // Lock order: the wallet row first, then (inside post) the balance rows.
+        // Lock order: the wallet row first, then (inside post) the balance rows. A postpaid wallet is locked too, so
+        // the charge and reservations against the credit limit are serialised.
+        if (postpaid) {
+            walletRepository.insertEmptyIfMissing(event.getOrgId());
+        }
         Wallet wallet = walletRepository.findByOrgId(event.getOrgId())
                 .orElseThrow(() -> new IllegalStateException("No wallet for org " + event.getOrgId()));
-        // Before the wallet balance changes: first use seeds the account with the current balance.
-        lines.add(new Posting(ledgerAccounts.buyerWallet(wallet), charge.negate()));
+        // A wallet read earlier in this transaction is not refreshed by the locking query.
+        entityManager.refresh(wallet, LockModeType.PESSIMISTIC_WRITE);
+        // Prepaid: before the wallet balance changes, as first use seeds the account with the current balance.
+        lines.add(new Posting(postpaid ? receivable : ledgerAccounts.buyerWallet(wallet), charge.negate()));
         post(LedgerTransactionType.RUN_CHARGE, "usage:" + event.getId(), run.getId(), event.getOrgId(),
                 Map.of("agentId", agent.getId().toString(),
                         "agentVersionId", run.getAgentVersion().getId().toString(),
                         "feePercent", feePercent.toPlainString()),
                 lines);
 
-        wallet.setBalance(wallet.getBalance().subtract(event.getAmount()));
-        wallet.setUpdatedAt(Instant.now());
-        walletRepository.save(wallet);
+        if (!postpaid) {
+            wallet.setBalance(wallet.getBalance().subtract(event.getAmount()));
+            wallet.setUpdatedAt(Instant.now());
+            walletRepository.save(wallet);
+        }
 
         event.setProcessed(true);
         usageEventRepository.save(event);

@@ -66,6 +66,9 @@ public class LedgerAccounts {
      * <p>
      * Call it before changing {@code lockedWallet}'s balance in the same transaction: the wallet's current balance
      * is taken as the opening amount, so a balance already adjusted for this transaction's charge would be wrong.
+     * <p>
+     * Resolve {@code platformAccount(EXTERNAL)} before locking the wallet. Here it is then only looked up; were it
+     * still missing, creating it would need a second connection while this one holds the wallet lock.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public UUID buyerWallet(Wallet lockedWallet) {
