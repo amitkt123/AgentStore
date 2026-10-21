@@ -3,10 +3,7 @@ package com.agentstore.platform.publishing;
 import com.agentstore.platform.AbstractIntegrationTest;
 import com.agentstore.platform.catalog.*;
 import com.agentstore.platform.identity.*;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -18,12 +15,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Method order is pinned because AbstractIntegrationTest does not reset DB state between
-// test methods, and detailIncludesManifestAndNotes() intentionally leaves its review item
-// PENDING (it never approves/rejects it) so it can assert on the item's PENDING status.
-// queueIncludesAgentNameAndVersionNumber() asserts an exact queue size of 1, which only
-// holds if it runs before detailIncludesManifestAndNotes() adds its own PENDING item.
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+// AbstractIntegrationTest does not reset DB state, so other test classes (and
+// detailIncludesManifestAndNotes(), which leaves its item PENDING) can leave items in the
+// queue. Assert on this test's own item rather than the queue size.
 class ReviewItemDetailControllerTest extends AbstractIntegrationTest {
 
     @LocalServerPort
@@ -54,7 +48,6 @@ class ReviewItemDetailControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @Order(1)
     void queueIncludesAgentNameAndVersionNumber() throws Exception {
         Org developer = orgRepository.save(new Org(null, "DevCo", OrgType.DEVELOPER));
         Agent agent = agentRepository.save(new Agent(null, developer, "Collections", "collections", "d"));
@@ -66,13 +59,14 @@ class ReviewItemDetailControllerTest extends AbstractIntegrationTest {
         var response = rest.exchange(url("/api/v1/review/queue"), HttpMethod.GET, new HttpEntity<>(adminHeaders()),
                 new ParameterizedTypeReference<List<ReviewItemResponse>>() {});
 
-        assertThat(response.getBody()).hasSize(1);
-        assertThat(response.getBody().get(0).agentName()).isEqualTo("Collections");
-        assertThat(response.getBody().get(0).versionNumber()).isEqualTo("1.0.0");
+        ReviewItemResponse item = response.getBody().stream()
+                .filter(r -> r.agentVersionId().equals(version.getId()))
+                .findFirst().orElseThrow();
+        assertThat(item.agentName()).isEqualTo("Collections");
+        assertThat(item.versionNumber()).isEqualTo("1.0.0");
     }
 
     @Test
-    @Order(2)
     void detailIncludesManifestAndNotes() throws Exception {
         Org developer = orgRepository.save(new Org(null, "DevCo2", OrgType.DEVELOPER));
         Agent agent = agentRepository.save(new Agent(null, developer, "Collections2", "collections", "d"));
