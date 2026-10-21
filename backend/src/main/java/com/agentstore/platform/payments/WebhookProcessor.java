@@ -36,9 +36,11 @@ public class WebhookProcessor {
     private final PaymentCrediting crediting;
     private final ReconciliationIssues issues;
     private final JdbcTemplate jdbc;
+    private final VirtualAccountRepository virtualAccounts;
 
     public WebhookProcessor(PaymentProvider provider, PaymentOrderRepository orders, PaymentCrediting crediting,
-                            ReconciliationIssues issues, JdbcTemplate jdbc) {
+                            ReconciliationIssues issues, JdbcTemplate jdbc, VirtualAccountRepository virtualAccounts) {
+        this.virtualAccounts = virtualAccounts;
         this.provider = provider;
         this.orders = orders;
         this.crediting = crediting;
@@ -80,7 +82,8 @@ public class WebhookProcessor {
             case PAYMENT_CAPTURED -> captured(event);
             case PAYMENT_FAILED -> failed(event);
             case ORDER_PAID -> Outcome.PROCESSED;   // stored only: the capture event carries the money
-            // VIRTUAL_ACCOUNT_CREDITED and REFUND_* are handled in later tasks; OTHER is stored only.
+            case VIRTUAL_ACCOUNT_CREDITED -> virtualAccountCredited(event);
+            // REFUND_* are handled in later tasks; OTHER is stored only.
             default -> Outcome.IGNORED;
         };
 
@@ -117,6 +120,33 @@ public class WebhookProcessor {
             case TOPUP -> crediting.creditTopUp(order, event.paymentId(), order.getAmount());
             case BILL -> crediting.creditBill(order, event.paymentId(), order.getAmount());
         };
+        return result == PaymentCrediting.Result.REFUSED ? Outcome.IGNORED : Outcome.PROCESSED;
+    }
+
+    private Outcome virtualAccountCredited(PaymentWebhookEvent event) {
+        Optional<VirtualAccount> va = event.virtualAccountId() == null ? Optional.empty()
+                : virtualAccounts.findByProviderAndProviderVaId(provider.name(), event.virtualAccountId());
+        if (va.isEmpty()) {
+            log.warn("Credit {} for unknown virtual account {}; stored, not credited", event.paymentId(),
+                    event.virtualAccountId());
+            return Outcome.IGNORED;
+        }
+        String paymentId = event.paymentId();
+        BigDecimal amount = event.amount();
+        if (paymentId == null || paymentId.isBlank() || amount == null || amount.signum() <= 0) {
+            log.error("Virtual account credit event {} has no payment id or a non-positive amount; not credited",
+                    event.eventId());
+            return Outcome.IGNORED;
+        }
+        amount = amount.setScale(2, java.math.RoundingMode.UNNECESSARY);
+        String providerOrderId = "va:" + paymentId;
+        // The unique provider_order_id makes a concurrent delivery of the same transfer reuse one order.
+        jdbc.update("insert into payment_order (id, org_id, purpose, method, amount, status, provider, "
+                        + "provider_order_id, refunded_amount, created_at) values (gen_random_uuid(), ?, 'TOPUP', "
+                        + "'BANK_TRANSFER', ?, 'CREATED', ?, ?, 0, now()) on conflict (provider_order_id) do nothing",
+                va.get().getOrgId(), amount, provider.name(), providerOrderId);
+        PaymentOrder order = orders.findByProviderAndProviderOrderId(provider.name(), providerOrderId).orElseThrow();
+        PaymentCrediting.Result result = crediting.creditTopUp(order, paymentId, order.getAmount());
         return result == PaymentCrediting.Result.REFUSED ? Outcome.IGNORED : Outcome.PROCESSED;
     }
 

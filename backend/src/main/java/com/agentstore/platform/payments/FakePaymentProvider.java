@@ -85,6 +85,7 @@ public class FakePaymentProvider implements PaymentProvider {
         private Instant at;
     }
 
+    private final java.util.concurrent.atomic.AtomicInteger virtualAccountCalls = new java.util.concurrent.atomic.AtomicInteger();
     private final String webhookSecret;
     private final List<FakeOrder> orders = new CopyOnWriteArrayList<>();
     private final List<FakePayment> payments = new CopyOnWriteArrayList<>();
@@ -125,6 +126,7 @@ public class FakePaymentProvider implements PaymentProvider {
 
     @Override
     public ProviderVirtualAccount createVirtualAccount(UUID orgId, String orgName) {
+        virtualAccountCalls.incrementAndGet();
         return virtualAccounts.computeIfAbsent(orgId, id -> {
             String suffix = id.toString().replace("-", "");
             FakeVirtualAccount v = new FakeVirtualAccount();
@@ -246,7 +248,11 @@ public class FakePaymentProvider implements PaymentProvider {
         refunds.clear();
         settlements.clear();
         virtualAccounts.clear();
+        virtualAccountCalls.set(0);
     }
+
+    /** How many times {@link #createVirtualAccount} was called since the last reset. */
+    public int virtualAccountCalls() { return virtualAccountCalls.get(); }
 
     public List<FakeOrder> orders() { return List.copyOf(orders); }
     public List<FakePayment> payments() { return List.copyOf(payments); }

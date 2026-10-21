@@ -59,6 +59,10 @@ public class TopUpService {
         }
     }
 
+    public boolean bankTransferEnabled() {
+        return props.methods().contains(PaymentMethod.BANK_TRANSFER);
+    }
+
     public CheckoutResponse createTopUp(UUID orgId, UUID userId, BigDecimal amount, PaymentMethod method) {
         if (method == PaymentMethod.BANK_TRANSFER) {
             throw new PaymentApiException(HttpStatus.UNPROCESSABLE_ENTITY, "PAYMENT_METHOD_DISABLED",
