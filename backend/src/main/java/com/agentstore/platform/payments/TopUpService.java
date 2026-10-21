@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -126,6 +127,13 @@ public class TopUpService {
             return orders.save(o);
         });
         return new CheckoutResponse(PaymentOrderView.of(updated), provider.name(), po.orderId(), po.checkout());
+    }
+
+    /** Orders left CREATED for over 24 hours become EXPIRED; a capture arriving later still credits them. */
+    public int expireStaleOrders() {
+        Integer expired = tx.execute(s -> orders.expireCreatedBefore(Instant.now().minus(Duration.ofHours(24))));
+        if (expired != null && expired > 0) log.info("Expired {} unpaid payment orders", expired);
+        return expired == null ? 0 : expired;
     }
 
     private void validateAmount(BigDecimal amount) {

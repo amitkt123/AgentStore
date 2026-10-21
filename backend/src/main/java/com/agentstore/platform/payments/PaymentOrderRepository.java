@@ -31,6 +31,12 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     @Query(value = "update payment_order set status = 'FAILED' where id = :id and status = 'CREATED'", nativeQuery = true)
     int markFailedIfCreated(UUID id);
 
+    /** CREATED orders made before {@code before} become EXPIRED; returns the rows changed. */
+    @Modifying
+    @Query(value = "update payment_order set status = 'EXPIRED' where status = 'CREATED' and created_at < :before",
+            nativeQuery = true)
+    int expireCreatedBefore(Instant before);
+
     /**
      * The org's PAID top-ups paid at or after {@code since} that still have money left to refund, newest
      * {@code paid_at} first: the order refunds are split across.
