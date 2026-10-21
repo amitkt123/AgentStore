@@ -96,3 +96,16 @@ it("shows bills, not top-ups, for postpaid", () => {
   expect(screen.getByText("No bills yet.")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Add money" })).not.toBeInTheDocument();
 });
+
+it("offers money back on postpaid when something is refundable", () => {
+  const refundable = { refundable: 300, parts: [{ paymentOrderId: "p1", method: "UPI" as const, paidAt: "2026-09-03T10:00:00Z", amount: 300 }] };
+  render(<BillingView wallet={postpaid} summary={empty} payments={{ ...none, bills: [], refundable, refunds: [] }} />);
+  expect(screen.getByRole("heading", { name: "Get money back" })).toBeInTheDocument();
+  expect(screen.getByText("You can get back ₹300")).toBeInTheDocument();
+});
+
+it("hides money back on postpaid when nothing is refundable", () => {
+  render(<BillingView wallet={postpaid} summary={empty}
+    payments={{ ...none, bills: [], refundable: { refundable: 0, parts: [] }, refunds: [] }} />);
+  expect(screen.queryByRole("heading", { name: "Get money back" })).not.toBeInTheDocument();
+});

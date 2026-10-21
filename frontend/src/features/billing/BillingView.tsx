@@ -42,8 +42,11 @@ export function BillingView({ wallet, summary, payments }: { wallet: Wallet; sum
         <>
           {payments.options && <AddMoney options={payments.options} balance={wallet.balance} />}
           {payments.topUps && <TopUpHistory topUps={payments.topUps} />}
-          {payments.refundable && <GetMoneyBack refundable={payments.refundable} refunds={payments.refunds ?? []} />}
         </>
+      )}
+      {/* Prepaid always shows the panel (its zero state explains why); postpaid only when it holds refundable top-ups. */}
+      {payments?.refundable && (wallet.mode === "PREPAID" || payments.refundable.refundable > 0) && (
+        <GetMoneyBack refundable={payments.refundable} refunds={payments.refunds ?? []} />
       )}
       {payments?.bills && wallet.mode === "POSTPAID" && (
         <Bills bills={payments.bills} owed={wallet.owed} methods={payments.options?.methods} />

@@ -41,9 +41,10 @@ export async function previewRefund(amount: number): Promise<{ refundable: Refun
   } catch (e) { return fail(e); }
 }
 
-export async function requestRefund(amount: number): Promise<{ refund: Refund } | { error: string }> {
+// requestId comes from the form, one per intended refund, so a retry after a lost answer is not a second refund.
+export async function requestRefund(amount: number, requestId: string): Promise<{ refund: Refund } | { error: string }> {
   try {
-    const refund = await createRefund(await orgId(), { requestId: crypto.randomUUID(), amount });
+    const refund = await createRefund(await orgId(), { requestId, amount });
     revalidatePath("/billing");
     return { refund };
   } catch (e) { return fail(e); }
