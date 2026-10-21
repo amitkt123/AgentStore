@@ -29,3 +29,16 @@ it("lets a developer, and only a developer, into the agents screens", () => {
   expect(gateTarget("BUYER_ADMIN", "/developer/agents/a1/versions/v1")).toBe("/home");
   expect(gateTarget("BUYER_APPROVER", "/developer/agents")).toBe("/home");
 });
+
+it.each(["BUYER_ADMIN", "BUYER_APPROVER"] as const)("keeps %s out of /admin", (role) => {
+  expect(gateTarget(role, "/admin/money")).toBe("/home");
+});
+
+it("sends a developer away from /admin to their own area", () => {
+  expect(gateTarget("DEVELOPER", "/admin/money")).toBe("/developer/verification");
+});
+
+it("lets ADMIN into /admin, and only matches whole segments", () => {
+  expect(gateTarget("ADMIN", "/admin/money")).toBeNull();
+  expect(gateTarget("BUYER_ADMIN", "/administrators")).toBeNull();
+});

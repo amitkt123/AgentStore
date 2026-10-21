@@ -24,12 +24,16 @@ export function developerRailItems(): RailItem[] {
   ];
 }
 
-// Sandbox runs and Test files join developerRailItems in P3c; the admin rail arrives in P4.
+export function adminRailItems(): RailItem[] {
+  return [{ href: "/admin/money", label: "Money", icon: "wallet" }];
+}
+
+// Sandbox runs and Test files join developerRailItems in P3c.
 export function railItemsFor(role: UserRole, needsYou: number): RailItem[] {
   switch (railFor(role)) {
     case "developer": return developerRailItems();
     case "buyer": return buyerRailItems(needsYou);
-    default: return [{ href: "/home", label: "Workspace", icon: "home" }];
+    case "admin": return adminRailItems();
   }
 }
 

@@ -17,7 +17,6 @@ it("gives developers verification and API keys and leaves the buyer rail alone",
   expect(railItemsFor("DEVELOPER", 3)).toEqual(developerRailItems());
   expect(railItemsFor("BUYER_ADMIN", 3)).toEqual(buyerRailItems(3));
   expect(railItemsFor("BUYER_APPROVER", 0)).toEqual(buyerRailItems(0));
-  expect(railItemsFor("ADMIN", 0).map((i) => i.href)).toEqual(["/home"]);
 });
 
 it("keeps Agents active inside a Studio route", () => {
@@ -27,4 +26,10 @@ it("keeps Agents active inside a Studio route", () => {
 
 it("gives buyers a Billing item after Files", () => {
   expect(buyerRailItems(0).map((i) => i.href)).toEqual(["/home", "/store", "/runs", "/files", "/billing"]);
+});
+
+it("gives ADMIN a Money rail", async () => {
+  const { adminRailItems } = await import("./Rail");
+  expect(adminRailItems()).toEqual([{ href: "/admin/money", label: "Money", icon: "wallet" }]);
+  expect(railItemsFor("ADMIN", 0)).toEqual(adminRailItems());
 });

@@ -1,0 +1,15 @@
+.wrap { display: flex; flex-direction: column; gap: 24px; }
+.warn { margin: 0; padding: 12px 16px; border-radius: 12px; color: var(--wa); background: var(--waS); font-weight: 600; }
+.section { display: flex; flex-direction: column; gap: 12px; }
+.section h2 { margin: 0; font-size: 16px; }
+.lookup, .form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.lookup > div, .form > div { flex: 1 1 200px; max-width: 320px; }
+.select { display: flex; flex-direction: column; gap: 6px; flex: 1 1 200px; max-width: 320px; }
+.select label { font-size: 13px; color: var(--ink3); }
+.select select { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--l); background: var(--s); color: var(--ink); font: inherit; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 0; }
+.fact { padding: 14px 16px; border-radius: 16px; background: var(--s); border: 1px solid var(--l); display: flex; flex-direction: column; gap: 4px; }
+.fact dt { color: var(--ink3); font-size: 13px; }
+.fact dd { margin: 0; font-weight: 600; color: var(--ink); }
+.err { color: var(--bad); margin: 0; }
+.ok { color: var(--ok); margin: 0; }
