@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -91,6 +93,31 @@ class LedgerServicePostTest extends AbstractIntegrationTest {
         for (String amount : List.of("1.25", "2.50", "-0.75")) {
             BigDecimal v = new BigDecimal(amount);
             post("test:" + UUID.randomUUID(), List.of(new Posting(a[0], v), new Posting(a[1], v.negate())));
+        }
+        assertThat(ledgerService.balanceOf(a[0])).isEqualByComparingTo("3.00");
+        assertThat(ledgerService.balanceOf(a[0])).isEqualByComparingTo(postings.sumByAccountId(a[0]));
+        assertThat(ledgerService.balanceOf(a[1])).isEqualByComparingTo(postings.sumByAccountId(a[1]));
+    }
+
+    @Test
+    void postUsesTheLockedBalanceNotOneReadEarlierInTheTransaction() {
+        UUID[] a = freshAccounts();
+        ExecutorService other = Executors.newSingleThreadExecutor();
+        try {
+            tx.executeWithoutResult(s -> {
+                // Loads a[0]'s balance (0.00) into this transaction's persistence context.
+                assertThat(ledgerService.balanceOf(a[0])).isEqualByComparingTo("0");
+                try {
+                    other.submit(() -> post("test:" + UUID.randomUUID(), List.of(
+                            new Posting(a[0], new BigDecimal("1.00")), new Posting(a[1], new BigDecimal("-1.00"))))).get();
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+                ledgerService.post(LedgerTransactionType.ADJUSTMENT, "test:" + UUID.randomUUID(), null, null, null,
+                        List.of(new Posting(a[0], new BigDecimal("2.00")), new Posting(a[1], new BigDecimal("-2.00"))));
+            });
+        } finally {
+            other.shutdownNow();
         }
         assertThat(ledgerService.balanceOf(a[0])).isEqualByComparingTo("3.00");
         assertThat(ledgerService.balanceOf(a[0])).isEqualByComparingTo(postings.sumByAccountId(a[0]));

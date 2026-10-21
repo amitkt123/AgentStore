@@ -1,5 +1,7 @@
 package com.agentstore.platform.ledger;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,9 @@ public class LedgerService {
     private final LedgerTransactionRepository ledgerTransactionRepository;
     private final LedgerPostingRepository ledgerPostingRepository;
     private final LedgerAccountBalanceRepository ledgerAccountBalanceRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public LedgerService(UsageEventRepository usageEventRepository, LedgerEntryRepository ledgerEntryRepository,
                           WalletRepository walletRepository, LedgerTransactionRepository ledgerTransactionRepository,
@@ -87,10 +92,14 @@ public class LedgerService {
         transaction = ledgerTransactionRepository.saveAndFlush(transaction);
 
         // Lock order: ascending account_id (byAccount iterates in Postgres uuid order).
+        // A balance already managed in this persistence context (e.g. read by balanceOf earlier) is returned as-is
+        // by the locking query, so refresh it under the lock. Pending balance changes were flushed by saveAndFlush.
         Map<UUID, LedgerAccountBalance> locked = new LinkedHashMap<>();
         for (UUID accountId : byAccount.keySet()) {
-            locked.put(accountId, ledgerAccountBalanceRepository.findForUpdate(accountId)
-                    .orElseThrow(() -> new IllegalArgumentException("Unknown ledger account: " + accountId)));
+            LedgerAccountBalance balance = ledgerAccountBalanceRepository.findForUpdate(accountId)
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown ledger account: " + accountId));
+            entityManager.refresh(balance);
+            locked.put(accountId, balance);
         }
 
         for (Posting posting : postings) {

@@ -63,6 +63,9 @@ public class LedgerAccounts {
      * already holds money, seeded with an ADJUSTMENT {@code opening:{orgId}} (BUYER_WALLET +balance, EXTERNAL
      * -balance), so the account and its opening balance commit or roll back together. The caller's lock on the
      * wallet row serialises creation per org, so no concurrent insert can race this one.
+     * <p>
+     * Call it before changing {@code lockedWallet}'s balance in the same transaction: the wallet's current balance
+     * is taken as the opening amount, so a balance already adjusted for this transaction's charge would be wrong.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public UUID buyerWallet(Wallet lockedWallet) {
