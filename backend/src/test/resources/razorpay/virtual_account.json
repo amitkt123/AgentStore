@@ -1,0 +1,27 @@
+{
+  "id": "va_DlGmm7jInLudH9",
+  "name": "Acme Robotics",
+  "entity": "virtual_account",
+  "status": "active",
+  "description": "Karya wallet top-ups for Acme Robotics",
+  "amount_expected": null,
+  "notes": {
+    "org_id": "11111111-2222-3333-4444-555555555555"
+  },
+  "amount_paid": 0,
+  "customer_id": null,
+  "receivers": [
+    {
+      "id": "ba_DlGmm9mSj8fjRM",
+      "entity": "bank_account",
+      "ifsc": "RATN0VAAPIS",
+      "bank_name": "RBL Bank",
+      "name": "Acme Robotics",
+      "notes": [],
+      "account_number": "2223330099089860"
+    }
+  ],
+  "close_by": null,
+  "closed_at": null,
+  "created_at": 1761091200
+}

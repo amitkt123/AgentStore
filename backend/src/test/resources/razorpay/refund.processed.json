@@ -1,0 +1,41 @@
+{
+  "entity": "event",
+  "account_id": "acc_BFQ7uQEaa7j2z7",
+  "event": "refund.processed",
+  "contains": ["refund", "payment"],
+  "payload": {
+    "refund": {
+      "entity": {
+        "id": "rfnd_FP8QHiV938haTz",
+        "entity": "refund",
+        "amount": 12550,
+        "currency": "INR",
+        "payment_id": "pay_DESlfW9H8K9uqM",
+        "notes": [],
+        "receipt": "9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+        "acquirer_data": { "rrn": "123456789012" },
+        "created_at": 1597078866,
+        "batch_id": null,
+        "status": "processed",
+        "speed_processed": "normal",
+        "speed_requested": "normal"
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_DESlfW9H8K9uqM",
+        "entity": "payment",
+        "amount": 50050,
+        "currency": "INR",
+        "status": "captured",
+        "order_id": "order_DESlLckIVRkHWj",
+        "method": "upi",
+        "amount_refunded": 12550,
+        "refund_status": "partial",
+        "captured": true,
+        "created_at": 1567674599
+      }
+    }
+  },
+  "created_at": 1597078914
+}

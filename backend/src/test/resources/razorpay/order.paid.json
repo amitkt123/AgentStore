@@ -1,0 +1,41 @@
+{
+  "entity": "event",
+  "account_id": "acc_BFQ7uQEaa7j2z7",
+  "event": "order.paid",
+  "contains": ["payment", "order"],
+  "payload": {
+    "payment": {
+      "entity": {
+        "id": "pay_DESlfW9H8K9uqM",
+        "entity": "payment",
+        "amount": 50050,
+        "currency": "INR",
+        "status": "captured",
+        "order_id": "order_DESlLckIVRkHWj",
+        "method": "netbanking",
+        "captured": true,
+        "bank": "HDFC",
+        "error_code": null,
+        "error_description": null,
+        "created_at": 1567674599
+      }
+    },
+    "order": {
+      "entity": {
+        "id": "order_DESlLckIVRkHWj",
+        "entity": "order",
+        "amount": 50050,
+        "amount_paid": 50050,
+        "amount_due": 0,
+        "currency": "INR",
+        "receipt": "3f1c2b9e-6d1a-4b7e-9a51-2f6c1d0e8a77",
+        "offer_id": null,
+        "status": "paid",
+        "attempts": 1,
+        "notes": [],
+        "created_at": 1567674581
+      }
+    }
+  },
+  "created_at": 1567674606
+}

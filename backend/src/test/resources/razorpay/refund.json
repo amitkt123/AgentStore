@@ -1,0 +1,17 @@
+{
+  "id": "rfnd_FP8QHiV938haTz",
+  "entity": "refund",
+  "amount": 12550,
+  "receipt": "9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+  "currency": "INR",
+  "payment_id": "pay_29QQoUBi66xm2f",
+  "notes": [],
+  "acquirer_data": {
+    "arn": null
+  },
+  "created_at": 1761091200,
+  "batch_id": null,
+  "status": "pending",
+  "speed_processed": "normal",
+  "speed_requested": "normal"
+}

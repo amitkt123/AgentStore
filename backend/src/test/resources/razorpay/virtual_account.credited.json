@@ -1,0 +1,85 @@
+{
+  "entity": "event",
+  "account_id": "acc_BFQ7uQEaa7j2z7",
+  "event": "virtual_account.credited",
+  "contains": ["payment", "virtual_account", "bank_transfer"],
+  "payload": {
+    "payment": {
+      "entity": {
+        "id": "pay_DlGmmE0kqRSuy6",
+        "entity": "payment",
+        "amount": 2500000,
+        "currency": "INR",
+        "status": "captured",
+        "order_id": null,
+        "invoice_id": null,
+        "international": false,
+        "method": "bank_transfer",
+        "amount_refunded": 0,
+        "refund_status": null,
+        "captured": true,
+        "description": null,
+        "card_id": null,
+        "bank": null,
+        "wallet": null,
+        "vpa": null,
+        "email": null,
+        "contact": null,
+        "notes": [],
+        "fee": 0,
+        "tax": 0,
+        "error_code": null,
+        "error_description": null,
+        "created_at": 1572000000
+      }
+    },
+    "virtual_account": {
+      "entity": {
+        "id": "va_DlGmm7jInLudH9",
+        "name": "Acme Robotics",
+        "entity": "virtual_account",
+        "status": "active",
+        "description": "Karya wallet top-ups for Acme Robotics",
+        "amount_expected": null,
+        "notes": [],
+        "amount_paid": 2500000,
+        "customer_id": null,
+        "receivers": [
+          {
+            "id": "ba_DlGmm9mSj8fjRM",
+            "entity": "bank_account",
+            "ifsc": "RATN0VAAPIS",
+            "bank_name": "RBL Bank",
+            "name": "Acme Robotics",
+            "notes": [],
+            "account_number": "2223330099089860"
+          }
+        ],
+        "close_by": null,
+        "closed_at": null,
+        "created_at": 1571999000
+      }
+    },
+    "bank_transfer": {
+      "entity": {
+        "id": "bt_DlGmmEOaXwYJuF",
+        "entity": "bank_transfer",
+        "payment_id": "pay_DlGmmE0kqRSuy6",
+        "mode": "NEFT",
+        "bank_reference": "157414364471",
+        "amount": 2500000,
+        "payer_bank_account": {
+          "id": "ba_DlGmmF7Qs8DvGN",
+          "entity": "bank_account",
+          "ifsc": "UTIB0003098",
+          "bank_name": "Axis Bank",
+          "name": "Acme Robotics Pvt Ltd",
+          "notes": [],
+          "account_number": "765432123456789"
+        },
+        "virtual_account_id": "va_DlGmm7jInLudH9"
+      }
+    }
+  },
+  "created_at": 1572000010
+}

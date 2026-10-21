@@ -31,6 +31,16 @@ class PaymentProviderConfigTest {
     }
 
     @Test
+    void razorpayProviderBeanWhenEverySecretIsSet() {
+        runner.withPropertyValues("agentstore.money.payments.provider=razorpay",
+                        "agentstore.money.payments.razorpay.key-id=rzp_test_abc",
+                        "agentstore.money.payments.razorpay.key-secret=sec",
+                        "agentstore.money.payments.razorpay.webhook-secret=whsec",
+                        "agentstore.money.payments.razorpay.base-url=https://api.razorpay.com")
+                .run(ctx -> assertThat(ctx.getBean(PaymentProvider.class)).isInstanceOf(RazorpayPaymentProvider.class));
+    }
+
+    @Test
     void razorpayWithBlankSecretFailsNamingTheVariable() {
         runner.withPropertyValues("agentstore.money.payments.provider=razorpay",
                         "agentstore.money.payments.razorpay.key-id=rzp_test_abc",

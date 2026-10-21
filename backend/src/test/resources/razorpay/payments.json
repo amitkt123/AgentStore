@@ -1,0 +1,58 @@
+{
+  "entity": "collection",
+  "count": 3,
+  "items": [
+    {
+      "id": "pay_G8VQzjPLoAvm6D",
+      "entity": "payment",
+      "amount": 50050,
+      "currency": "INR",
+      "status": "captured",
+      "order_id": "order_IluGWxBm9U8zJ8",
+      "invoice_id": null,
+      "international": false,
+      "method": "upi",
+      "amount_refunded": 0,
+      "refund_status": null,
+      "captured": true,
+      "description": null,
+      "card_id": null,
+      "bank": null,
+      "wallet": null,
+      "vpa": "buyer@okhdfc",
+      "email": "buyer@example.com",
+      "contact": "+919000090000",
+      "notes": [],
+      "fee": 1181,
+      "tax": 180,
+      "error_code": null,
+      "error_description": null,
+      "created_at": 1761091300
+    },
+    {
+      "id": "pay_G8VaL2Z68LRtDs",
+      "entity": "payment",
+      "amount": 20000,
+      "currency": "INR",
+      "status": "failed",
+      "order_id": "order_G8VXOp0qX2cmfS",
+      "method": "card",
+      "captured": false,
+      "error_code": "BAD_REQUEST_ERROR",
+      "error_description": "Payment failed",
+      "created_at": 1761091400
+    },
+    {
+      "id": "pay_DlGmmE0kqRSuy6",
+      "entity": "payment",
+      "amount": 2500000,
+      "currency": "INR",
+      "status": "captured",
+      "order_id": null,
+      "virtual_account_id": "va_DlGmm7jInLudH9",
+      "method": "bank_transfer",
+      "captured": true,
+      "created_at": 1761091500
+    }
+  ]
+}
