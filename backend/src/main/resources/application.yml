@@ -41,6 +41,21 @@ agentstore:
     gst-tcs:
       enabled: false
       rate: 0.01
+    payments:
+      provider: razorpay
+      methods: UPI,CARD,NETBANKING,BANK_TRANSFER
+      topup-min: 100.00
+      topup-daily-limit: 100000.00
+      refund-window-days: 180
+      bill-due-days: 15
+      webhook-rate-per-minute: 120
+      razorpay:
+        key-id: ${RAZORPAY_KEY_ID:}
+        key-secret: ${RAZORPAY_KEY_SECRET:}
+        webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+        base-url: https://api.razorpay.com
+      fake:
+        webhook-secret: fake-webhook-secret
   data:
     retention-interval: PT1H
   jwt:

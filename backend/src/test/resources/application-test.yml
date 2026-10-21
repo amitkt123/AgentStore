@@ -1,4 +1,7 @@
 agentstore:
+  money:
+    payments:
+      provider: fake
   jwt:
     secret: test-only-secret-not-for-prod-0123456789abcdef
   identity:
