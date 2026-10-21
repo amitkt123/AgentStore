@@ -5,6 +5,7 @@ import com.agentstore.platform.execution.*;
 import com.agentstore.platform.identity.JwtService;
 import com.agentstore.platform.identity.UserRole;
 import com.agentstore.platform.runtime.InMemoryBackends.InMemoryResourceBackend;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -42,6 +43,11 @@ class RuntimeEndToEndTest extends AbstractIntegrationTest {
     RunStepRepository stepRepository;
     @Autowired
     FakeSandboxProvider sandbox;
+
+    @BeforeEach
+    void reset() {
+        resources.written.clear();   // the backend bean is shared across tests in the cached context
+    }
 
     private String url(String path) {
         return "http://localhost:" + port + path;
