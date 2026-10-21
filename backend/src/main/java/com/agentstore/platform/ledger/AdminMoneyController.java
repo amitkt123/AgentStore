@@ -49,7 +49,7 @@ public class AdminMoneyController {
     private final LedgerAccountRepository accountRepository;
     private final LedgerAccountBalanceRepository balanceRepository;
     private final LedgerTransactionRepository transactionRepository;
-    private final WalletController walletController;
+    private final WalletView walletView;
     private final TransactionTemplate tx;
 
     @PersistenceContext
@@ -61,7 +61,7 @@ public class AdminMoneyController {
                                 LedgerAccountRepository accountRepository,
                                 LedgerAccountBalanceRepository balanceRepository,
                                 LedgerTransactionRepository transactionRepository,
-                                WalletController walletController, PlatformTransactionManager transactionManager) {
+                                WalletView walletView, PlatformTransactionManager transactionManager) {
         this.orgRepository = orgRepository;
         this.walletRepository = walletRepository;
         this.billingModeService = billingModeService;
@@ -71,7 +71,7 @@ public class AdminMoneyController {
         this.accountRepository = accountRepository;
         this.balanceRepository = balanceRepository;
         this.transactionRepository = transactionRepository;
-        this.walletController = walletController;
+        this.walletView = walletView;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
@@ -146,7 +146,7 @@ public class AdminMoneyController {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "requestId was already used for another request");
             }
         }
-        return walletController.responseFor(orgId);
+        return walletView.of(orgId);
     }
 
     private void applyAdjustment(UUID orgId, UUID external, AdjustmentRequest request, UUID adminUserId) {

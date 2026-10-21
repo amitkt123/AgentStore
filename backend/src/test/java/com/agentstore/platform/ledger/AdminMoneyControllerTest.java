@@ -182,13 +182,13 @@ class AdminMoneyControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void ledgerChecksReportAWalletWithoutItsLedgerAccount() {
+    void ledgerChecksSkipAWalletFundedBeforeItsLedgerAccount() {
         Org org = buyer();
         walletRepository.insertEmptyIfMissing(org.getId());
-        assertThat(balances.walletsNotMatchingLedger()).doesNotContain(org.getId());   // empty wallet, no account
+        // A pre-WS10a wallet: funded, no BUYER_WALLET yet. Its balance becomes the opening balance on first use.
         jdbc.update("update wallet set balance = 5 where org_id = ?", org.getId());
         try {
-            assertThat(balances.walletsNotMatchingLedger()).contains(org.getId());
+            assertThat(balances.walletsNotMatchingLedger()).doesNotContain(org.getId());
         } finally {
             jdbc.update("update wallet set balance = 0 where org_id = ?", org.getId());
         }

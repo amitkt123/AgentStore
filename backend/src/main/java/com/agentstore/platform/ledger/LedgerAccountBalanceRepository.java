@@ -29,12 +29,12 @@ public interface LedgerAccountBalanceRepository extends JpaRepository<LedgerAcco
     java.util.List<UUID> accountsNotMatchingPostings();
 
     /**
-     * Orgs whose {@code wallet.balance} differs from their BUYER_WALLET balance. An org without a BUYER_WALLET
-     * account counts as 0, so it matches only while its wallet is empty.
+     * Orgs whose {@code wallet.balance} differs from their BUYER_WALLET balance. A wallet without a BUYER_WALLET
+     * account (funded before WS10a) is skipped: its balance becomes the account's opening balance on first use.
      */
     @Query(value = "select w.org_id from wallet w "
-            + "left join ledger_account a on a.org_id = w.org_id and a.kind = 'BUYER_WALLET' "
-            + "left join ledger_account_balance b on b.account_id = a.id "
-            + "where w.balance <> coalesce(b.balance, 0)", nativeQuery = true)
+            + "join ledger_account a on a.org_id = w.org_id and a.kind = 'BUYER_WALLET' "
+            + "join ledger_account_balance b on b.account_id = a.id "
+            + "where w.balance <> b.balance", nativeQuery = true)
     java.util.List<UUID> walletsNotMatchingLedger();
 }

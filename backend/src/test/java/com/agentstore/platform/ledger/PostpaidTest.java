@@ -140,7 +140,9 @@ class PostpaidTest extends AbstractIntegrationTest {
         Wallet wallet = wallet(orgId);
         assertThat(wallet.getBalance()).isEqualByComparingTo("0");
         assertThat(wallet.getReserved()).isEqualByComparingTo("200.00");
-        assertThat(accounts.findByOrgIdAndKind(orgId, LedgerAccountKind.BUYER_RECEIVABLE)).isEmpty();
+        // Pre-created with the org (V46); a reservation posts nothing to it.
+        UUID receivable = accounts.findByOrgIdAndKind(orgId, LedgerAccountKind.BUYER_RECEIVABLE).orElseThrow().getId();
+        assertThat(ledgerService.balanceOf(receivable)).isEqualByComparingTo("0");
 
         walletReservationService.release(orgId, new BigDecimal("200.00"));
         assertThat(wallet(orgId).getReserved()).isEqualByComparingTo("0");

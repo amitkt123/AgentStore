@@ -69,6 +69,30 @@ class LedgerSchemaTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void postedTransactionsAndPostingsCannotBeUpdatedOrDeleted() {
+        UUID[] ids = new UUID[1];
+        tx.executeWithoutResult(s -> {
+            UUID a = account(UUID.randomUUID(), "BUYER_WALLET");
+            UUID b = account(UUID.randomUUID(), "DEVELOPER_PAYABLE");
+            ids[0] = transaction();
+            post(ids[0], a, "10.00");
+            post(ids[0], b, "-10.00");
+        });
+        UUID t = ids[0];
+
+        assertThatThrownBy(() -> jdbc.update("update ledger_posting set amount = 0 where transaction_id = ?", t))
+                .isInstanceOf(DataAccessException.class).rootCause().hasMessageContaining("ledger_immutable");
+        assertThatThrownBy(() -> jdbc.update("delete from ledger_posting where transaction_id = ?", t))
+                .isInstanceOf(DataAccessException.class).rootCause().hasMessageContaining("ledger_immutable");
+        assertThatThrownBy(() -> jdbc.update("update ledger_transaction set type = 'RUN_CHARGE' where id = ?", t))
+                .isInstanceOf(DataAccessException.class).rootCause().hasMessageContaining("ledger_immutable");
+        assertThatThrownBy(() -> jdbc.update("delete from ledger_transaction where id = ?", t))
+                .isInstanceOf(DataAccessException.class).rootCause().hasMessageContaining("ledger_immutable");
+        assertThat(jdbc.queryForObject("select count(*) from ledger_posting where transaction_id = ?", Long.class, t))
+                .isEqualTo(2L);
+    }
+
+    @Test
     void platformAccountKindIsUniqueWithNullOrg() {
         // V45 already created the platform's PAYOUT_FEES account, so a second org-less one must be refused.
         assertThatThrownBy(() -> account(null, "PAYOUT_FEES"))

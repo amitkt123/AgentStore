@@ -86,8 +86,7 @@ public class LedgerService {
                 .map(v -> v.getPanEncrypted() != null).orElse(false);
         FeePolicy.Split split = feePolicy.split(charge, feePercent, developerHasPan);
 
-        // Resolve (and, first time, create) the credit-side accounts before taking any lock: creation runs in its
-        // own transaction and must not wait on a connection while this one holds the wallet row.
+        // Resolve the credit-side accounts before taking the wallet lock.
         List<Posting> lines = new ArrayList<>();
         lines.add(new Posting(ledgerAccounts.orgAccount(developerOrgId, LedgerAccountKind.DEVELOPER_PAYABLE),
                 split.developer()));
@@ -98,30 +97,28 @@ public class LedgerService {
         if (split.gstTcs().signum() != 0) {
             lines.add(new Posting(ledgerAccounts.platformAccount(LedgerAccountKind.TAX_TCS_PAYABLE), split.gstTcs()));
         }
-
-        boolean postpaid = billingModeService.modeFor(event.getOrgId()) == BillingMode.POSTPAID;
-        UUID receivable = null;
-        if (postpaid) {
-            receivable = ledgerAccounts.orgAccount(event.getOrgId(), LedgerAccountKind.BUYER_RECEIVABLE);
-        } else {
-            // buyerWallet may post an opening balance against EXTERNAL; have it exist before the wallet is locked.
-            ledgerAccounts.platformAccount(LedgerAccountKind.EXTERNAL);
-        }
+        // buyerWallet may post an opening balance against EXTERNAL.
+        ledgerAccounts.platformAccount(LedgerAccountKind.EXTERNAL);
 
         LedgerEntry entry = ledgerEntryRepository.save(new LedgerEntry(null, event.getId(), event.getRunId(),
                 event.getOrgId(), event.getAmount(), LedgerEntryType.CHARGE));
 
         // Lock order: the wallet row first, then (inside post) the balance rows. A postpaid wallet is locked too, so
-        // the charge and reservations against the credit limit are serialised.
-        if (postpaid) {
+        // the charge and reservations against the credit limit are serialised. A switch to POSTPAID after this read
+        // went through setMode, which creates the row first.
+        if (billingModeService.modeFor(event.getOrgId()) == BillingMode.POSTPAID) {
             walletRepository.insertEmptyIfMissing(event.getOrgId());
         }
         Wallet wallet = walletRepository.findByOrgId(event.getOrgId())
                 .orElseThrow(() -> new IllegalStateException("No wallet for org " + event.getOrgId()));
         // A wallet read earlier in this transaction is not refreshed by the locking query.
         entityManager.refresh(wallet, LockModeType.PESSIMISTIC_WRITE);
+        // Re-read under the lock: setMode takes it too, so a switch that committed after the read above shows here.
+        boolean postpaid = billingModeService.currentModeFor(event.getOrgId()) == BillingMode.POSTPAID;
         // Prepaid: before the wallet balance changes, as first use seeds the account with the current balance.
-        lines.add(new Posting(postpaid ? receivable : ledgerAccounts.buyerWallet(wallet), charge.negate()));
+        lines.add(new Posting(postpaid
+                ? ledgerAccounts.orgAccount(event.getOrgId(), LedgerAccountKind.BUYER_RECEIVABLE)
+                : ledgerAccounts.buyerWallet(wallet), charge.negate()));
         post(LedgerTransactionType.RUN_CHARGE, "usage:" + event.getId(), run.getId(), event.getOrgId(),
                 Map.of("agentId", agent.getId().toString(),
                         "agentVersionId", run.getAgentVersion().getId().toString(),

@@ -83,6 +83,7 @@ class WalletControllerTest extends AbstractIntegrationTest {
     void prepaidOrgWithoutWalletReadsAsEmptyAndWritesNothing() {
         Org buyer = orgRepository.save(new Org(null, "BuyerCo3", OrgType.BUYER));
 
+        long accountsBefore = accountCount(buyer.getId());
         WalletResponse wallet = getWallet(buyer.getId());
 
         assertThat(wallet.mode()).isEqualTo(BillingMode.PREPAID);
@@ -93,8 +94,7 @@ class WalletControllerTest extends AbstractIntegrationTest {
         assertThat(wallet.spentThisMonth()).isEqualByComparingTo("0");
         assertThat(wallet.cap()).isNull();
         assertThat(walletRepository.findReadOnlyByOrgId(buyer.getId())).isEmpty();
-        assertThat(jdbc.queryForObject("select count(*) from ledger_account where org_id = ?", Long.class,
-                buyer.getId())).isZero();
+        assertThat(accountCount(buyer.getId())).isEqualTo(accountsBefore);
     }
 
     @Test
@@ -188,8 +188,12 @@ class WalletControllerTest extends AbstractIntegrationTest {
         var scenario = fixtures.liveTierA(new BigDecimal("100000.00"), new BigDecimal("1000.00"));
         UUID orgId = scenario.buyer().getId();
         UUID lastMonthEvent = charge(scenario, "30.00");
-        jdbc.update("update ledger_transaction set created_at = date_trunc('month', now() at time zone 'UTC') "
-                + "at time zone 'UTC' - interval '1 day' where idempotency_key = ?", "usage:" + lastMonthEvent);
+        // Backdate it past the immutability trigger, which replica mode skips for this transaction only.
+        tx.executeWithoutResult(s -> {
+            jdbc.execute("set local session_replication_role = replica");
+            jdbc.update("update ledger_transaction set created_at = date_trunc('month', now() at time zone 'UTC') "
+                    + "at time zone 'UTC' - interval '1 day' where idempotency_key = ?", "usage:" + lastMonthEvent);
+        });
         charge(scenario, "100.00");
 
         assertThat(getWallet(orgId).spentThisMonth()).isEqualByComparingTo("100.00");
@@ -220,13 +224,17 @@ class WalletControllerTest extends AbstractIntegrationTest {
         Org org = new Org(null, "postpaid-" + UUID.randomUUID(), OrgType.BUYER);
         org.setBillingMode(BillingMode.POSTPAID);
         UUID orgId = orgRepository.save(org).getId();
+        long accountsBefore = accountCount(orgId);
 
         WalletResponse wallet = getWallet(orgId);
 
         assertThat(wallet.owed()).isEqualByComparingTo("0");
         assertThat(wallet.available()).isEqualByComparingTo("50000.00");
         assertThat(walletRepository.findReadOnlyByOrgId(orgId)).isEmpty();
-        assertThat(jdbc.queryForObject("select count(*) from ledger_account where org_id = ?", Long.class, orgId))
-                .isZero();
+        assertThat(accountCount(orgId)).isEqualTo(accountsBefore);
+    }
+
+    private long accountCount(UUID orgId) {
+        return jdbc.queryForObject("select count(*) from ledger_account where org_id = ?", Long.class, orgId);
     }
 }

@@ -3,13 +3,9 @@ package com.agentstore.platform.ledger;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,28 +14,31 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Finds ledger accounts, creating each (with its zero balance row) the first time it is needed. */
+/**
+ * Finds ledger accounts. Platform accounts (V45) and each org's DEVELOPER_PAYABLE or BUYER_RECEIVABLE (V46, on org
+ * insert) exist up front, so charges and finishes only look them up while holding run or wallet locks. A missing one
+ * is still created, with its zero balance row, in the caller's transaction ({@code on conflict do nothing}), so no
+ * second connection is ever needed under a lock.
+ */
 @Component
 public class LedgerAccounts {
 
     private final LedgerAccountRepository accountRepository;
     private final LedgerAccountBalanceRepository balanceRepository;
     private final LedgerService ledgerService;
-    private final TransactionTemplate requiresNew;
 
     @PersistenceContext
     private EntityManager entityManager;
 
     public LedgerAccounts(LedgerAccountRepository accountRepository, LedgerAccountBalanceRepository balanceRepository,
-                          LedgerService ledgerService, PlatformTransactionManager transactionManager) {
+                          LedgerService ledgerService) {
         this.accountRepository = accountRepository;
         this.balanceRepository = balanceRepository;
         this.ledgerService = ledgerService;
-        this.requiresNew = new TransactionTemplate(transactionManager);
-        this.requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     /** A buyer or developer org's account. The buyer wallet goes through {@link #buyerWallet} instead. */
+    @Transactional
     public UUID orgAccount(UUID orgId, LedgerAccountKind kind) {
         Objects.requireNonNull(orgId, "orgId");
         if (kind.isPlatform()) {
@@ -48,15 +47,16 @@ public class LedgerAccounts {
         if (kind == LedgerAccountKind.BUYER_WALLET) {
             throw new IllegalArgumentException("BUYER_WALLET needs its opening balance; use buyerWallet");
         }
-        return find(orgId, kind).orElseGet(() -> createOrReread(orgId, kind));
+        return find(orgId, kind).orElseGet(() -> createIfMissing(orgId, kind));
     }
 
     /** A platform account. V45 creates them all, so this is normally a plain lookup and takes no lock. */
+    @Transactional
     public UUID platformAccount(LedgerAccountKind kind) {
         if (!kind.isPlatform()) {
             throw new IllegalArgumentException(kind + " is an org account; use orgAccount");
         }
-        return find(null, kind).orElseGet(() -> createOrReread(null, kind));
+        return find(null, kind).orElseGet(() -> createIfMissing(null, kind));
     }
 
     /**
@@ -67,9 +67,6 @@ public class LedgerAccounts {
      * <p>
      * Call it before changing {@code lockedWallet}'s balance in the same transaction: the wallet's current balance
      * is taken as the opening amount, so a balance already adjusted for this transaction's charge would be wrong.
-     * <p>
-     * Resolve {@code platformAccount(EXTERNAL)} before locking the wallet. Here it is then only looked up; were it
-     * still missing, creating it would need a second connection while this one holds the wallet lock.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public UUID buyerWallet(Wallet lockedWallet) {
@@ -100,13 +97,20 @@ public class LedgerAccounts {
         return account.map(LedgerAccount::getId);
     }
 
-    /** Creates in its own transaction; a concurrent creator that wins the unique index makes us re-read theirs. */
-    private UUID createOrReread(UUID orgId, LedgerAccountKind kind) {
-        try {
-            return requiresNew.execute(status -> create(orgId, kind));
-        } catch (DataIntegrityViolationException e) {
-            return find(orgId, kind).orElseThrow(() -> e);
+    /**
+     * Inserts the account unless it exists, then reads whichever row holds the unique index. A concurrent creator
+     * inserts its balance row in the same transaction as its account, so only our own insert needs one.
+     */
+    private UUID createIfMissing(UUID orgId, LedgerAccountKind kind) {
+        int inserted = orgId == null
+                ? accountRepository.insertPlatformAccountIfMissing(kind.name())
+                : accountRepository.insertOrgAccountIfMissing(orgId, kind.name());
+        UUID account = find(orgId, kind)
+                .orElseThrow(() -> new IllegalStateException("Ledger account " + kind + " missing after insert"));
+        if (inserted == 1) {
+            accountRepository.insertBalanceIfMissing(account);
         }
+        return account;
     }
 
     private UUID create(UUID orgId, LedgerAccountKind kind) {
