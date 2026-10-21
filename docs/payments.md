@@ -60,7 +60,7 @@ Flows:
      VALUES (gen_random_uuid(), '<org-uuid>', to_char(now(), 'YYYY-MM'), 250.00, 'OPEN', now() + interval '15 days', now());
      ```
   3. Open Billing as that org, press Pay on the bill, complete the test payment. The bill becomes PAID and `BUYER_RECEIVABLE` clears.
-- [ ] Reconciliation run (`/admin/money`, or wait for the nightly job): no issues.
+- [ ] Reconciliation run (`POST /api/v1/admin/payments/reconciliation/run?date=YYYY-MM-DD` as ADMIN, or wait for the nightly job), then `GET /api/v1/admin/payments/reconciliation?date=YYYY-MM-DD`: no issues. There is no reconciliation screen yet (WS10c).
 
 Go-live gates (hard stops: do not take live money until each is confirmed):
 - [ ] **Refund list returns the receipt.** `GET /v1/payments/{id}/refunds` must return the `receipt` sent with `POST /v1/payments/{id}/refund` (the refund part id). A retry after a timeout looks the refund up by that receipt; the adapter also sends the part id as `X-Refund-Idempotency`, so a repeated request returns the first refund. Confirm both in test mode by refunding, then listing.
@@ -76,7 +76,7 @@ Razorpay API assumptions to confirm (the adapter was written from documentation,
 - [ ] `payment.failed` carries `error_description`. `refund.failed` carries no reason, so the default "Provider failed the refund" is shown.
 - [ ] `/v1/payments`, `/v1/refunds` and `/v1/settlements` accept `from`/`to` in epoch seconds, treat `to` as inclusive (range inclusivity), and page with `count` (max 100) and `skip`.
 - [ ] Settlement `fees` is the total fee in paise and includes tax. If it excludes `tax`, the gateway-fee posting under-counts.
-- [ ] Payments from `GET /v1/payments` carry `virtual_account_id` for bank transfers. If not, reconciliation cannot flag a bank-transfer payment as MISSING_LOCALLY; the fix is `GET /v1/virtual_accounts/{id}/payments` per known account.
+- [ ] Payments from `GET /v1/payments` and `GET /v1/payments/{id}` carry `virtual_account_id` for bank transfers. If not, reconciliation cannot flag a bank-transfer payment as MISSING_LOCALLY and the apply endpoint cannot credit it; the fix is `GET /v1/virtual_accounts/{id}/payments` per known account.
 - [ ] Error bodies are `{"error": {"code": "...", "description": ...}}`; a refund over the refundable amount or on an unknown payment is a 400, not a 5xx.
 - [ ] Rate limiting answers 429 (the adapter treats 429 and 408 as "outcome unknown", retried later).
 - [ ] The Checkout `amount` the backend returns is paise and the frontend passes it through unchanged.

@@ -52,7 +52,7 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | P3c Studio "what it did" half and flow canvas | Not started | — | none | All (G16) |
 | Buyer Billing page `/billing` | Done (WS10a, WS10b) | #39, this PR | plans `2026-10-21-ws10a-…`, `2026-10-21-ws10b-…` | — |
 | Developer Earnings page `/developer/earnings` | Done (WS10a) | #39 | plan `2026-10-21-ws10a-…` | Withdraw, payout account (WS10c) |
-| Admin Money page `/admin/money` (fee, credit limit, billing mode, wallet adjustments, platform accounts, ledger checks) | Done (WS10a) | #39 | plan `2026-10-21-ws10a-…` | Withdrawals, freezes (WS10c). Reconciliation issues done in WS10b |
+| Admin Money page `/admin/money` (fee, credit limit, billing mode, wallet adjustments, platform accounts, ledger checks) | Done (WS10a) | #39 | plan `2026-10-21-ws10a-…` | Withdrawals, freezes, reconciliation screen (WS10c). Reconciliation issues exist as an API only (WS10b): `POST /api/v1/admin/payments/reconciliation/run?date=`, `GET /api/v1/admin/payments/reconciliation?date=` |
 | FE-3 developer money (earnings, payouts) | Partly superseded by the Earnings page above | — | plan `2026-09-23-fe3-…` | Payouts (WS10c) |
 | FE-4 admin consoles | Not started | — | plan `2026-09-23-fe4-…` | All |
 
