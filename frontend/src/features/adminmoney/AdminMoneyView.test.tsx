@@ -91,6 +91,9 @@ it("offers wallet adjustment for buyer orgs only and submits it", async () => {
   unmount();
   render(<AdminMoneyView accounts={accounts} org={org({ type: "DEVELOPER" })} orgQuery={ORG} />);
   expect(screen.queryByRole("button", { name: "Adjust wallet" })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Billing mode")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Credit limit")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Fee %")).toBeInTheDocument();
 });
 
 it("shows an adjustment error inline", async () => {

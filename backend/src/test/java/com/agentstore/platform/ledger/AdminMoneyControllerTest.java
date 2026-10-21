@@ -139,6 +139,30 @@ class AdminMoneyControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void developerOrgsGetNoWalletModeOrCreditLimitButKeepTheirFee() {
+        Org developer = orgRepository.save(new Org(null, "Dev-" + UUID.randomUUID(), OrgType.DEVELOPER));
+        String money = "/api/v1/admin/orgs/" + developer.getId() + "/money";
+
+        var adjusted = call(HttpMethod.POST, adjustPath(developer.getId()), admin(),
+                adjustment(UUID.randomUUID().toString(), "10.00"), String.class);
+        assertThat(adjusted.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(call(HttpMethod.PATCH, money, admin(), Map.of("billingMode", "POSTPAID"), String.class)
+                .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(call(HttpMethod.PATCH, money, admin(), Map.of("creditLimit", new BigDecimal("100.00")), String.class)
+                .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(accounts.findByOrgIdAndKind(developer.getId(), LedgerAccountKind.BUYER_WALLET)).isEmpty();
+        assertThat(walletRepository.findReadOnlyByOrgId(developer.getId())).isEmpty();
+        Org stored = orgRepository.findById(developer.getId()).orElseThrow();
+        assertThat(stored.getBillingMode()).isNull();
+        assertThat(stored.getCreditLimit()).isNull();
+
+        var fee = call(HttpMethod.PATCH, money, admin(), Map.of("feePercent", new BigDecimal("12.50")),
+                OrgMoneySettingsResponse.class);
+        assertThat(fee.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(fee.getBody().effectiveFeePercent()).isEqualByComparingTo("12.50");
+    }
+
+    @Test
     void ledgerChecksReportABalanceThatDriftedFromItsPostings() {
         Org org = buyer();
         call(HttpMethod.POST, adjustPath(org.getId()), admin(), adjustment(UUID.randomUUID().toString(), "40.00"),

@@ -120,14 +120,18 @@ function SettingsForm({ org, onChange }: { org: OrgMoney; onChange: (o: OrgMoney
   return (
     <form className={styles.form} onSubmit={onSubmit} aria-label="Money settings">
       <Field label="Fee %" type="number" step="0.01" min="0" max="100" value={fee} onChange={(e) => setFee(e.target.value)} hint={`Blank keeps ${org.effectiveFeePercent}%`} />
-      <div className={styles.select}>
-        <label htmlFor="billing-mode">Billing mode</label>
-        <select id="billing-mode" value={mode} onChange={(e) => setMode(e.target.value as BillingMode)}>
-          <option value="PREPAID">PREPAID</option>
-          <option value="POSTPAID">POSTPAID</option>
-        </select>
-      </div>
-      <Field label="Credit limit" type="number" step="0.01" min="0" value={limit} onChange={(e) => setLimit(e.target.value)} hint="Blank keeps the current limit" />
+      {org.type === "BUYER" && (
+        <>
+          <div className={styles.select}>
+            <label htmlFor="billing-mode">Billing mode</label>
+            <select id="billing-mode" value={mode} onChange={(e) => setMode(e.target.value as BillingMode)}>
+              <option value="PREPAID">PREPAID</option>
+              <option value="POSTPAID">POSTPAID</option>
+            </select>
+          </div>
+          <Field label="Credit limit" type="number" step="0.01" min="0" value={limit} onChange={(e) => setLimit(e.target.value)} hint="Blank keeps the current limit" />
+        </>
+      )}
       <Button type="submit" loading={busy}>Save settings</Button>
       <Message status={status} />
     </form>

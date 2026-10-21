@@ -3,6 +3,7 @@ package com.agentstore.platform.ledger;
 import com.agentstore.platform.data.Caller;
 import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.OrgRepository;
+import com.agentstore.platform.identity.OrgType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
@@ -89,8 +90,9 @@ public class AdminMoneyController {
         if (limit != null && limit.signum() < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "creditLimit must not be negative");
         }
-        if (!orgRepository.existsById(orgId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Org not found");
+        OrgType type = orgType(orgId);
+        if ((limit != null || request.billingMode() != null) && type != OrgType.BUYER) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only buyer orgs have a billing mode or credit limit");
         }
         // One transaction under the org row lock: fee, limit and mode commit together, and the entity setMode
         // saves is the one carrying the new fee and limit.
@@ -130,8 +132,8 @@ public class AdminMoneyController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "amount must be non-zero with at most 2 decimal places");
         }
-        if (!orgRepository.existsById(orgId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Org not found");
+        if (orgType(orgId) != OrgType.BUYER) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only buyer orgs have a wallet");
         }
         UUID adminUserId = Caller.current().userId();
         // Created outside the transaction so no second connection is needed while the wallet is locked.
@@ -186,6 +188,11 @@ public class AdminMoneyController {
         wallet.setBalance(wallet.getBalance().add(amount));
         wallet.setUpdatedAt(Instant.now());
         walletRepository.save(wallet);
+    }
+
+    private OrgType orgType(UUID orgId) {
+        return orgRepository.findById(orgId).map(Org::getType)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Org not found"));
     }
 
     /** True when this exact request already ran; 409 when the key was used for another org or amount. */
