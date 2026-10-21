@@ -50,10 +50,13 @@ public class RefundService {
     private static final Logger log = LoggerFactory.getLogger(RefundService.class);
 
     /**
-     * The retry job leaves a PENDING part alone until it has been untouched this long, so it does not race the
-     * request that is still submitting it. Provider HTTP timeouts must stay well below this.
+     * The lease a submitter takes on a PENDING part (see {@link #claim}): no one else submits the part until it has
+     * been untouched this long. Provider HTTP timeouts must stay well below this, or a still-running call could
+     * be overtaken by a retry.
      */
     static final Duration RETRY_GRACE = Duration.ofMinutes(5);
+    /** A retry run stops taking new parts after this long, well inside the job's ShedLock lockAtMostFor (PT10M). */
+    static final Duration JOB_BUDGET = Duration.ofMinutes(4);
     /** A PROCESSING part with no webhook for this long is looked up at the provider (lost or early webhook). */
     static final Duration POLL_AFTER = Duration.ofHours(1);
     private static final int RETRY_BATCH = 100;
@@ -145,7 +148,7 @@ public class RefundService {
         if (c.created()) {
             // The money has left the wallet in the ledger; now ask the provider, outside any transaction.
             for (UUID partId : c.partIds()) {
-                submitQuietly(partId);
+                submitQuietly(partId, true);
             }
         }
         return new Requested(tx.execute(s -> view(refunds.findById(c.refundId()).orElseThrow())), c.created());
@@ -230,10 +233,19 @@ public class RefundService {
      */
     public void submitPending() {
         Instant now = Instant.now();
+        Instant stopAt = now.plus(JOB_BUDGET);
         for (UUID partId : parts.pendingIdsBefore(now.minus(RETRY_GRACE), PageRequest.of(0, RETRY_BATCH))) {
-            submitQuietly(partId);
+            if (Instant.now().isAfter(stopAt)) {
+                log.warn("Refund retry run out of time; remaining parts wait for the next run");
+                return;
+            }
+            submitQuietly(partId, false);
         }
         for (UUID partId : parts.processingIdsBefore(now.minus(POLL_AFTER), PageRequest.of(0, RETRY_BATCH))) {
+            if (Instant.now().isAfter(stopAt)) {
+                log.warn("Refund poll run out of time; remaining parts wait for the next run");
+                return;
+            }
             try {
                 poll(partId);
             } catch (RuntimeException e) {
@@ -271,9 +283,9 @@ public class RefundService {
         }
     }
 
-    private void submitQuietly(UUID partId) {
+    private void submitQuietly(UUID partId, boolean first) {
         try {
-            submit(partId);
+            submit(partId, first);
         } catch (RuntimeException e) {
             // The part stays PENDING; the retry job tries it again.
             log.error("Submitting refund part {} failed; left for retry", partId, e);
@@ -281,10 +293,22 @@ public class RefundService {
     }
 
     /**
-     * Asks the provider for one PENDING part, looking it up by receipt first so a refund the provider already made
-     * (for example before a timeout) is not made again. Must not run inside a transaction.
+     * Retries one PENDING part whose lease has lapsed; a part another submitter holds is skipped. Must not run
+     * inside a transaction.
      */
     public void submit(UUID partId) {
+        submit(partId, false);
+    }
+
+    /**
+     * Claims the part, then asks the provider, looking it up by receipt first so a refund the provider already made
+     * (for example before a timeout) is not made again. {@code first} is the request's own submit right after commit.
+     */
+    private void submit(UUID partId, boolean first) {
+        if (!claim(partId, first)) {
+            log.info("Refund part {} is not PENDING or is held by another submitter; skipped", partId);
+            return;
+        }
         Submission s = tx.execute(st -> {
             BuyerRefundPart part = parts.findById(partId).orElseThrow();
             if (part.getStatus() != BuyerRefundPart.Status.PENDING) return null;
@@ -318,6 +342,18 @@ public class RefundService {
             }
         }
         tx.executeWithoutResult(st -> recordSubmitted(partId, result));
+    }
+
+    /**
+     * Atomically takes the lease on a PENDING part, committed before any provider call, so two submitters (the
+     * request thread and a retry run, or two overlapping retry runs) cannot both call the provider. The first submit
+     * claims a part never claimed before ({@code updated_at = created_at}); a retry claims one untouched for
+     * {@link #RETRY_GRACE}. Both set {@code updated_at = now()}, which renews the lease.
+     */
+    private boolean claim(UUID partId, boolean first) {
+        Integer changed = tx.execute(st -> first ? parts.claimFirstSubmit(partId)
+                : parts.claimRetry(partId, Instant.now().minus(RETRY_GRACE)));
+        return changed != null && changed == 1;
     }
 
     private void recordSubmitted(UUID partId, PaymentProvider.ProviderRefund result) {

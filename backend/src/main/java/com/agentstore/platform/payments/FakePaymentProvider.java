@@ -58,6 +58,29 @@ public class FakePaymentProvider implements PaymentProvider {
         refundsStayPending = pending;
     }
 
+    private final java.util.concurrent.atomic.AtomicInteger refundCalls = new java.util.concurrent.atomic.AtomicInteger();
+    private volatile java.util.concurrent.CountDownLatch holdEntered;
+    private volatile java.util.concurrent.CountDownLatch holdRelease;
+    private volatile boolean unavailableNextRefund;
+
+    /**
+     * Makes the next {@link #refund} count down {@code entered} and wait for {@code release} before acting, outside
+     * any lock, so a test can race a second submitter against it. Cleared by use or {@link #reset()}.
+     */
+    public synchronized void holdNextRefund(java.util.concurrent.CountDownLatch entered,
+                                            java.util.concurrent.CountDownLatch release) {
+        holdEntered = entered;
+        holdRelease = release;
+    }
+
+    /** Makes the next {@link #refund} throw {@link PaymentProviderUnavailableException} without recording anything. */
+    public void unavailableNextRefund() {
+        unavailableNextRefund = true;
+    }
+
+    /** How many times {@link #refund} was called since the last reset (each call could pay out at a real gateway). */
+    public int refundCalls() { return refundCalls.get(); }
+
     public static final String SIGNATURE_HEADER = "X-Fake-Signature";
     public static final String EVENT_ID_HEADER = "X-Fake-Event-Id";
 
@@ -161,7 +184,35 @@ public class FakePaymentProvider implements PaymentProvider {
     }
 
     @Override
-    public synchronized ProviderRefund refund(String providerPaymentId, BigDecimal amount, String receipt) {
+    public ProviderRefund refund(String providerPaymentId, BigDecimal amount, String receipt) {
+        refundCalls.incrementAndGet();
+        java.util.concurrent.CountDownLatch entered;
+        java.util.concurrent.CountDownLatch release;
+        synchronized (this) {
+            entered = holdEntered;
+            release = holdRelease;
+            holdEntered = null;
+            holdRelease = null;
+        }
+        if (release != null) {
+            entered.countDown();
+            try {
+                if (!release.await(30, java.util.concurrent.TimeUnit.SECONDS)) {
+                    throw new PaymentProviderUnavailableException("fake provider: hold timed out");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new PaymentProviderUnavailableException("fake provider: interrupted");
+            }
+        }
+        if (unavailableNextRefund) {
+            unavailableNextRefund = false;
+            throw new PaymentProviderUnavailableException("fake provider: injected refund outage");
+        }
+        return recordRefund(providerPaymentId, amount, receipt);
+    }
+
+    private synchronized ProviderRefund recordRefund(String providerPaymentId, BigDecimal amount, String receipt) {
         Optional<ProviderRefund> existing = findRefund(providerPaymentId, receipt);
         if (existing.isPresent()) return existing.get();
         if (failRefundsFor.contains(providerPaymentId)) {
@@ -275,6 +326,12 @@ public class FakePaymentProvider implements PaymentProvider {
         failRefundsFor.clear();
         timeoutNextRefund = false;
         refundsStayPending = false;
+        unavailableNextRefund = false;
+        refundCalls.set(0);
+        synchronized (this) {
+            holdEntered = null;
+            holdRelease = null;
+        }
         orders.clear();
         payments.clear();
         refunds.clear();

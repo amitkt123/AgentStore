@@ -384,6 +384,64 @@ class RefundServiceTest extends AbstractIntegrationTest {
 
     @Test
     @Order(11)
+    void secondSubmitterWhileFirstIsAtTheProviderDoesNotRefundAgain() throws Exception {
+        Org org = buyer();
+        PaymentOrder o = paidTopUp(org, "500.00", daysAgo(1));
+        java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        fake().holdNextRefund(entered, release);
+
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+        String requestId = "req-" + UUID.randomUUID();
+        var first = pool.submit(() -> refunds.request(org.getId(), UUID.randomUUID(), requestId, new BigDecimal("100.00")));
+        assertThat(entered.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        UUID partId = jdbc.queryForObject("select p.id from buyer_refund_part p join buyer_refund r on r.id = p.refund_id "
+                + "where r.org_id = ? and r.request_id = ?", UUID.class, org.getId(), requestId);
+
+        // the request thread is inside provider.refund; another submitter must not call it again
+        refunds.submit(partId);
+        refunds.submitPending();
+        release.countDown();
+        RefundView v = first.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        pool.shutdown();
+
+        assertThat(fake().refundCalls()).isEqualTo(1);
+        assertThat(v.status()).isEqualTo("DONE");
+        assertThat(fake().refunds()).filteredOn(r -> r.getPaymentId().equals(paymentId(o))).hasSize(1);
+    }
+
+    @Test
+    @Order(12)
+    void twoRetryRunsOnAStalePendingPartRefundOnce() throws Exception {
+        Org org = buyer();
+        PaymentOrder o = paidTopUp(org, "500.00", daysAgo(1));
+        fake().unavailableNextRefund();
+        RefundView v = refunds.request(org.getId(), UUID.randomUUID(), "req-" + UUID.randomUUID(), new BigDecimal("150.00"));
+        UUID partId = v.parts().get(0).id();
+        assertThat(parts.findById(partId).orElseThrow().getStatus()).isEqualTo(BuyerRefundPart.Status.PENDING);
+        jdbc.update("update buyer_refund_part set updated_at = now() - interval '10 minutes' where id = ?", partId);
+        int callsBefore = fake().refundCalls();
+
+        java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        fake().holdNextRefund(entered, release);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var run1 = pool.submit(() -> refunds.submitPending());
+        assertThat(entered.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        refunds.submitPending();   // an overlapping run (lock expired, slow provider) finds the part claimed
+        refunds.submit(partId);
+        release.countDown();
+        run1.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        pool.shutdown();
+
+        assertThat(fake().refundCalls() - callsBefore).isEqualTo(1);
+        assertThat(parts.findById(partId).orElseThrow().getStatus()).isEqualTo(BuyerRefundPart.Status.DONE);
+        assertThat(fake().refunds()).filteredOn(r -> r.getPaymentId().equals(paymentId(o))).hasSize(1);
+        assertThat(wallet(org.getId())).isEqualByComparingTo("350.00");
+    }
+
+    @Test
+    @Order(13)
     void sameRequestIdReturnsTheExistingRefund() {
         Org org = buyer();
         paidTopUp(org, "500.00", daysAgo(1));

@@ -30,4 +30,16 @@ public interface BuyerRefundPartRepository extends JpaRepository<BuyerRefundPart
     @Query(value = "update buyer_refund_part set updated_at = now() where id = :id and status = 'PROCESSING'",
             nativeQuery = true)
     int touchProcessing(UUID id);
+
+    /** Leases a PENDING part that was never claimed (the request's own submit); returns the rows changed. */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query(value = "update buyer_refund_part set updated_at = clock_timestamp() where id = :id and status = 'PENDING' "
+            + "and updated_at = created_at", nativeQuery = true)
+    int claimFirstSubmit(UUID id);
+
+    /** Leases a PENDING part untouched since {@code before} (a retry); returns the rows changed. */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query(value = "update buyer_refund_part set updated_at = clock_timestamp() where id = :id and status = 'PENDING' "
+            + "and updated_at < :before", nativeQuery = true)
+    int claimRetry(UUID id, Instant before);
 }

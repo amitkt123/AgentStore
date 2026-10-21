@@ -51,4 +51,23 @@ class PaymentsSchemaTest extends AbstractIntegrationTest {
         jdbc.update(sql, org);
         assertThatThrownBy(() -> jdbc.update(sql, org)).isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    void duplicateProviderRefundIdIsRejected() {
+        String orderId = "order_" + UUID.randomUUID();
+        insertOrder(orderId, "100.00", "0");
+        UUID order = jdbc.queryForObject("select id from payment_order where provider_order_id = ?", UUID.class, orderId);
+        UUID refund = UUID.randomUUID();
+        jdbc.update("insert into buyer_refund (id, org_id, request_id, amount, status) "
+                + "values (?, gen_random_uuid(), ?, 10.00, 'PROCESSING')", refund, "req_" + refund);
+        String sql = "insert into buyer_refund_part (id, refund_id, payment_order_id, amount, provider_refund_id, status) "
+                + "values (gen_random_uuid(), ?, ?, 5.00, ?, 'PENDING')";
+        String providerRefundId = "rfnd_" + UUID.randomUUID();
+        jdbc.update(sql, refund, order, providerRefundId);
+        // many parts may have no provider refund id yet
+        jdbc.update(sql, refund, order, null);
+        jdbc.update(sql, refund, order, null);
+        assertThatThrownBy(() -> jdbc.update(sql, refund, order, providerRefundId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
 }
