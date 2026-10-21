@@ -2,6 +2,7 @@ package com.agentstore.platform.execution;
 
 import com.agentstore.platform.events.DomainEventPublisher;
 import com.agentstore.platform.ledger.LedgerService;
+import com.agentstore.platform.ledger.RunLlmCostService;
 import com.agentstore.platform.ledger.UsageEvent;
 import com.agentstore.platform.ledger.UsageEventRepository;
 import com.agentstore.platform.ledger.WalletReservationService;
@@ -45,6 +46,7 @@ public class RunLifecycleService {
     private final RunStepRepository runStepRepository;
     private final UsageEventRepository usageEventRepository;
     private final LedgerService ledgerService;
+    private final RunLlmCostService runLlmCostService;
     private final ManifestParser manifestParser;
     private final SandboxProvider sandboxProvider;
     private final WalletReservationService walletReservationService;
@@ -58,7 +60,7 @@ public class RunLifecycleService {
                                ManifestParser manifestParser, SandboxProvider sandboxProvider,
                                WalletReservationService walletReservationService,
                                GateRequestRepository gateRequestRepository, ApplicationEventPublisher events,
-                               DomainEventPublisher domainEvents) {
+                               DomainEventPublisher domainEvents, RunLlmCostService runLlmCostService) {
         this.gateRequestRepository = gateRequestRepository;
         this.events = events;
         this.domainEvents = domainEvents;
@@ -66,6 +68,7 @@ public class RunLifecycleService {
         this.runStepRepository = runStepRepository;
         this.usageEventRepository = usageEventRepository;
         this.ledgerService = ledgerService;
+        this.runLlmCostService = runLlmCostService;
         this.manifestParser = manifestParser;
         this.sandboxProvider = sandboxProvider;
         this.walletReservationService = walletReservationService;
@@ -345,6 +348,10 @@ public class RunLifecycleService {
         run.setCompletedAt(Instant.now());
         run.setAwaitingSince(null);
         runRepository.save(run);
+        if (run.getConnection() != null) {
+            // After the reservation release above: the wallet row is locked before any ledger balance row.
+            runLlmCostService.post(run);
+        }
         // A run that ends for any reason (failure, spend cap, violations, legacy events) must not leave its gate
         // PENDING: nobody can decide it any more. Decisions close their own gate before reaching here.
         gateRequestRepository.findFirstByRunIdAndStatusOrderByCreatedAtAsc(run.getId(), GateStatus.PENDING).ifPresent(gate -> {
