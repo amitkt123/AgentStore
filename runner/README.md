@@ -100,6 +100,6 @@ portal, then `agentstore login`, `agentstore init` and `agentstore push --wait`.
 
 ## Point Spring at the runner
 
-Run the backend with `SPRING_PROFILES_ACTIVE=runner`, `RUNNER_BASE_URL=http://localhost:8090` and the same
+Run the backend with `SPRING_PROFILES_ACTIVE=dev,runner` (or set `SECRET_ENCRYPTION_KEY`), `RUNNER_BASE_URL=http://localhost:8090` and the same
 `RUNNER_SECRET`. E2B sandboxes must reach Spring's callback URL, so for local development expose Spring with
 `cloudflared tunnel --url http://localhost:8080` and set `CALLBACK_BASE_URL` to the printed https URL.

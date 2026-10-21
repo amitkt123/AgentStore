@@ -1,0 +1,15 @@
+{
+  "scopes": [
+    { "type": "READ", "resource": "expenses", "description": "Your expense lines, to total them" }
+  ],
+  "resources": [
+    {
+      "name": "expenses",
+      "format": "csv",
+      "schema": {
+        "required": ["description", "amount"],
+        "properties": { "description": { "type": "string" }, "amount": { "type": "number" } }
+      }
+    }
+  ]
+}

@@ -46,7 +46,7 @@ agentstore:
     mode: ${EMAIL_MODE:log}          # log | smtp
     from: ${EMAIL_FROM:Karya <no-reply@karya.example>}
   secrets:
-    encryption-key-base64: ${SECRET_ENCRYPTION_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+    encryption-key-base64: ${SECRET_ENCRYPTION_KEY}   # no default: required outside the dev and test profiles
   callback:
     base-url: ${CALLBACK_BASE_URL:http://localhost:8080}
   runtime:
