@@ -20,14 +20,21 @@ SQL
 )"
 [ -n "$org" ] || { echo "no buyer org found for $EMAIL (sign up as a buyer first)" >&2; exit 1; }
 
+# POST JSON ($3) to $2 with optional bearer token ($1); prints the body, fails with status and body on non-2xx.
+post_json() {
+  local resp status
+  resp="$(curl -sS -w '\n%{http_code}' -X POST "$2" -H 'Content-Type: application/json' \
+    ${1:+-H "Authorization: Bearer $1"} --data-binary "$3")" || { echo "request to $2 failed" >&2; exit 1; }
+  status="${resp##*$'\n'}"; resp="${resp%$'\n'*}"
+  [[ "$status" == 2* ]] || { echo "POST $2 -> HTTP $status: $resp" >&2; exit 1; }
+  printf '%s' "$resp"
+}
+
 login="$(python3 -c 'import json,os; print(json.dumps({"email": os.environ["ADMIN_EMAIL"], "password": os.environ["ADMIN_PASSWORD"]}))' \
-  | curl -sS -f -X POST "$API_URL/api/v1/auth/login" -H 'Content-Type: application/json' --data-binary @-)" \
-  || { echo "admin login failed for $ADMIN_EMAIL (is the backend up, and is it an ADMIN? see demo-make-admin.sh)" >&2; exit 1; }
+  | { read -r b; post_json "" "$API_URL/api/v1/auth/login" "$b"; })"
 token="$(printf '%s' "$login" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')"
 
 body="$(python3 -c 'import json,sys; print(json.dumps({"requestId": sys.argv[1], "amount": sys.argv[2], "note": "demo-fund-wallet.sh"}))' \
   "$(uuidgen)" "$AMOUNT")"
-wallet="$(curl -sS -f -X POST "$API_URL/api/v1/admin/orgs/$org/wallet/adjustments" \
-  -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$body")" \
-  || { echo "adjustment failed (a debit may exceed the available balance, or the org is postpaid)" >&2; exit 1; }
+wallet="$(post_json "$token" "$API_URL/api/v1/admin/orgs/$org/wallet/adjustments" "$body")"
 printf '%s' "$wallet" | python3 -c 'import json,sys; w=json.load(sys.stdin); print("org '"$org"' balance:", w["balance"])'

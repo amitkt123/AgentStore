@@ -204,4 +204,50 @@ class AdminMoneyControllerTest extends AbstractIntegrationTest {
         assertThat(call(HttpMethod.GET, "/api/v1/admin/ledger/accounts", headers, null, String.class)
                 .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
+
+    @Test
+    void sameRequestIdOnAnotherOrgOrAmountIs409AndLeavesWalletAlone() {
+        Org first = buyer();
+        Org second = buyer();
+        String requestId = UUID.randomUUID().toString();
+        call(HttpMethod.POST, adjustPath(first.getId()), admin(), adjustment(requestId, "200.00"), WalletResponse.class);
+
+        var otherOrg = call(HttpMethod.POST, adjustPath(second.getId()), admin(), adjustment(requestId, "200.00"),
+                String.class);
+        assertThat(otherOrg.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(walletRepository.balanceOfOrg(second.getId()).orElse(BigDecimal.ZERO)).isEqualByComparingTo("0");
+
+        var otherAmount = call(HttpMethod.POST, adjustPath(first.getId()), admin(), adjustment(requestId, "300.00"),
+                String.class);
+        assertThat(otherAmount.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(walletBalance(first.getId())).isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    void retryAfterSwitchingToPostpaidReplays() {
+        Org org = buyer();
+        String requestId = UUID.randomUUID().toString();
+        call(HttpMethod.POST, adjustPath(org.getId()), admin(), adjustment(requestId, "50.00"), WalletResponse.class);
+        call(HttpMethod.POST, adjustPath(org.getId()), admin(), adjustment(UUID.randomUUID().toString(), "-50.00"),
+                WalletResponse.class);
+        call(HttpMethod.PATCH, "/api/v1/admin/orgs/" + org.getId() + "/money", admin(),
+                Map.of("billingMode", "POSTPAID"), OrgMoneySettingsResponse.class);
+
+        var retry = call(HttpMethod.POST, adjustPath(org.getId()), admin(), adjustment(requestId, "50.00"),
+                String.class);
+        assertThat(retry.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void patchingFeeKeepsBillingModeAndViceVersa() {
+        Org org = buyer();
+        call(HttpMethod.PATCH, "/api/v1/admin/orgs/" + org.getId() + "/money", admin(),
+                Map.of("billingMode", "POSTPAID", "creditLimit", new BigDecimal("1000.00")),
+                OrgMoneySettingsResponse.class);
+        var after = call(HttpMethod.PATCH, "/api/v1/admin/orgs/" + org.getId() + "/money", admin(),
+                Map.of("feePercent", new BigDecimal("5")), OrgMoneySettingsResponse.class).getBody();
+        assertThat(after.billingMode()).isEqualTo(BillingMode.POSTPAID);
+        assertThat(after.creditLimit()).isEqualByComparingTo("1000.00");
+        assertThat(after.feePercent()).isEqualByComparingTo("5");
+    }
 }

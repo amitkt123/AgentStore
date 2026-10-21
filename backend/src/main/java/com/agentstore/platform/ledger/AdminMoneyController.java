@@ -86,15 +86,17 @@ public class AdminMoneyController {
         if (!orgRepository.existsById(orgId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Org not found");
         }
-        if (request.billingMode() != null) {
-            billingModeService.setMode(orgId, request.billingMode());
-        }
-        if (fee != null || limit != null) {
-            Org org = orgRepository.findById(orgId).orElseThrow();
+        // One transaction under the org row lock: fee, limit and mode commit together, and the entity setMode
+        // saves is the one carrying the new fee and limit.
+        tx.executeWithoutResult(status -> {
+            Org org = orgRepository.findByIdForUpdate(orgId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Org not found"));
             if (fee != null) org.setPlatformFeePercent(fee);
             if (limit != null) org.setCreditLimit(limit);
-            orgRepository.save(org);
-        }
+            if (request.billingMode() != null) {
+                billingModeService.setMode(orgId, request.billingMode());
+            }
+        });
         return settings(orgId);
     }
 
@@ -130,25 +132,26 @@ public class AdminMoneyController {
             tx.executeWithoutResult(status -> applyAdjustment(orgId, external, request, adminUserId));
         } catch (DataIntegrityViolationException e) {
             // Lost a race on the idempotency key: the winner's adjustment stands. Read it back in a new transaction.
-            requireSameOrg(orgId, request.requestId());
+            if (!isReplay(orgId, request)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "requestId was already used for another request");
+            }
         }
         return walletController.responseFor(orgId);
     }
 
     private void applyAdjustment(UUID orgId, UUID external, AdjustmentRequest request, UUID adminUserId) {
+        String key = "adjustment:" + request.requestId();
+        // A retry replays even if the org has since switched mode; checked again under the lock below.
+        if (alreadyApplied(key, orgId, request.amount())) {
+            return;
+        }
         if (billingModeService.modeFor(orgId) == BillingMode.POSTPAID) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Postpaid orgs have no wallet to adjust");
         }
         walletRepository.insertEmptyIfMissing(orgId);
         Wallet wallet = walletRepository.findByOrgId(orgId).orElseThrow();
         entityManager.refresh(wallet, LockModeType.PESSIMISTIC_WRITE);
-
-        String key = "adjustment:" + request.requestId();
-        var existing = transactionRepository.findByIdempotencyKey(key);
-        if (existing.isPresent()) {
-            if (!orgId.equals(existing.get().getOrgId())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "requestId was already used for another org");
-            }
+        if (alreadyApplied(key, orgId, request.amount())) {
             return;
         }
         BigDecimal amount = request.amount();
@@ -161,18 +164,40 @@ public class AdminMoneyController {
         Map<String, Object> reference = new java.util.HashMap<>();
         reference.put("note", request.note());
         reference.put("adminUserId", adminUserId.toString());
-        ledgerService.post(LedgerTransactionType.ADJUSTMENT, key, null, orgId, reference,
+        reference.put("amount", amount.toPlainString());
+        LedgerTransaction posted = ledgerService.post(LedgerTransactionType.ADJUSTMENT, key, null, orgId, reference,
                 List.of(new Posting(walletAccount, amount), new Posting(external, amount.negate())));
+        if (!orgId.equals(posted.getOrgId())) {
+            // Another org's request with the same id committed between our check and the post.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "requestId was already used for another org");
+        }
         wallet.setBalance(wallet.getBalance().add(amount));
         wallet.setUpdatedAt(Instant.now());
         walletRepository.save(wallet);
     }
 
-    private void requireSameOrg(UUID orgId, String requestId) {
-        var existing = tx.execute(status -> transactionRepository.findByIdempotencyKey("adjustment:" + requestId));
-        if (existing == null || existing.isEmpty() || !orgId.equals(existing.get().getOrgId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "requestId was already used for another org");
+    /** True when this exact request already ran; 409 when the key was used for another org or amount. */
+    private boolean alreadyApplied(String key, UUID orgId, BigDecimal amount) {
+        var existing = transactionRepository.findByIdempotencyKey(key);
+        if (existing.isEmpty()) {
+            return false;
         }
+        if (!matches(existing.get(), orgId, amount)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "requestId was already used for another request");
+        }
+        return true;
+    }
+
+    private boolean isReplay(UUID orgId, AdjustmentRequest request) {
+        var existing = tx.execute(status ->
+                transactionRepository.findByIdempotencyKey("adjustment:" + request.requestId()));
+        return existing != null && existing.isPresent() && matches(existing.get(), orgId, request.amount());
+    }
+
+    private static boolean matches(LedgerTransaction transaction, UUID orgId, BigDecimal amount) {
+        Object recorded = transaction.getReference() == null ? null : transaction.getReference().get("amount");
+        return orgId.equals(transaction.getOrgId()) && recorded != null
+                && new BigDecimal(String.valueOf(recorded)).compareTo(amount) == 0;
     }
 
     private OrgMoneySettingsResponse settings(UUID orgId) {
