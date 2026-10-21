@@ -52,7 +52,7 @@ Flows:
 - [ ] Failed payment (`failure@razorpay`) then a retry on the same order: failure message shown, retry credits once.
 - [ ] Bank transfer to the test virtual account (Dashboard, Smart Collect, test payment on the account): wallet credited.
 - [ ] Partial refund of a top-up: wallet debited, refund reaches PROCESSED via webhook, then a second refund of the rest.
-- [ ] Postpaid bill. The automatic bill run happens only at 00:30 UTC on the 1st (`BillingCycleJob`); there is no admin trigger, so in test mode create the bill by hand:
+- [ ] Postpaid bill. The automatic bill run is at 00:30 UTC on the 1st (`BillingCycleJob`), and the hourly `PaymentMaintenanceJob` re-issues last month's bills (idempotent) in case that run failed. It bills only last month and there is no admin trigger, so in test mode create the bill by hand:
   1. On `/admin/money`, switch a test org to POSTPAID and make a run charge so the org owes something. Note the amount owed.
   2. Insert an OPEN bill for that org, with the amount it owes (replace the org id and amount):
      ```sql

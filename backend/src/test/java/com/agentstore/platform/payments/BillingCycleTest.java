@@ -290,4 +290,34 @@ class BillingCycleTest extends AbstractIntegrationTest {
         // An OVERDUE bill still blocks runs, and still counts as overdue.
         assertThat(billing.hasOverdueBill(s.orgId())).isTrue();
     }
+
+    @Test
+    void hourlyMaintenanceIssuesLastMonthsBillsIfTheMonthlyRunWasMissed() {
+        Setup s = postpaid();
+        YearMonth last = YearMonth.now(java.time.ZoneOffset.UTC).minusMonths(1);
+        chargeAt(s, "45.00", last.atDay(10).atStartOfDay().toInstant(java.time.ZoneOffset.UTC));
+        PaymentMaintenanceJob job = new PaymentMaintenanceJob(billing, topUps);
+
+        job.run();
+        job.run();
+
+        assertThat(billsOf(s.orgId())).singleElement().satisfies(b -> {
+            assertThat(b.getPeriod()).isEqualTo(last.toString());
+            assertThat(b.getAmount()).isEqualByComparingTo("45.00");
+        });
+    }
+
+    @Test
+    void maintenanceStepsFailIndependently() {
+        BillingCycleService failingBilling = org.mockito.Mockito.mock(BillingCycleService.class);
+        TopUpService failingTopUps = org.mockito.Mockito.mock(TopUpService.class);
+        org.mockito.Mockito.when(failingBilling.markOverdueBills()).thenThrow(new IllegalStateException("boom"));
+        org.mockito.Mockito.when(failingTopUps.expireStaleOrders()).thenThrow(new IllegalStateException("boom"));
+
+        new PaymentMaintenanceJob(failingBilling, failingTopUps).run();
+
+        org.mockito.Mockito.verify(failingBilling)
+                .issueBills(YearMonth.now(java.time.ZoneOffset.UTC).minusMonths(1));
+        org.mockito.Mockito.verify(failingTopUps).expireStaleOrders();
+    }
 }
