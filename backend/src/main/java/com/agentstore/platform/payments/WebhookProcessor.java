@@ -121,10 +121,7 @@ public class WebhookProcessor {
             return Outcome.IGNORED;
         }
         // Credit the order's own amount (equal by the check above) so the ledger carries its scale.
-        PaymentCrediting.Result result = switch (order.getPurpose()) {
-            case TOPUP -> crediting.creditTopUp(order, event.paymentId(), order.getAmount());
-            case BILL -> crediting.creditBill(order, event.paymentId(), order.getAmount());
-        };
+        PaymentCrediting.Result result = crediting.credit(order, event.paymentId(), order.getAmount());
         return result == PaymentCrediting.Result.REFUSED ? Outcome.IGNORED : Outcome.PROCESSED;
     }
 
@@ -143,14 +140,7 @@ public class WebhookProcessor {
                     event.eventId());
             return Outcome.IGNORED;
         }
-        amount = amount.setScale(2, java.math.RoundingMode.UNNECESSARY);
-        String providerOrderId = "va:" + paymentId;
-        // The unique provider_order_id makes a concurrent delivery of the same transfer reuse one order.
-        jdbc.update("insert into payment_order (id, org_id, purpose, method, amount, status, provider, "
-                        + "provider_order_id, refunded_amount, created_at) values (gen_random_uuid(), ?, 'TOPUP', "
-                        + "'BANK_TRANSFER', ?, 'CREATED', ?, ?, 0, now()) on conflict (provider_order_id) do nothing",
-                va.get().getOrgId(), amount, provider.name(), providerOrderId);
-        PaymentOrder order = orders.findByProviderAndProviderOrderId(provider.name(), providerOrderId).orElseThrow();
+        PaymentOrder order = crediting.bankTransferOrder(va.get().getOrgId(), paymentId, amount);
         PaymentCrediting.Result result = crediting.creditTopUp(order, paymentId, order.getAmount());
         return result == PaymentCrediting.Result.REFUSED ? Outcome.IGNORED : Outcome.PROCESSED;
     }

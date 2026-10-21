@@ -271,6 +271,13 @@ public class FakePaymentProvider implements PaymentProvider {
     }
 
     @Override
+    public Optional<ProviderPayment> fetchPayment(String paymentId) {
+        return payments.stream().filter(p -> p.getPaymentId().equals(paymentId)).findFirst()
+                .map(p -> new ProviderPayment(p.getPaymentId(), p.getOrderId(), p.getAmount(), p.getStatus(),
+                        p.getVirtualAccountId()));
+    }
+
+    @Override
     public List<ProviderPayment> fetchPayments(LocalDate dayUtc) {
         return payments.stream().filter(p -> onDay(p.getAt(), dayUtc))
                 .map(p -> new ProviderPayment(p.getPaymentId(), p.getOrderId(), p.getAmount(), p.getStatus(),

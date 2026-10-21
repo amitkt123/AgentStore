@@ -224,6 +224,28 @@ class RazorpayPaymentProviderTest {
     }
 
     @Test
+    void fetchPaymentReadsOneByIdAndTreatsARejectionAsUnknown() {
+        server.expect(requestTo(BASE + "/v1/payments/pay_DlGmmE0kqRSuy6"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("Authorization", basicAuth()))
+                .andRespond(withSuccess("{\"id\":\"pay_DlGmmE0kqRSuy6\",\"entity\":\"payment\",\"amount\":2500000,"
+                        + "\"status\":\"captured\",\"order_id\":null,\"virtual_account_id\":\"va_DlGmm7jInLudH9\"}",
+                        MediaType.APPLICATION_JSON));
+        assertThat(provider.fetchPayment("pay_DlGmmE0kqRSuy6")).contains(new ProviderPayment("pay_DlGmmE0kqRSuy6",
+                null, new BigDecimal("25000.00"), "captured", "va_DlGmm7jInLudH9"));
+
+        server.reset();
+        server.expect(requestTo(BASE + "/v1/payments/pay_nope")).andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"error\":{\"code\":\"BAD_REQUEST_ERROR\",\"description\":\"The id provided does not exist\"}}"));
+        assertThat(provider.fetchPayment("pay_nope")).isEmpty();
+
+        server.reset();
+        server.expect(requestTo(BASE + "/v1/payments/pay_x")).andRespond(withServerError());
+        assertThatThrownBy(() -> provider.fetchPayment("pay_x")).isInstanceOf(PaymentProviderUnavailableException.class);
+    }
+
+    @Test
     void signatureVerification() throws Exception {
         byte[] body = fixture("payment.captured.json").getBytes(StandardCharsets.UTF_8);
         String sig = hmac(body, WEBHOOK_SECRET);

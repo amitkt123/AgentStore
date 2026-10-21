@@ -26,6 +26,17 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
 
     Optional<PaymentOrder> findByProviderAndProviderOrderId(String provider, String providerOrderId);
 
+    /**
+     * The CREATED bank-transfer top-up order {@code va:{paymentId}} a virtual-account credit is booked against; the
+     * unique provider_order_id makes concurrent callers for the same transfer reuse one order.
+     */
+    @Modifying
+    @Query(value = "insert into payment_order (id, org_id, purpose, method, amount, status, provider, "
+            + "provider_order_id, refunded_amount, created_at) values (gen_random_uuid(), :orgId, 'TOPUP', "
+            + "'BANK_TRANSFER', :amount, 'CREATED', :provider, :providerOrderId, 0, now()) "
+            + "on conflict (provider_order_id) do nothing", nativeQuery = true)
+    int insertBankTransferOrderIfAbsent(UUID orgId, BigDecimal amount, String provider, String providerOrderId);
+
     /** CREATED → FAILED only, so a PAID (or already FAILED/EXPIRED) order is left alone; returns the rows changed. */
     @Modifying
     @Query(value = "update payment_order set status = 'FAILED' where id = :id and status = 'CREATED'", nativeQuery = true)

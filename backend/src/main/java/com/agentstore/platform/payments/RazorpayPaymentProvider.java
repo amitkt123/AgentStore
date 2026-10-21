@@ -292,9 +292,30 @@ public class RazorpayPaymentProvider implements PaymentProvider {
     // ---- day fetches for reconciliation ----
 
     @Override
+    public Optional<ProviderPayment> fetchPayment(String paymentId) {
+        JsonNode p;
+        try {
+            p = call("fetch payment", () -> http.get().uri("/v1/payments/{id}", paymentId).retrieve().body(String.class));
+        } catch (PaymentProviderRejectedException e) {
+            // Razorpay answers an unknown id with a 400 (or 404); either way there is nothing to credit.
+            return Optional.empty();
+        }
+        requiredText(p, "id", "fetch payment");
+        try {
+            return Optional.of(toPayment(p));
+        } catch (ArithmeticException e) {
+            throw new PaymentProviderUnavailableException("Razorpay fetch payment returned a fractional paise amount");
+        }
+    }
+
+    @Override
     public List<ProviderPayment> fetchPayments(LocalDate dayUtc) {
-        return fetchDay("list payments", "/v1/payments", dayUtc, p -> new ProviderPayment(text(p, "id"),
-                text(p, "order_id"), rupees(p, "amount"), text(p, "status"), text(p, "virtual_account_id")));
+        return fetchDay("list payments", "/v1/payments", dayUtc, RazorpayPaymentProvider::toPayment);
+    }
+
+    private static ProviderPayment toPayment(JsonNode p) {
+        return new ProviderPayment(text(p, "id"), text(p, "order_id"), rupees(p, "amount"), text(p, "status"),
+                text(p, "virtual_account_id"));
     }
 
     @Override

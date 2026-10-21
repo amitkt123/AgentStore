@@ -29,6 +29,9 @@ public interface PaymentProvider {
 
     PaymentWebhookEvent parseWebhook(byte[] body, Map<String, String> headers);
 
+    /** One payment by its provider id; empty when the provider does not know it. */
+    Optional<ProviderPayment> fetchPayment(String paymentId);
+
     List<ProviderPayment> fetchPayments(LocalDate dayUtc);
 
     List<ProviderRefund> fetchRefunds(LocalDate dayUtc);

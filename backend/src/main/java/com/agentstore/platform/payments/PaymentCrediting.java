@@ -141,6 +141,27 @@ public class PaymentCrediting {
         return Result.CREDITED;
     }
 
+    /** Credits {@code order} by its purpose: {@link #creditTopUp} or {@link #creditBill}. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Result credit(PaymentOrder order, String paymentId, BigDecimal amount) {
+        return switch (order.getPurpose()) {
+            case TOPUP -> creditTopUp(order, paymentId, amount);
+            case BILL -> creditBill(order, paymentId, amount);
+        };
+    }
+
+    /**
+     * The bank-transfer top-up order for a virtual-account credit of {@code amount} (created once, keyed
+     * {@code va:{paymentId}}); pass it to {@link #creditTopUp}.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public PaymentOrder bankTransferOrder(UUID orgId, String paymentId, BigDecimal amount) {
+        String providerOrderId = "va:" + paymentId;
+        orders.insertBankTransferOrderIfAbsent(orgId, amount.setScale(2, java.math.RoundingMode.UNNECESSARY),
+                provider.name(), providerOrderId);
+        return orders.findByProviderAndProviderOrderId(provider.name(), providerOrderId).orElseThrow();
+    }
+
     /** A PAID top-up order of its own for a second payment that arrived on {@code paid}. */
     private PaymentOrder duplicateOrder(PaymentOrder paid, String paymentId, BigDecimal amount) {
         PaymentOrder dup = new PaymentOrder();

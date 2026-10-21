@@ -81,6 +81,14 @@ Razorpay API assumptions to confirm (the adapter was written from documentation,
 - [ ] Rate limiting answers 429 (the adapter treats 429 and 408 as "outcome unknown", retried later).
 - [ ] The Checkout `amount` the backend returns is paise and the frontend passes it through unchanged.
 
+## Reconciliation issues and how to resolve them
+
+The nightly `ReconciliationJob` (or `POST /api/v1/admin/payments/reconciliation/run?date=YYYY-MM-DD`, ADMIN) compares one UTC day with the provider. List the day's issues with `GET /api/v1/admin/payments/reconciliation?date=YYYY-MM-DD` and mark one done with `POST /api/v1/admin/payments/reconciliation/{issueId}/resolve` (`{"note": "..."}`). There is no screen for these yet (the `/admin/money` reconciliation view is WS10c); use the API.
+
+- `MISSING_LOCALLY` (the provider captured a payment we never credited, usually a lost webhook): call `POST /api/v1/admin/payments/payments/{providerPaymentId}/apply` (ADMIN). It fetches the payment from the provider, requires status `captured` and an order (or virtual account) of ours with a matching amount, then credits it through the same path as the webhook (ledger key `payment:{id}`, so a late webhook or a second call credits nothing more) and resolves the open `MISSING_LOCALLY` issues for that payment. **Never resolve it with a wallet adjustment:** the adjustment is not keyed to the payment, so a late webhook would credit the money a second time, and the top-up would not be refundable to its source.
+- `REFUND_UNMATCHED` (a provider refund with no local refund part, e.g. one made in the Razorpay dashboard): decide by hand; the wallet was not debited.
+- `AMOUNT_MISMATCH`, `MISSING_AT_PROVIDER`, `REFUND_MISMATCH`, `DUPLICATE_PAYMENT`, `BILL_NOT_FOUND`, `LEDGER_CHECK_FAILED`: investigate, fix by hand, then resolve with a note.
+
 ## Before live money
 
 - Business KYC completed with Razorpay and the account activated.
