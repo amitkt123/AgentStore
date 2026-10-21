@@ -15,7 +15,7 @@ All keys are under `agentstore.money.payments` (bound to `PaymentProperties`).
 | `refund-window-days` | `180` | Older money needs an admin |
 | `bill-due-days` | `15` | Days from bill issue to due date |
 | `webhook-rate-per-minute` | `120` | Rate limit on the webhook endpoint |
-| `razorpay.key-id`, `razorpay.key-secret`, `razorpay.webhook-secret` | from `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` (blank) | Razorpay credentials. The Razorpay provider refuses to start if any is blank |
+| `razorpay.key-id`, `razorpay.key-secret`, `razorpay.webhook-secret` | from `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` (blank) | Razorpay credentials. The Razorpay provider refuses to start if any is blank, when the provider is `razorpay` (the `application.yml` default) |
 | `razorpay.base-url` | `https://api.razorpay.com` | API base |
 | `fake.webhook-secret` | `fake-webhook-secret` | Signs fake webhooks |
 
@@ -52,7 +52,14 @@ Flows:
 - [ ] Failed payment (`failure@razorpay`) then a retry on the same order: failure message shown, retry credits once.
 - [ ] Bank transfer to the test virtual account (Dashboard, Smart Collect, test payment on the account): wallet credited.
 - [ ] Partial refund of a top-up: wallet debited, refund reaches PROCESSED via webhook, then a second refund of the rest.
-- [ ] Postpaid bill: run the monthly bill, pay it with the Pay button, bill becomes PAID and `BUYER_RECEIVABLE` clears.
+- [ ] Postpaid bill. The automatic bill run happens only at 00:30 UTC on the 1st (`BillingCycleJob`); there is no admin trigger, so in test mode create the bill by hand:
+  1. On `/admin/money`, switch a test org to POSTPAID and make a run charge so the org owes something. Note the amount owed.
+  2. Insert an OPEN bill for that org, with the amount it owes (replace the org id and amount):
+     ```sql
+     INSERT INTO buyer_bill (id, org_id, period, amount, status, due_at, created_at)
+     VALUES (gen_random_uuid(), '<org-uuid>', to_char(now(), 'YYYY-MM'), 250.00, 'OPEN', now() + interval '15 days', now());
+     ```
+  3. Open Billing as that org, press Pay on the bill, complete the test payment. The bill becomes PAID and `BUYER_RECEIVABLE` clears.
 - [ ] Reconciliation run (`/admin/money`, or wait for the nightly job): no issues.
 
 Razorpay API assumptions to confirm (the adapter was written from documentation, not a live account):
