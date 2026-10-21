@@ -144,4 +144,16 @@ class PaymentWebhookControllerTest extends AbstractIntegrationTest {
         assertThat(wallet(org.getId())).isEqualByComparingTo("0");
         assertThat(orders.findById(c.order().id()).orElseThrow().getStatus()).isEqualTo(PaymentOrder.Status.CREATED);
     }
+
+    @Test
+    void bodyOverOneMegabyteIs413AndNothingIsStored() {
+        long before = jdbc.queryForObject("select count(*) from payment_webhook_event", Long.class);
+        byte[] big = new byte[1024 * 1024 + 1];
+        java.util.Arrays.fill(big, (byte) 'a');
+
+        ResponseEntity<String> res = postHook("fake", big, fake().signedHeaders(big));
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(jdbc.queryForObject("select count(*) from payment_webhook_event", Long.class)).isEqualTo(before);
+    }
 }

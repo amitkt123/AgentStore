@@ -93,6 +93,7 @@ The nightly `ReconciliationJob` (or `POST /api/v1/admin/payments/reconciliation/
 
 - Business KYC completed with Razorpay and the account activated.
 - Live keys and a live webhook (stable HTTPS URL, not a quick tunnel) with its own secret; keys only in the deployment's secret store.
+- Set `AGENTSTORE_FORWARD_HEADERS=native`, and only behind a trusted proxy that sets `X-Forwarded-For`. Without it the webhook rate limit (`webhook-rate-per-minute`, per client IP) sees only the proxy's IP, so every sender shares one bucket. Webhook bodies over 1 MB are refused with 413 before the signature is checked.
 - Items for a CA or lawyer (spec §8): GST treatment and tax invoices (WS10 non-goal, bills are statements), refund and chargeback policy, holding buyer money before payout, and the terms shown at top-up.
 - Re-run the checklist above in live mode with a small real amount, then a reconciliation run.
 - Decide the daily top-up limit and `methods` for launch.
