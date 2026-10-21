@@ -9,7 +9,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-@RestControllerAdvice(assignableTypes = {TopUpController.class, FakePaymentController.class, BankTransferController.class})
+@RestControllerAdvice(assignableTypes = {TopUpController.class, FakePaymentController.class, BankTransferController.class,
+        RefundController.class})
 public class PaymentApiErrors {
 
     @ExceptionHandler(PaymentApiException.class)

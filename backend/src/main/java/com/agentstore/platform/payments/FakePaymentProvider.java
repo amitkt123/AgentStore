@@ -36,6 +36,28 @@ public class FakePaymentProvider implements PaymentProvider {
         failNextCreateOrder = true;
     }
 
+    private final java.util.Set<String> failRefundsFor = ConcurrentHashMap.newKeySet();
+    private volatile boolean timeoutNextRefund;
+    private volatile boolean refundsStayPending;
+
+    /** Makes every {@link #refund} against {@code paymentId} throw {@link PaymentProviderRejectedException}; cleared by {@link #reset()}. */
+    public void failRefundsFor(String paymentId) {
+        failRefundsFor.add(paymentId);
+    }
+
+    /**
+     * Makes the next {@link #refund} record the refund and then throw {@link PaymentProviderUnavailableException},
+     * as a timeout after the provider acted does; {@link #findRefund} finds it. Cleared by use or {@link #reset()}.
+     */
+    public void timeoutNextRefund() {
+        timeoutNextRefund = true;
+    }
+
+    /** New refunds are recorded as PENDING (as a real gateway usually answers) instead of PROCESSED; cleared by {@link #reset()}. */
+    public void refundsStayPending(boolean pending) {
+        refundsStayPending = pending;
+    }
+
     public static final String SIGNATURE_HEADER = "X-Fake-Signature";
     public static final String EVENT_ID_HEADER = "X-Fake-Event-Id";
 
@@ -142,6 +164,9 @@ public class FakePaymentProvider implements PaymentProvider {
     public synchronized ProviderRefund refund(String providerPaymentId, BigDecimal amount, String receipt) {
         Optional<ProviderRefund> existing = findRefund(providerPaymentId, receipt);
         if (existing.isPresent()) return existing.get();
+        if (failRefundsFor.contains(providerPaymentId)) {
+            throw new PaymentProviderRejectedException("fake provider: refunds rejected for " + providerPaymentId);
+        }
         FakePayment p = payments.stream().filter(x -> x.getPaymentId().equals(providerPaymentId)).findFirst()
                 .orElseThrow(() -> new PaymentProviderRejectedException("Unknown payment " + providerPaymentId));
         BigDecimal already = refunds.stream().filter(r -> r.getPaymentId().equals(providerPaymentId))
@@ -154,10 +179,14 @@ public class FakePaymentProvider implements PaymentProvider {
         r.setRefundId("fake_rfnd_" + UUID.randomUUID().toString().replace("-", ""));
         r.setPaymentId(providerPaymentId);
         r.setAmount(amount);
-        r.setStatus("PROCESSED");
+        r.setStatus(refundsStayPending ? "PENDING" : "PROCESSED");
         r.setReceipt(receipt);
         r.setAt(Instant.now());
         refunds.add(r);
+        if (timeoutNextRefund) {
+            timeoutNextRefund = false;
+            throw new PaymentProviderUnavailableException("fake provider: injected refund timeout");
+        }
         return toProviderRefund(r);
     }
 
@@ -243,6 +272,9 @@ public class FakePaymentProvider implements PaymentProvider {
     /** Clears every record; the bean is shared across a Spring context, so tests call this when they need a clean slate. */
     public void reset() {
         failNextCreateOrder = false;
+        failRefundsFor.clear();
+        timeoutNextRefund = false;
+        refundsStayPending = false;
         orders.clear();
         payments.clear();
         refunds.clear();

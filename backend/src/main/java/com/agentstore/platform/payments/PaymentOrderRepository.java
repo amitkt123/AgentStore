@@ -30,4 +30,15 @@ public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID
     @Modifying
     @Query(value = "update payment_order set status = 'FAILED' where id = :id and status = 'CREATED'", nativeQuery = true)
     int markFailedIfCreated(UUID id);
+
+    /**
+     * The org's PAID top-ups paid at or after {@code since} that still have money left to refund, newest
+     * {@code paid_at} first: the order refunds are split across.
+     */
+    @Query("select o from PaymentOrder o where o.orgId = :orgId "
+            + "and o.purpose = com.agentstore.platform.payments.PaymentOrder.Purpose.TOPUP "
+            + "and o.status = com.agentstore.platform.payments.PaymentOrder.Status.PAID "
+            + "and o.providerPaymentId is not null and o.paidAt >= :since and o.refundedAmount < o.amount "
+            + "order by o.paidAt desc, o.id desc")
+    List<PaymentOrder> refundableTopUps(UUID orgId, Instant since);
 }

@@ -37,9 +37,12 @@ public class WebhookProcessor {
     private final ReconciliationIssues issues;
     private final JdbcTemplate jdbc;
     private final VirtualAccountRepository virtualAccounts;
+    private final RefundService refunds;
 
     public WebhookProcessor(PaymentProvider provider, PaymentOrderRepository orders, PaymentCrediting crediting,
-                            ReconciliationIssues issues, JdbcTemplate jdbc, VirtualAccountRepository virtualAccounts) {
+                            ReconciliationIssues issues, JdbcTemplate jdbc, VirtualAccountRepository virtualAccounts,
+                            RefundService refunds) {
+        this.refunds = refunds;
         this.virtualAccounts = virtualAccounts;
         this.provider = provider;
         this.orders = orders;
@@ -83,7 +86,9 @@ public class WebhookProcessor {
             case PAYMENT_FAILED -> failed(event);
             case ORDER_PAID -> Outcome.PROCESSED;   // stored only: the capture event carries the money
             case VIRTUAL_ACCOUNT_CREDITED -> virtualAccountCredited(event);
-            // REFUND_* are handled in later tasks; OTHER is stored only.
+            case REFUND_PROCESSED -> refundOutcome(event, true);
+            case REFUND_FAILED -> refundOutcome(event, false);
+            // OTHER is stored only.
             default -> Outcome.IGNORED;
         };
 
@@ -148,6 +153,25 @@ public class WebhookProcessor {
         PaymentOrder order = orders.findByProviderAndProviderOrderId(provider.name(), providerOrderId).orElseThrow();
         PaymentCrediting.Result result = crediting.creditTopUp(order, paymentId, order.getAmount());
         return result == PaymentCrediting.Result.REFUSED ? Outcome.IGNORED : Outcome.PROCESSED;
+    }
+
+    /**
+     * Settles the refund part the provider refund id belongs to. An id we have not stored yet (the provider call
+     * timed out before we saw it) is ignored: the part is still PENDING and the retry job looks it up by receipt.
+     */
+    private Outcome refundOutcome(PaymentWebhookEvent event, boolean processed) {
+        Optional<java.util.UUID> part = refunds.partForProviderRefund(event.refundId());
+        if (part.isEmpty()) {
+            log.warn("Refund event {} for unknown refund {}; stored only", event.eventId(), event.refundId());
+            return Outcome.IGNORED;
+        }
+        if (processed) {
+            refunds.markDone(part.get(), event.refundId());
+        } else {
+            refunds.failPart(part.get(), event.failureReason() == null || event.failureReason().isBlank()
+                    ? "Provider failed the refund" : event.failureReason());
+        }
+        return Outcome.PROCESSED;
     }
 
     private Outcome failed(PaymentWebhookEvent event) {
