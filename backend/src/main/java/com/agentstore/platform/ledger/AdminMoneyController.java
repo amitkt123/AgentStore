@@ -50,6 +50,7 @@ public class AdminMoneyController {
     private final LedgerAccountBalanceRepository balanceRepository;
     private final LedgerTransactionRepository transactionRepository;
     private final WalletView walletView;
+    private final LedgerChecks ledgerChecks;
     private final TransactionTemplate tx;
 
     @PersistenceContext
@@ -61,7 +62,7 @@ public class AdminMoneyController {
                                 LedgerAccountRepository accountRepository,
                                 LedgerAccountBalanceRepository balanceRepository,
                                 LedgerTransactionRepository transactionRepository,
-                                WalletView walletView, PlatformTransactionManager transactionManager) {
+                                WalletView walletView, LedgerChecks ledgerChecks, PlatformTransactionManager transactionManager) {
         this.orgRepository = orgRepository;
         this.walletRepository = walletRepository;
         this.billingModeService = billingModeService;
@@ -72,6 +73,7 @@ public class AdminMoneyController {
         this.balanceRepository = balanceRepository;
         this.transactionRepository = transactionRepository;
         this.walletView = walletView;
+        this.ledgerChecks = ledgerChecks;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
@@ -113,9 +115,9 @@ public class AdminMoneyController {
         List<PlatformAccountResponse> accounts = balanceRepository.platformBalances().stream()
                 .map(row -> new PlatformAccountResponse((LedgerAccountKind) row[0], (BigDecimal) row[1]))
                 .toList();
-        return new PlatformAccountsResponse(accounts, balanceRepository.totalOfAllBalances().signum() == 0,
-                balanceRepository.accountsNotMatchingPostings().isEmpty(),
-                balanceRepository.walletsNotMatchingLedger().isEmpty());
+        LedgerChecks.Result checks = ledgerChecks.run();
+        return new PlatformAccountsResponse(accounts, checks.totalsZero(), checks.balancesMatchPostings(),
+                checks.walletsMatchLedger());
     }
 
     /**

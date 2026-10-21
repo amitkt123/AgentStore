@@ -23,14 +23,19 @@ public class ReconciliationIssues {
     }
 
     public void record(String kind, String providerRef, Map<String, Object> detail) {
+        record(LocalDate.now(ZoneOffset.UTC), kind, providerRef, detail);
+    }
+
+    /** Records the issue for {@code day}; returns false when that (day, kind, provider_ref) was already recorded. */
+    public boolean record(LocalDate day, String kind, String providerRef, Map<String, Object> detail) {
         String json;
         try {
             json = mapper.writeValueAsString(detail);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException(e);
         }
-        jdbc.update("insert into reconciliation_issue (id, day, kind, provider_ref, detail) "
+        return jdbc.update("insert into reconciliation_issue (id, day, kind, provider_ref, detail) "
                         + "values (gen_random_uuid(), ?, ?, ?, ?::jsonb) on conflict (day, kind, provider_ref) do nothing",
-                Date.valueOf(LocalDate.now(ZoneOffset.UTC)), kind, providerRef, json);
+                Date.valueOf(day), kind, providerRef, json) > 0;
     }
 }
