@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -28,6 +29,9 @@ public class Agent {
     private String category;
     private String description;
     private Instant createdAt;
+
+    /** Per-agent platform fee override; null falls back to the org, then config. */
+    private BigDecimal platformFeePercent;
 
     public Agent(UUID id, Org developerOrg, String name, String category, String description) {
         this.id = id;

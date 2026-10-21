@@ -1,11 +1,13 @@
 package com.agentstore.platform.identity;
 
+import com.agentstore.platform.ledger.BillingMode;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -37,6 +39,16 @@ public class Org {
     private Instant developerVerifiedAt;
 
     private Instant createdAt;
+
+    /** Per-org platform fee override for the org's agents; null falls back to config. */
+    private BigDecimal platformFeePercent;
+
+    /** Null means the configured default billing mode. */
+    @Enumerated(EnumType.STRING)
+    private BillingMode billingMode;
+
+    /** Postpaid credit limit; null means the configured default. */
+    private BigDecimal creditLimit;
 
     public Org(UUID id, String name, OrgType type) {
         this.id = id;
