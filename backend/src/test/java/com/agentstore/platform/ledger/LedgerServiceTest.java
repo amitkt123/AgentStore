@@ -1,11 +1,12 @@
 package com.agentstore.platform.ledger;
 
 import com.agentstore.platform.AbstractIntegrationTest;
+import com.agentstore.platform.execution.ExecutionFixtures;
+import com.agentstore.platform.execution.RunStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -13,21 +14,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LedgerServiceTest extends AbstractIntegrationTest {
 
     @Autowired
+    ExecutionFixtures fixtures;
+    @Autowired
     LedgerService ledgerService;
     @Autowired
     UsageEventRepository usageEventRepository;
     @Autowired
     LedgerEntryRepository ledgerEntryRepository;
-    @Autowired
-    WalletRepository walletRepository;
 
     @Test
     void chargingAUsageEventCreatesExactlyOneLedgerEntryEvenIfCalledTwice() {
-        UUID runId = UUID.randomUUID();
-        UUID orgId = UUID.randomUUID();
-        Wallet wallet = new Wallet(null, orgId, new BigDecimal("1000.00"), null);
-        wallet.setUpdatedAt(Instant.now());
-        walletRepository.save(wallet);
+        // A charge needs a real run: it pays the run's agent developer.
+        ExecutionFixtures.Scenario scenario = fixtures.liveTierA(new BigDecimal("500.00"), new BigDecimal("1000.00"));
+        UUID runId = fixtures.run(scenario, RunStatus.RUNNING, "sbx-" + UUID.randomUUID(), "tok-" + UUID.randomUUID()).getId();
+        UUID orgId = scenario.buyer().getId();
 
         UsageEvent event = usageEventRepository.save(
                 new UsageEvent(null, runId, orgId, new BigDecimal("5"), new BigDecimal("2.00"), new BigDecimal("10.00")));
