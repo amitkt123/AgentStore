@@ -67,6 +67,8 @@ public interface LedgerTransactionRepository extends JpaRepository<LedgerTransac
 
         String getRunDisplayId();
 
+        UUID getRunId();
+
         UUID getAgentId();
 
         String getAgentName();
@@ -88,7 +90,7 @@ public interface LedgerTransactionRepository extends JpaRepository<LedgerTransac
      */
     @Query(nativeQuery = true, value = """
             select t.id as id, t.type as type, t.created_at as at, r.display_id as runDisplayId,
-                   a.id as agentId, a.name as agentName,
+                   t.run_id as runId, a.id as agentId, a.name as agentName,
                    coalesce(sum(case when t.type = 'RUN_CHARGE' and la.kind in ('BUYER_WALLET', 'BUYER_RECEIVABLE')
                                       and p.amount < 0 then -p.amount end), 0) as buyerPaid,
                    coalesce(sum(case when la.kind = 'PLATFORM_REVENUE' then p.amount end), 0) as platformFee,
@@ -104,7 +106,7 @@ public interface LedgerTransactionRepository extends JpaRepository<LedgerTransac
             where t.created_at >= :from and t.created_at < :to
               and exists (select 1 from ledger_posting dp
                           where dp.transaction_id = t.id and dp.account_id = :accountId)
-            group by t.id, t.type, t.created_at, r.display_id, a.id, a.name
+            group by t.id, t.type, t.created_at, t.run_id, r.display_id, a.id, a.name
             order by t.created_at, t.id""")
     List<DeveloperTransactionRow> developerTransactionsBetween(@Param("accountId") UUID accountId,
                                                                @Param("from") Instant from,

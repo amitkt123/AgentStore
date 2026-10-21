@@ -181,4 +181,55 @@ class EarningsControllerTest extends AbstractIntegrationTest {
         assertThat(get("/api/v1/developer/statements/2026-10/download", org, UserRole.BUYER_ADMIN, String.class)
                 .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
+
+    @Autowired
+    LedgerAccounts ledgerAccounts;
+    @Autowired
+    org.springframework.transaction.support.TransactionTemplate tx;
+
+    @Test
+    void oneRunWithTwoChargesCountsOnce() {
+        var s = fixtures.liveTierA(new BigDecimal("100000.00"), new BigDecimal("1000.00"));
+        Run run = newRun(s);
+        charge(s, run, "100.00");
+        charge(s, run, "50.00");
+
+        var body = get("/api/v1/developer/earnings", developerOrg(s), UserRole.DEVELOPER, EarningsResponse.class).getBody();
+
+        assertThat(body.byAgent().get(0).runs()).isEqualTo(1);
+        assertThat(body.byAgent().get(0).perRun()).isEqualByComparingTo("120.00");
+        String csv = get("/api/v1/developer/statements/" + body.month() + "/download", developerOrg(s),
+                UserRole.DEVELOPER, String.class).getBody();
+        assertThat(csv.trim().split("\r?\n")).hasSize(3);
+    }
+
+    @Test
+    void taxPostingsAreReportedAndReduceEarned() {
+        var s = fixtures.liveTierA(new BigDecimal("100000.00"), new BigDecimal("1000.00"));
+        Run run = newRun(s);
+        UUID dev = developerOrg(s);
+        tx.executeWithoutResult(st -> ledgerService.post(LedgerTransactionType.RUN_CHARGE, "usage:" + UUID.randomUUID(),
+                run.getId(), s.buyer().getId(), Map.of("agentId", s.version().getAgent().getId().toString()),
+                java.util.List.of(
+                        new Posting(ledgerAccounts.orgAccount(s.buyer().getId(), LedgerAccountKind.BUYER_RECEIVABLE),
+                                new BigDecimal("-100.00")),
+                        new Posting(ledgerAccounts.orgAccount(dev, LedgerAccountKind.DEVELOPER_PAYABLE), new BigDecimal("78.90")),
+                        new Posting(ledgerAccounts.platformAccount(LedgerAccountKind.PLATFORM_REVENUE), new BigDecimal("20.00")),
+                        new Posting(ledgerAccounts.platformAccount(LedgerAccountKind.TAX_TDS_PAYABLE), new BigDecimal("0.10")),
+                        new Posting(ledgerAccounts.platformAccount(LedgerAccountKind.TAX_TCS_PAYABLE), new BigDecimal("1.00")))));
+
+        var body = get("/api/v1/developer/earnings", dev, UserRole.DEVELOPER, EarningsResponse.class).getBody();
+
+        assertThat(body.buyersPaid()).isEqualByComparingTo("100.00");
+        assertThat(body.platformFee()).isEqualByComparingTo("20.00");
+        assertThat(body.tax()).isEqualByComparingTo("1.10");
+        assertThat(body.earned()).isEqualByComparingTo("78.90");
+    }
+
+    @Test
+    void csvNeutralisesFormulaNames() {
+        assertThat(EarningsStatementCsv.neutralise("=SUM(A1)")).isEqualTo("'=SUM(A1)");
+        assertThat(EarningsStatementCsv.neutralise("@x")).isEqualTo("'@x");
+        assertThat(EarningsStatementCsv.neutralise("Plain")).isEqualTo("Plain");
+    }
 }

@@ -16,7 +16,7 @@ final class EarningsStatementCsv {
             csv.append(String.join(",",
                             field(row.getAt().toString()),
                             field(row.getRunDisplayId()),
-                            field(row.getAgentName()),
+                            field(neutralise(row.getAgentName())),
                             field(row.getType()),
                             row.getBuyerPaid().setScale(2).toPlainString(),
                             row.getPlatformFee().setScale(2).toPlainString(),
@@ -26,6 +26,12 @@ final class EarningsStatementCsv {
                     .append("\r\n");
         }
         return csv.toString();
+    }
+
+    /** Stops spreadsheets treating a leading =, +, - or @ as a formula. */
+    static String neutralise(String value) {
+        if (value != null && !value.isEmpty() && "=+-@".indexOf(value.charAt(0)) >= 0) return "'" + value;
+        return value;
     }
 
     static String field(String value) {

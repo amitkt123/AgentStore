@@ -22,10 +22,12 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** A developer org's earnings and statement, read straight from its DEVELOPER_PAYABLE postings. Creates nothing. */
@@ -119,7 +121,7 @@ public class EarningsController {
 
     private static final class Totals {
         private final String name;
-        private int runs;
+        private final Set<UUID> runIds = new HashSet<>();
         private BigDecimal buyersPaid = BigDecimal.ZERO, fee = BigDecimal.ZERO, ai = BigDecimal.ZERO,
                 earned = BigDecimal.ZERO;
 
@@ -128,7 +130,7 @@ public class EarningsController {
         }
 
         void add(LedgerTransactionRepository.DeveloperTransactionRow row) {
-            if ("RUN_CHARGE".equals(row.getType())) runs++;
+            if ("RUN_CHARGE".equals(row.getType()) && row.getRunId() != null) runIds.add(row.getRunId());
             buyersPaid = buyersPaid.add(row.getBuyerPaid());
             fee = fee.add(row.getPlatformFee());
             ai = ai.add(row.getAiUsage());
@@ -136,6 +138,7 @@ public class EarningsController {
         }
 
         EarningsResponse.ByAgent toResponse(UUID agentId) {
+            int runs = runIds.size();
             BigDecimal perRun = runs == 0 ? BigDecimal.ZERO.setScale(2)
                     : earned.divide(BigDecimal.valueOf(runs), 2, RoundingMode.HALF_UP);
             return new EarningsResponse.ByAgent(agentId, name, runs, buyersPaid, fee, ai, earned, perRun);
