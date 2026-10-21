@@ -1,0 +1,30 @@
+name: Runner
+
+on:
+  # PRs to master that touch these paths only
+  pull_request:
+    branches: [master]
+    paths:
+      - "runner/**"
+      - "!runner/e2b-shim/**"
+      - ".github/workflows/runner.yml"
+
+# A newer push to the same PR cancels the older run
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: runner/pom.xml
+      - name: Test
+        working-directory: runner
+        run: mvn -B -ntp clean test
