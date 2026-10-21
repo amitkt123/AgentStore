@@ -1,0 +1,79 @@
+# Payments runbook (WS10b)
+
+How money gets in (top-ups, bank transfer, bill payments) and back (refunds), which provider runs it, and what to check before live money. Design: `docs/superpowers/specs/2026-10-21-ws10-money-in-and-out-design.md` §2. Plan: `docs/superpowers/plans/2026-10-21-ws10b-money-in-and-back.md`.
+
+## Choosing the provider and methods
+
+All keys are under `agentstore.money.payments` (bound to `PaymentProperties`).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `provider` | `razorpay` (`application.yml`); `fake` in `application-dev.yml` and `application-test.yml` | Which payment provider bean runs |
+| `methods` | `UPI,CARD,NETBANKING,BANK_TRANSFER` | Methods a buyer may use; others answer `PAYMENT_METHOD_DISABLED` |
+| `topup-min` | `100.00` | Smallest top-up (rupees) |
+| `topup-daily-limit` | `100000.00` | Per org per day (soft limit, see `known-issues.md`) |
+| `refund-window-days` | `180` | Older money needs an admin |
+| `bill-due-days` | `15` | Days from bill issue to due date |
+| `webhook-rate-per-minute` | `120` | Rate limit on the webhook endpoint |
+| `razorpay.key-id`, `razorpay.key-secret`, `razorpay.webhook-secret` | from `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` (blank) | Razorpay credentials. The Razorpay provider refuses to start if any is blank |
+| `razorpay.base-url` | `https://api.razorpay.com` | API base |
+| `fake.webhook-secret` | `fake-webhook-secret` | Signs fake webhooks |
+
+## Fake mode in dev
+
+The dev profile (`scripts/dev-up.sh` runs `dev,runner`) uses `provider: fake`. No keys are needed. Orders, virtual accounts and refunds are simulated in-process, and webhooks are signed with `fake.webhook-secret` and posted to `POST /webhooks/payments/fake`. Use it to try Add money, Bank transfer details, Get money back and Pay on the Billing page.
+
+## Switching to Razorpay test mode
+
+1. In the Razorpay dashboard, switch to Test Mode and create API keys. Enable Smart Collect (virtual accounts) on the test account.
+2. Put the keys in `.dev/env` (git-ignored; `scripts/dev-up.sh` sources it and the backend inherits the variables):
+   ```
+   RAZORPAY_KEY_ID=rzp_test_...
+   RAZORPAY_KEY_SECRET=...
+   RAZORPAY_WEBHOOK_SECRET=...
+   ```
+3. Set `agentstore.money.payments.provider=razorpay` (for example `AGENTSTORE_MONEY_PAYMENTS_PROVIDER=razorpay` in `.dev/env`).
+4. Webhook: in Dashboard, Settings, Webhooks, add `{tunnel}/webhooks/payments/razorpay` (the tunnel URL `dev-up.sh` prints as "callback URL"), set the same secret as `RAZORPAY_WEBHOOK_SECRET`, and tick exactly these six events:
+   - `payment.captured`
+   - `payment.failed`
+   - `order.paid`
+   - `virtual_account.credited`
+   - `refund.processed`
+   - `refund.failed`
+   The quick tunnel URL changes on every `dev-up.sh`, so update the dashboard URL each time.
+
+## Manual test-mode checklist (to be done by the user once keys exist)
+
+Not yet done. Nothing below has run against real Razorpay.
+
+Flows:
+- [ ] UPI top-up (Razorpay test VPA `success@razorpay`): wallet credited once, top-up history shows PAID.
+- [ ] Card top-up (Razorpay test card): wallet credited.
+- [ ] Failed payment (`failure@razorpay`) then a retry on the same order: failure message shown, retry credits once.
+- [ ] Bank transfer to the test virtual account (Dashboard, Smart Collect, test payment on the account): wallet credited.
+- [ ] Partial refund of a top-up: wallet debited, refund reaches PROCESSED via webhook, then a second refund of the rest.
+- [ ] Postpaid bill: run the monthly bill, pay it with the Pay button, bill becomes PAID and `BUYER_RECEIVABLE` clears.
+- [ ] Reconciliation run (`/admin/money`, or wait for the nightly job): no issues.
+
+Razorpay API assumptions to confirm (the adapter was written from documentation, not a live account):
+- [ ] `POST /v1/orders` accepts `{amount, currency, receipt, notes}` and returns `id`; a 36-character UUID receipt is within the 40-character limit.
+- [ ] Checkout `config.display.blocks.<name>.instruments[0].method` takes `upi`, `card` or `netbanking`, and with `sequence: ["block.<name>"]` and `preferences.show_default_blocks: false` restricts checkout to that method.
+- [ ] `POST /v1/virtual_accounts` with `receivers.types=["bank_account"]`, `description` and `notes` succeeds without `customer_id`; `receivers[]` holds an entry with `entity: "bank_account"`, `account_number`, `ifsc` and `name`.
+- [ ] `POST /v1/payments/{id}/refund` accepts `receipt`, and both its response and `GET /v1/payments/{id}/refunds` return that `receipt` (retry after a timeout depends on it). Refund statuses are `pending`, `processed`, `failed`.
+- [ ] Webhook signature is the lowercase hex HMAC-SHA256 of the raw body keyed with the webhook secret, in `X-Razorpay-Signature`; the event id is in `X-Razorpay-Event-Id`.
+- [ ] Payload shapes: `payload.payment.entity` for `payment.*` and `order.paid`; `payload.refund.entity` (with `payment_id`) for `refund.*`; `payload.virtual_account.entity.id` plus `payload.payment.entity` (method `bank_transfer`, paise) for `virtual_account.credited`.
+- [ ] `payment.failed` carries `error_description`. `refund.failed` carries no reason, so the default "Provider failed the refund" is shown.
+- [ ] `/v1/payments`, `/v1/refunds` and `/v1/settlements` accept `from`/`to` in epoch seconds, treat `to` as inclusive (range inclusivity), and page with `count` (max 100) and `skip`.
+- [ ] Settlement `fees` is the total fee in paise and includes tax. If it excludes `tax`, the gateway-fee posting under-counts.
+- [ ] Payments from `GET /v1/payments` carry `virtual_account_id` for bank transfers. If not, reconciliation cannot flag a bank-transfer payment as MISSING_LOCALLY; the fix is `GET /v1/virtual_accounts/{id}/payments` per known account.
+- [ ] Error bodies are `{"error": {"code": "...", "description": ...}}`; a refund over the refundable amount or on an unknown payment is a 400, not a 5xx.
+- [ ] Rate limiting answers 429 (the adapter treats 429 and 408 as "outcome unknown", retried later).
+- [ ] The Checkout `amount` the backend returns is paise and the frontend passes it through unchanged.
+
+## Before live money
+
+- Business KYC completed with Razorpay and the account activated.
+- Live keys and a live webhook (stable HTTPS URL, not a quick tunnel) with its own secret; keys only in the deployment's secret store.
+- Items for a CA or lawyer (spec §8): GST treatment and tax invoices (WS10 non-goal, bills are statements), refund and chargeback policy, holding buyer money before payout, and the terms shown at top-up.
+- Re-run the checklist above in live mode with a small real amount, then a reconciliation run.
+- Decide the daily top-up limit and `methods` for launch.
