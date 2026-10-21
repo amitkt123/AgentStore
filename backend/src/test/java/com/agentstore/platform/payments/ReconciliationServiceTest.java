@@ -159,6 +159,57 @@ class ReconciliationServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void providerRefundWithNoLocalPartIsFlagged() {
+        UUID org = org();
+        String ord = uniq("ord_"), pay = uniq("pay_");
+        PaymentOrder o = order(org, PaymentOrder.Status.PAID, ord, pay, "500.00", AT);
+        fake().seedPayment(pay, ord, new BigDecimal("500.00"), "captured", null, AT);
+        // Made outside Karya (e.g. in the dashboard): no part, no matching receipt.
+        String outside = uniq("rfnd_");
+        fake().seedRefund(outside, pay, new BigDecimal("50.00"), "PROCESSED", null, AT);
+        // Made by us but its provider id not stored yet (timeout): the receipt is a local part id.
+        UUID refundId = UUID.randomUUID(), partId = UUID.randomUUID();
+        jdbc.update("insert into buyer_refund (id, org_id, request_id, amount, status) values (?, ?, ?, 100, 'PROCESSING')",
+                refundId, org, uniq("req-"));
+        jdbc.update("insert into buyer_refund_part (id, refund_id, payment_order_id, amount, status) "
+                + "values (?, ?, ?, 100, 'PENDING')", partId, refundId, o.getId());
+        fake().seedRefund(uniq("rfnd_"), pay, new BigDecimal("100.00"), "PENDING", partId.toString(), AT);
+
+        reconciliation.reconcile(DAY);
+
+        assertThat(issues()).hasSize(1);
+        assertThat(issues().get(0)).containsEntry("kind", "REFUND_UNMATCHED").containsEntry("provider_ref", outside);
+    }
+
+    @Test
+    void providerRefundUnderAnHourOldIsNotFlaggedYet() {
+        LocalDate today = LocalDate.now(java.time.ZoneOffset.UTC);
+        Instant started = Instant.now();
+        Instant recent = started.minusSeconds(600);
+        if (!recent.atZone(java.time.ZoneOffset.UTC).toLocalDate().equals(today)) recent = started;
+        String young = uniq("rfnd_");
+        String old = uniq("rfnd_");
+        fake().seedRefund(young, uniq("pay_"), new BigDecimal("10.00"), "PROCESSED", null, recent);
+        Instant hourAgo = started.minusSeconds(7200);
+        boolean oldIsToday = hourAgo.atZone(java.time.ZoneOffset.UTC).toLocalDate().equals(today);
+        if (oldIsToday) fake().seedRefund(old, uniq("pay_"), new BigDecimal("10.00"), "PROCESSED", null, hourAgo);
+        try {
+            reconciliation.reconcile(today);
+
+            assertThat(jdbc.queryForObject("select count(*) from reconciliation_issue where provider_ref = ?",
+                    Integer.class, young)).isZero();
+            if (oldIsToday) {
+                assertThat(jdbc.queryForObject("select count(*) from reconciliation_issue where provider_ref = ? "
+                        + "and kind = 'REFUND_UNMATCHED'", Integer.class, old)).isEqualTo(1);
+            }
+        } finally {
+            // Today's run also flagged other classes' data; drop only what it recorded.
+            jdbc.update("delete from reconciliation_issue where day = ? and created_at >= ?", Date.valueOf(today),
+                    java.sql.Timestamp.from(started));
+        }
+    }
+
+    @Test
     void feesPostedOnce() {
         String settlement = uniq("setl_");
         fake().seedSettlement(settlement, new BigDecimal("23.60"), AT);

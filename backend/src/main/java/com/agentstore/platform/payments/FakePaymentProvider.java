@@ -391,7 +391,8 @@ public class FakePaymentProvider implements PaymentProvider {
     }
 
     private static ProviderRefund toProviderRefund(FakeRefund r) {
-        return new ProviderRefund(r.getRefundId(), r.getPaymentId(), r.getAmount(), r.getStatus(), r.getReceipt());
+        return new ProviderRefund(r.getRefundId(), r.getPaymentId(), r.getAmount(), r.getStatus(), r.getReceipt(),
+                r.getAt());
     }
 
     private static boolean onDay(Instant at, LocalDate day) {

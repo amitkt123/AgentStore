@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Base64;
@@ -164,7 +165,7 @@ class RazorpayPaymentProviderTest {
         ProviderRefund r = provider.refund("pay_29QQoUBi66xm2f", new BigDecimal("125.50"), receipt);
 
         assertThat(r).isEqualTo(new ProviderRefund("rfnd_FP8QHiV938haTz", "pay_29QQoUBi66xm2f",
-                new BigDecimal("125.50"), "PENDING", receipt));
+                new BigDecimal("125.50"), "PENDING", receipt, Instant.ofEpochSecond(1761091200)));
     }
 
     @Test
@@ -175,7 +176,8 @@ class RazorpayPaymentProviderTest {
                 .andRespond(withSuccess(fixture("payment_refunds.json"), MediaType.APPLICATION_JSON));
         Optional<ProviderRefund> found = provider.findRefund("pay_29QQoUBi66xm2f", "9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f");
         assertThat(found).contains(new ProviderRefund("rfnd_FP8QHiV938haTz", "pay_29QQoUBi66xm2f",
-                new BigDecimal("125.50"), "PROCESSED", "9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f"));
+                new BigDecimal("125.50"), "PROCESSED", "9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+                Instant.ofEpochSecond(1761094800)));
 
         server.reset();
         server.expect(requestTo(BASE + "/v1/payments/pay_29QQoUBi66xm2f/refunds?count=100&skip=0"))
@@ -344,8 +346,9 @@ class RazorpayPaymentProviderTest {
                 new ProviderPayment("pay_DlGmmE0kqRSuy6", null, new BigDecimal("25000.00"), "captured", "va_DlGmm7jInLudH9"));
         assertThat(provider.fetchRefunds(day)).containsExactly(
                 new ProviderRefund("rfnd_FP8QHiV938haTz", "pay_29QQoUBi66xm2f", new BigDecimal("125.50"), "PROCESSED",
-                        "9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f"),
-                new ProviderRefund("rfnd_FP8R8EGjGbPkVb", "pay_G8VQzjPLoAvm6D", new BigDecimal("50.00"), "PENDING", null));
+                        "9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f", Instant.ofEpochSecond(1761094800)),
+                new ProviderRefund("rfnd_FP8R8EGjGbPkVb", "pay_G8VQzjPLoAvm6D", new BigDecimal("50.00"), "PENDING", null,
+                        Instant.ofEpochSecond(1761095000)));
         assertThat(provider.fetchSettlements(day)).containsExactly(
                 new ProviderSettlement("setl_DGlQ1Rj8os78Ec", new BigDecimal("4.71")));
         server.verify();

@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -344,8 +345,10 @@ public class RazorpayPaymentProvider implements PaymentProvider {
 
     private static ProviderRefund toRefund(JsonNode r) {
         String status = text(r, "status");
+        JsonNode created = r.path("created_at");
         return new ProviderRefund(text(r, "id"), text(r, "payment_id"), rupees(r, "amount"),
-                status == null ? null : status.toUpperCase(Locale.ROOT), text(r, "receipt"));
+                status == null ? null : status.toUpperCase(Locale.ROOT), text(r, "receipt"),
+                created.canConvertToLong() && created.isIntegralNumber() ? Instant.ofEpochSecond(created.longValue()) : null);
     }
 
     static long toPaise(BigDecimal rupees) {

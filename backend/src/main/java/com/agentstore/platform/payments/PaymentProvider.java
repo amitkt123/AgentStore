@@ -1,6 +1,7 @@
 package com.agentstore.platform.payments;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -38,8 +39,9 @@ public interface PaymentProvider {
 
     record ProviderVirtualAccount(String id, String accountNumber, String ifsc, String beneficiaryName) {}
 
-    /** {@code status} is PROCESSED, PENDING or FAILED. */
-    record ProviderRefund(String refundId, String paymentId, BigDecimal amount, String status, String receipt) {}
+    /** {@code status} is PROCESSED, PENDING or FAILED; {@code createdAt} is when the provider made it (null if unknown). */
+    record ProviderRefund(String refundId, String paymentId, BigDecimal amount, String status, String receipt,
+                          Instant createdAt) {}
 
     record ProviderPayment(String paymentId, String orderId, BigDecimal amount, String status, String virtualAccountId) {}
 

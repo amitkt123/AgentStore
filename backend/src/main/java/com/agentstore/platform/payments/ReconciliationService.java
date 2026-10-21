@@ -38,6 +38,8 @@ import java.util.UUID;
 public class ReconciliationService {
 
     private static final Logger log = LoggerFactory.getLogger(ReconciliationService.class);
+    /** A provider refund younger than this may not be stored locally yet, so it is not flagged as unmatched. */
+    static final java.time.Duration UNMATCHED_REFUND_GRACE = java.time.Duration.ofHours(1);
 
     private final PaymentProvider provider;
     private final ReconciliationIssues issues;
@@ -132,7 +134,13 @@ public class ReconciliationService {
         for (PaymentProvider.ProviderRefund r : refunds) {
             List<String> parts = jdbc.queryForList(
                     "select status from buyer_refund_part where provider_refund_id = ?", String.class, r.refundId());
-            if (parts.isEmpty()) continue;
+            if (parts.isEmpty()) {
+                if (!awaitingLocalPart(r)) {
+                    found += flag(day, "REFUND_UNMATCHED", r.refundId(), detail("paymentId", r.paymentId(),
+                            "amount", r.amount(), "providerStatus", r.status(), "receipt", r.receipt()));
+                }
+                continue;
+            }
             String local = parts.get(0);
             if (!refundStatusAgrees(r.status(), local)) {
                 found += flag(day, "REFUND_MISMATCH", r.refundId(),
@@ -140,6 +148,23 @@ public class ReconciliationService {
             }
         }
         return found;
+    }
+
+    /**
+     * A provider refund with no part holding its id is ours when its receipt is a part id (the refund call timed out
+     * before we stored the id; the retry job settles it) and possibly ours when it is under an hour old (the
+     * submitting transaction may not have committed yet). Anything else was made outside Karya.
+     */
+    private boolean awaitingLocalPart(PaymentProvider.ProviderRefund r) {
+        if (r.createdAt() != null && r.createdAt().isAfter(Instant.now().minus(UNMATCHED_REFUND_GRACE))) return true;
+        if (r.receipt() == null) return false;
+        UUID partId;
+        try {
+            partId = UUID.fromString(r.receipt());
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        return count("select count(*) from buyer_refund_part where id = ?", partId) > 0;
     }
 
     private static boolean refundStatusAgrees(String provider, String local) {

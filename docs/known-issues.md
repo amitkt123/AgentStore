@@ -11,7 +11,7 @@ Cross-cutting inconsistencies, unenforced declarations and open risks. Moved fro
 - **Only the settlement fee is posted:** the gateway fee is booked per settlement (`gateway-fee:{settlementId}`); the settlement net paid to the bank is not posted.
 - **A second captured payment on an already-PAID order is not rejected:** on a top-up order it is credited as its own top-up (`dup:{paymentId}`); on a paid bill it becomes a DUPLICATE_PAYMENT reconciliation issue for an admin to refund by hand.
 - **A refund webhook for an unknown refund id is ignored:** the retry job polls refund parts still PROCESSING after 1 hour. A provider "processed" after we already reversed a part becomes a reconciliation issue, not an automatic correction.
-- **Refunds made outside Karya are not detected:** a refund made in the Razorpay dashboard is not found by reconciliation.
+- **Refunds made outside Karya need an admin:** reconciliation flags a provider refund with no local refund part as `REFUND_UNMATCHED` (refunds under an hour old, or whose receipt is a local part id, are skipped). The wallet is not debited automatically; an admin decides (usually a wallet adjustment with a note).
 - **The daily top-up limit is soft:** concurrent orders can slightly exceed `topup-daily-limit`.
 - **A run charge can escape the monthly bill:** a charge whose transaction starts before month end but commits after the 00:30 UTC billing run is never billed.
 - **Bank-transfer payments may not be flagged MISSING_LOCALLY:** if Razorpay's payment list omits `virtual_account_id`, reconciliation cannot match them to a virtual account (confirm in test mode, `docs/payments.md`).
