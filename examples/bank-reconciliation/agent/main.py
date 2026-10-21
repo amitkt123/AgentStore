@@ -7,6 +7,7 @@ this file, so all the work sits under main().
 import json
 import os
 import urllib.request
+from decimal import Decimal
 
 # First keyword found in the narration wins; anything else goes to suspense for a person to look at.
 ACCOUNTS = [
@@ -57,14 +58,20 @@ def account_for(narration):
     return SUSPENSE
 
 
+def money(value):
+    # Do the arithmetic in Decimal; JSON gets a plain number because the gate preview only totals numeric fields.
+    # float() of a two-place Decimal prints back as the same digits, so nothing drifts on the way out.
+    return float(value.quantize(Decimal("0.01")))
+
+
 def journal_entry(row):
-    amount = float(row["amount"])
+    amount = Decimal(str(row["amount"]))
     return {
         "date": row["date"],
         "account": account_for(row["narration"]),
         "narration": row["narration"],
-        "debit": round(-amount, 2) if amount < 0 else 0,
-        "credit": round(amount, 2) if amount > 0 else 0,
+        "debit": money(-amount) if amount < 0 else 0,
+        "credit": money(amount) if amount > 0 else 0,
     }
 
 
