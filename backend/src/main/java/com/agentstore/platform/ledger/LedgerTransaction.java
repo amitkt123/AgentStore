@@ -8,6 +8,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -33,7 +34,7 @@ public class LedgerTransaction {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private String reference;
+    private Map<String, Object> reference;
 
     private Instant createdAt;
 

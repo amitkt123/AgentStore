@@ -24,7 +24,7 @@ public class LedgerPosting {
 
     private UUID accountId;
 
-    /** Positive debits the account, negative credits it; a transaction's postings sum to zero. */
+    /** Positive raises the account's balance, negative lowers it; a transaction's postings sum to zero. */
     private BigDecimal amount;
 
     private Instant createdAt;
