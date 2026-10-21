@@ -103,6 +103,7 @@ class RazorpayPaymentProviderTest {
                 .andExpect(jsonPath("$.currency").value("INR"))
                 .andExpect(jsonPath("$.receipt").value(receipt))
                 .andExpect(jsonPath("$.notes.purpose").value("TOPUP"))
+                .andExpect(jsonPath("$.payment_capture").value(1))
                 .andRespond(withSuccess(fixture("order.json"), MediaType.APPLICATION_JSON));
 
         ProviderOrder order = provider.createOrder(receipt, new BigDecimal("500.50"), PaymentMethod.UPI,
@@ -157,6 +158,7 @@ class RazorpayPaymentProviderTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(jsonPath("$.amount").value(12550))
                 .andExpect(jsonPath("$.receipt").value(receipt))
+                .andExpect(header("X-Refund-Idempotency", receipt))
                 .andRespond(withSuccess(fixture("refund.json"), MediaType.APPLICATION_JSON));
 
         ProviderRefund r = provider.refund("pay_29QQoUBi66xm2f", new BigDecimal("125.50"), receipt);
@@ -179,6 +181,44 @@ class RazorpayPaymentProviderTest {
         server.expect(requestTo(BASE + "/v1/payments/pay_29QQoUBi66xm2f/refunds?count=100&skip=0"))
                 .andRespond(withSuccess(fixture("payment_refunds.json"), MediaType.APPLICATION_JSON));
         assertThat(provider.findRefund("pay_29QQoUBi66xm2f", "no-such-receipt")).isEmpty();
+    }
+
+    @Test
+    void refundListWithoutItemsIsUnavailableNotNotFound() {
+        // A 2xx without an items array must never read as "no such refund": the caller would refund again.
+        server.expect(requestTo(BASE + "/v1/payments/pay_29QQoUBi66xm2f/refunds?count=100&skip=0"))
+                .andRespond(withSuccess("{\"entity\":\"collection\",\"count\":0}", MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> provider.findRefund("pay_29QQoUBi66xm2f", "9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f"))
+                .isInstanceOf(PaymentProviderUnavailableException.class)
+                .hasMessageContaining("list payment refunds");
+
+        server.reset();
+        server.expect(requestTo(BASE + "/v1/payments/pay_29QQoUBi66xm2f/refunds?count=100&skip=0"))
+                .andRespond(withSuccess("{\"items\":{\"id\":\"SECRET\"}}", MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> provider.findRefund("pay_29QQoUBi66xm2f", "r-1"))
+                .isInstanceOf(PaymentProviderUnavailableException.class).hasMessageNotContaining("SECRET");
+    }
+
+    @Test
+    void dayFetchWithoutItemsIsUnavailableNotAnEmptyDay() {
+        LocalDate day = LocalDate.of(2026, 10, 21);
+        long from = day.atStartOfDay(ZoneOffset.UTC).toEpochSecond();
+        String q = "?from=" + from + "&to=" + (from + 86_399) + "&count=100&skip=0";
+        server.expect(requestTo(BASE + "/v1/payments" + q))
+                .andRespond(withSuccess("{\"entity\":\"collection\"}", MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> provider.fetchPayments(day))
+                .isInstanceOf(PaymentProviderUnavailableException.class).hasMessageContaining("list payments");
+
+        server.reset();
+        server.expect(requestTo(BASE + "/v1/refunds" + q))
+                .andRespond(withSuccess("{\"items\":null}", MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> provider.fetchRefunds(day))
+                .isInstanceOf(PaymentProviderUnavailableException.class).hasMessageContaining("list refunds");
+
+        server.reset();
+        server.expect(requestTo(BASE + "/v1/settlements" + q))
+                .andRespond(withSuccess("{\"entity\":\"collection\",\"count\":0,\"items\":[]}", MediaType.APPLICATION_JSON));
+        assertThat(provider.fetchSettlements(day)).isEmpty();   // a real empty day is still empty
     }
 
     @Test

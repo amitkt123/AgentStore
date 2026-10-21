@@ -42,6 +42,8 @@ public class RazorpayPaymentProvider implements PaymentProvider {
     static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
     static final String SIGNATURE_HEADER = "X-Razorpay-Signature";
     static final String EVENT_ID_HEADER = "X-Razorpay-Event-Id";
+    /** Razorpay answers a repeated refund request carrying the same key with the first refund instead of a new one. */
+    static final String REFUND_IDEMPOTENCY_HEADER = "X-Refund-Idempotency";
     static final String DEFAULT_BASE_URL = "https://api.razorpay.com";
     static final String CHECKOUT_NAME = "Karya";
 
@@ -105,6 +107,7 @@ public class RazorpayPaymentProvider implements PaymentProvider {
         body.put("currency", "INR");
         body.put("receipt", receipt);
         body.put("notes", notes == null ? Map.of() : notes);
+        body.put("payment_capture", 1);   // auto-capture: an authorized-only payment never credits a wallet
         JsonNode order = call("create order", () -> http.post().uri("/v1/orders")
                 .contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(String.class));
         String orderId = requiredText(order, "id", "create order");
@@ -172,6 +175,10 @@ public class RazorpayPaymentProvider implements PaymentProvider {
         body.put("amount", toPaise(amount));
         body.put("receipt", receipt);
         JsonNode refund = call("refund", () -> http.post().uri("/v1/payments/{id}/refund", providerPaymentId)
+                .headers(h -> {
+                    // The receipt is the refund part id, a UUID: within the header's 10+ chars of [A-Za-z0-9_-].
+                    if (receipt != null && receipt.matches("[A-Za-z0-9_-]{10,}")) h.set(REFUND_IDEMPOTENCY_HEADER, receipt);
+                })
                 .contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(String.class));
         requiredText(refund, "id", "refund");
         return toRefund(refund);
@@ -185,7 +192,7 @@ public class RazorpayPaymentProvider implements PaymentProvider {
             JsonNode list = call("list payment refunds", () -> http.get().uri(b -> b.path("/v1/payments/{id}/refunds")
                     .queryParam("count", PAGE_SIZE).queryParam("skip", s).build(providerPaymentId))
                     .retrieve().body(String.class));
-            JsonNode items = list.path("items");
+            JsonNode items = items(list, "list payment refunds");
             for (JsonNode item : items) {
                 if (receipt.equals(text(item, "receipt"))) return Optional.of(toRefund(item));
             }
@@ -310,7 +317,7 @@ public class RazorpayPaymentProvider implements PaymentProvider {
             JsonNode list = call(endpoint, () -> http.get().uri(b -> b.path(path).queryParam("from", from)
                     .queryParam("to", to).queryParam("count", PAGE_SIZE).queryParam("skip", s).build())
                     .retrieve().body(String.class));
-            JsonNode items = list.path("items");
+            JsonNode items = items(list, endpoint);
             try {
                 for (JsonNode item : items) out.add(mapper.apply(item));
             } catch (ArithmeticException e) {
@@ -322,6 +329,18 @@ public class RazorpayPaymentProvider implements PaymentProvider {
     }
 
     // ---- helpers ----
+
+    /**
+     * The {@code items} array of a list answer. A 2xx without one is unreadable, not empty: read as empty it would make
+     * a refund look absent (and be made again) or a day look quiet.
+     */
+    private static JsonNode items(JsonNode list, String endpoint) {
+        JsonNode items = list.get("items");
+        if (items == null || !items.isArray()) {
+            throw new PaymentProviderUnavailableException("Razorpay " + endpoint + " answer has no items array");
+        }
+        return items;
+    }
 
     private static ProviderRefund toRefund(JsonNode r) {
         String status = text(r, "status");

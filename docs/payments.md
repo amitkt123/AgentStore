@@ -62,11 +62,15 @@ Flows:
   3. Open Billing as that org, press Pay on the bill, complete the test payment. The bill becomes PAID and `BUYER_RECEIVABLE` clears.
 - [ ] Reconciliation run (`/admin/money`, or wait for the nightly job): no issues.
 
+Go-live gates (hard stops: do not take live money until each is confirmed):
+- [ ] **Refund list returns the receipt.** `GET /v1/payments/{id}/refunds` must return the `receipt` sent with `POST /v1/payments/{id}/refund` (the refund part id). A retry after a timeout looks the refund up by that receipt; the adapter also sends the part id as `X-Refund-Idempotency`, so a repeated request returns the first refund. Confirm both in test mode by refunding, then listing.
+- [ ] **Payments auto-capture.** Orders are created with `payment_capture: 1`; also confirm in Dashboard → Settings → Payment capture that payments are captured automatically. An authorized-but-not-captured payment never sends `payment.captured`, so no wallet is credited.
+
 Razorpay API assumptions to confirm (the adapter was written from documentation, not a live account):
-- [ ] `POST /v1/orders` accepts `{amount, currency, receipt, notes}` and returns `id`; a 36-character UUID receipt is within the 40-character limit.
+- [ ] `POST /v1/orders` accepts `{amount, currency, receipt, notes, payment_capture}` and returns `id`; a 36-character UUID receipt is within the 40-character limit.
 - [ ] Checkout `config.display.blocks.<name>.instruments[0].method` takes `upi`, `card` or `netbanking`, and with `sequence: ["block.<name>"]` and `preferences.show_default_blocks: false` restricts checkout to that method.
 - [ ] `POST /v1/virtual_accounts` with `receivers.types=["bank_account"]`, `description` and `notes` succeeds without `customer_id`; `receivers[]` holds an entry with `entity: "bank_account"`, `account_number`, `ifsc` and `name`.
-- [ ] `POST /v1/payments/{id}/refund` accepts `receipt`, and both its response and `GET /v1/payments/{id}/refunds` return that `receipt` (retry after a timeout depends on it). Refund statuses are `pending`, `processed`, `failed`.
+- [ ] `POST /v1/payments/{id}/refund` accepts `receipt` and the `X-Refund-Idempotency` header, and both its response and `GET /v1/payments/{id}/refunds` return that `receipt` (see the go-live gate above). Refund statuses are `pending`, `processed`, `failed`. A list answer without an `items` array is treated as an outage, never as "no refunds".
 - [ ] Webhook signature is the lowercase hex HMAC-SHA256 of the raw body keyed with the webhook secret, in `X-Razorpay-Signature`; the event id is in `X-Razorpay-Event-Id`.
 - [ ] Payload shapes: `payload.payment.entity` for `payment.*` and `order.paid`; `payload.refund.entity` (with `payment_id`) for `refund.*`; `payload.virtual_account.entity.id` plus `payload.payment.entity` (method `bank_transfer`, paise) for `virtual_account.credited`.
 - [ ] `payment.failed` carries `error_description`. `refund.failed` carries no reason, so the default "Provider failed the refund" is shown.
