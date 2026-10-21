@@ -54,8 +54,7 @@ agentstore:
         key-secret: ${RAZORPAY_KEY_SECRET:}
         webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
         base-url: https://api.razorpay.com
-      fake:
-        webhook-secret: fake-webhook-secret
+      # fake.webhook-secret is set only in application-dev.yml and application-test.yml
   data:
     retention-interval: PT1H
   jwt:

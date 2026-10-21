@@ -2,6 +2,8 @@ agentstore:
   money:
     payments:
       provider: fake
+      fake:
+        webhook-secret: fake-webhook-secret
   jwt:
     secret: test-only-secret-not-for-prod-0123456789abcdef
   identity:

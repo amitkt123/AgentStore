@@ -139,7 +139,12 @@ public class FakePaymentProvider implements PaymentProvider {
     private final Map<UUID, FakeVirtualAccount> virtualAccounts = new ConcurrentHashMap<>();
 
     public FakePaymentProvider(PaymentProperties.Fake config) {
-        this.webhookSecret = config == null || config.webhookSecret() == null ? "" : config.webhookSecret();
+        if (config == null || config.webhookSecret() == null || config.webhookSecret().isBlank()) {
+            // Only application-dev.yml and application-test.yml set it, so the fake cannot run anywhere else by accident.
+            throw new IllegalStateException(
+                    "Payment provider fake requires agentstore.money.payments.fake.webhook-secret to be set");
+        }
+        this.webhookSecret = config.webhookSecret();
     }
 
     @Override

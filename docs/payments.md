@@ -17,7 +17,7 @@ All keys are under `agentstore.money.payments` (bound to `PaymentProperties`).
 | `webhook-rate-per-minute` | `120` | Rate limit on the webhook endpoint |
 | `razorpay.key-id`, `razorpay.key-secret`, `razorpay.webhook-secret` | from `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` (blank) | Razorpay credentials. The Razorpay provider refuses to start if any is blank, when the provider is `razorpay` (the `application.yml` default) |
 | `razorpay.base-url` | `https://api.razorpay.com` | API base |
-| `fake.webhook-secret` | `fake-webhook-secret` | Signs fake webhooks |
+| `fake.webhook-secret` | `fake-webhook-secret` in `application-dev.yml` and `application-test.yml` only (unset in `application.yml`) | Signs fake webhooks. The fake provider refuses to start when it is blank, so it cannot run outside dev and test by accident |
 
 ## Fake mode in dev
 

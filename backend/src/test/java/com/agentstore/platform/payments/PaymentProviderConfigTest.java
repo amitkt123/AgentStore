@@ -21,12 +21,12 @@ class PaymentProviderConfigTest {
                     "agentstore.money.payments.topup-daily-limit=1000.00",
                     "agentstore.money.payments.refund-window-days=180",
                     "agentstore.money.payments.bill-due-days=15",
-                    "agentstore.money.payments.webhook-rate-per-minute=120",
-                    "agentstore.money.payments.fake.webhook-secret=s");
+                    "agentstore.money.payments.webhook-rate-per-minute=120");
 
     @Test
     void fakeProviderBean() {
-        runner.withPropertyValues("agentstore.money.payments.provider=fake")
+        runner.withPropertyValues("agentstore.money.payments.provider=fake",
+                        "agentstore.money.payments.fake.webhook-secret=s")
                 .run(ctx -> assertThat(ctx.getBean(PaymentProvider.class)).isInstanceOf(FakePaymentProvider.class));
     }
 
@@ -51,6 +51,25 @@ class PaymentProviderConfigTest {
                     String all = allMessages(ctx.getStartupFailure());
                     assertThat(all).contains("RAZORPAY_KEY_SECRET").doesNotContain("whsec").doesNotContain("rzp_test_abc");
                 });
+    }
+
+    @Test
+    void fakeWithoutAWebhookSecretFailsAtStartup() {
+        runner.withPropertyValues("agentstore.money.payments.provider=fake")
+                .run(ctx -> {
+                    assertThat(ctx).hasFailed();
+                    assertThat(allMessages(ctx.getStartupFailure())).contains("fake.webhook-secret");
+                });
+        runner.withPropertyValues("agentstore.money.payments.provider=fake",
+                        "agentstore.money.payments.fake.webhook-secret= ")
+                .run(ctx -> assertThat(ctx).hasFailed());
+    }
+
+    @Test
+    void baseConfigCarriesNoFakeWebhookSecret() throws Exception {
+        String base = new String(getClass().getResourceAsStream("/application.yml").readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(base).doesNotContain("fake-webhook-secret");
     }
 
     @Test
