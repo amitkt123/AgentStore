@@ -43,6 +43,15 @@ public class BillingModeService {
         return orgRepository.findById(orgId).map(Org::getBillingMode).orElse(props.billingMode());
     }
 
+    /**
+     * Like {@link #modeFor}, but read from the database even if this transaction already loaded the org. Call it
+     * while holding the org's wallet lock: {@link #setMode} takes that lock, so the answer holds until commit.
+     */
+    @Transactional(readOnly = true)
+    public BillingMode currentModeFor(UUID orgId) {
+        return orgRepository.billingModeOf(orgId).orElse(props.billingMode());
+    }
+
     /** The org's postpaid credit limit, else the configured default. */
     @Transactional(readOnly = true)
     public BigDecimal creditLimit(UUID orgId) {

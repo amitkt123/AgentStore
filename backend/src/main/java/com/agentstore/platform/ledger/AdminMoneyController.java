@@ -154,6 +154,10 @@ public class AdminMoneyController {
         if (alreadyApplied(key, orgId, request.amount())) {
             return;
         }
+        // setMode takes the wallet lock too, so a switch that committed after the check above shows up here.
+        if (billingModeService.currentModeFor(orgId) == BillingMode.POSTPAID) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Postpaid orgs have no wallet to adjust");
+        }
         BigDecimal amount = request.amount();
         BigDecimal available = wallet.getBalance().subtract(wallet.getReserved());
         if (amount.signum() < 0 && amount.negate().compareTo(available) > 0) {

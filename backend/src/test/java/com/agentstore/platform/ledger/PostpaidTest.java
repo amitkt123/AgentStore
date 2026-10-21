@@ -45,6 +45,8 @@ class PostpaidTest extends AbstractIntegrationTest {
     TransactionTemplate tx;
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired
+    AdminMoneyController adminMoneyController;
 
     record Setup(ExecutionFixtures.Scenario scenario, Run run) {
         UUID buyerOrgId() {
@@ -88,6 +90,13 @@ class PostpaidTest extends AbstractIntegrationTest {
         Wallet wallet = new Wallet(null, orgId, new BigDecimal(balance), null);
         wallet.setUpdatedAt(Instant.now());
         walletRepository.save(wallet);
+        return orgId;
+    }
+
+    /** A prepaid buyer org with an empty wallet row. */
+    UUID buyerWithEmptyWallet() {
+        UUID orgId = orgRepository.save(new Org(null, "buyer-" + UUID.randomUUID(), OrgType.BUYER)).getId();
+        walletRepository.insertEmptyIfMissing(orgId);
         return orgId;
     }
 
@@ -299,6 +308,69 @@ class PostpaidTest extends AbstractIntegrationTest {
         }
         assertThat(wallet(s.buyerOrgId()).getBalance()).isEqualByComparingTo("900.00");
         assertThat(orgBalance(s.buyerOrgId(), LedgerAccountKind.BUYER_WALLET)).isEqualByComparingTo("900.00");
+    }
+
+    @Test
+    void reserveDecidesOnTheModeSwitchedBeforeItsLock() {
+        UUID orgId = buyerWithEmptyWallet();
+        ExecutorService other = Executors.newSingleThreadExecutor();
+        try {
+            tx.executeWithoutResult(s -> {
+                // Loads the org (PREPAID) into this transaction's persistence context.
+                assertThat(billingModeService.modeFor(orgId)).isEqualTo(BillingMode.PREPAID);
+                runAndWait(other, () -> billingModeService.setMode(orgId, BillingMode.POSTPAID));
+                walletReservationService.reserve(orgId, new BigDecimal("50.00"));
+            });
+        } finally {
+            other.shutdownNow();
+        }
+        assertThat(wallet(orgId).getReserved()).isEqualByComparingTo("50.00");
+    }
+
+    @Test
+    void reserveRefusesWhenSwitchedToPrepaidBeforeItsLock() {
+        Setup s = postpaid("1000.00");
+        UUID orgId = s.buyerOrgId();
+        ExecutorService other = Executors.newSingleThreadExecutor();
+        try {
+            tx.executeWithoutResult(st -> {
+                assertThat(billingModeService.modeFor(orgId)).isEqualTo(BillingMode.POSTPAID);
+                runAndWait(other, () -> billingModeService.setMode(orgId, BillingMode.PREPAID));
+                assertThatThrownBy(() -> walletReservationService.reserve(orgId, new BigDecimal("50.00")))
+                        .isInstanceOf(InsufficientFundsException.class);
+                st.setRollbackOnly();
+            });
+        } finally {
+            other.shutdownNow();
+        }
+        assertThat(wallet(orgId).getReserved()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void adjustmentRefusesWhenSwitchedToPostpaidBeforeItsLock() {
+        UUID orgId = buyerWithEmptyWallet();
+        ExecutorService other = Executors.newSingleThreadExecutor();
+        var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                new com.agentstore.platform.identity.JwtService.Claims(UUID.randomUUID(), UUID.randomUUID(),
+                        com.agentstore.platform.identity.UserRole.ADMIN), null,
+                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN")));
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+        try {
+            tx.executeWithoutResult(st -> {
+                assertThat(billingModeService.modeFor(orgId)).isEqualTo(BillingMode.PREPAID);
+                runAndWait(other, () -> billingModeService.setMode(orgId, BillingMode.POSTPAID));
+                assertThatThrownBy(() -> adminMoneyController.adjust(orgId,
+                        new AdjustmentRequest("switch-" + orgId, new BigDecimal("10.00"), "test")))
+                        .isInstanceOfSatisfying(ResponseStatusException.class,
+                                e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+                st.setRollbackOnly();
+            });
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+            other.shutdownNow();
+        }
+        assertThat(wallet(orgId).getBalance()).isEqualByComparingTo("0");
+        assertThat(accounts.findByOrgIdAndKind(orgId, LedgerAccountKind.BUYER_WALLET)).isEmpty();
     }
 
     private static void runAndWait(ExecutorService executor, Runnable work) {

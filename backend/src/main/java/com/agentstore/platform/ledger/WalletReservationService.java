@@ -34,17 +34,26 @@ public class WalletReservationService {
         if (amount.signum() < 0) {
             throw new IllegalArgumentException("Reservation amount must not be negative: " + amount);
         }
-        Wallet wallet;
         if (billingModeService.modeFor(orgId) == BillingMode.POSTPAID) {
             walletRepository.insertEmptyIfMissing(orgId);
-            wallet = lock(orgId).orElseThrow();
+        }
+        Optional<Wallet> locked = lock(orgId);
+        // The mode may have switched before the lock was taken; setMode needs this lock, so it is settled now.
+        BillingMode mode = billingModeService.currentModeFor(orgId);
+        if (locked.isEmpty() && mode == BillingMode.POSTPAID) {
+            walletRepository.insertEmptyIfMissing(orgId);
+            locked = lock(orgId);
+        }
+        Wallet wallet;
+        if (mode == BillingMode.POSTPAID) {
+            wallet = locked.orElseThrow();
             // Charges to the receivable take this wallet lock first, so what is owed cannot move under us.
             BigDecimal committed = billingModeService.owed(orgId).add(wallet.getReserved()).add(amount);
             if (committed.compareTo(billingModeService.creditLimit(orgId)) > 0) {
                 throw new InsufficientFundsException("Credit limit reached");
             }
         } else {
-            wallet = lock(orgId).orElseThrow(() -> new InsufficientFundsException("No wallet for org"));
+            wallet = locked.orElseThrow(() -> new InsufficientFundsException("No wallet for org"));
             BigDecimal available = wallet.getBalance().subtract(wallet.getReserved());
             if (available.compareTo(amount) < 0) {
                 throw new InsufficientFundsException("Insufficient wallet balance for spend cap");
