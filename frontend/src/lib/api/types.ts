@@ -95,3 +95,33 @@ export interface Readiness { ready: boolean; blockers: Blocker[] }
 export type ManifestPatchOp = "add_read_scope" | "add_resource" | "add_allowlist_host" | "remove_scope";
 export interface ManifestPatchRequest { op: ManifestPatchOp; resource?: string; description?: string; requiresApproval?: boolean; name?: string; format?: string; schema?: unknown; host?: string; type?: string }
 export interface ManifestPatchResult { manifestRevision: number; diff: { addedScopes: string[]; removedScopes: string[]; addedHosts: string[] } }
+
+// Money (WS10a). BigDecimal amounts arrive as JSON numbers, like the other money fields above.
+export type BillingMode = "PREPAID" | "POSTPAID";
+export type LedgerAccountKind = string;
+
+export interface Wallet {
+  mode: BillingMode; balance: number; held: number; available: number; spentThisMonth: number;
+  monthlyLimit: number | null; creditLimit: number | null; owed: number; cap: number | null; reserved: number;
+}
+export interface BillingLine {
+  runDisplayId: string; units: number; unitDisplay: string | null; amount: number;
+  terminalReason: TerminalReason | null; decidedBy: string | null; at: string;
+}
+export interface BillingAgentLines { agentId: string; agent: string; runs: number; total: number; lines: BillingLine[] }
+export interface BillingSummary { month: string; total: number; agents: BillingAgentLines[] }
+export interface EarningsAgent {
+  agentId: string; agent: string; runs: number; buyersPaid: number; fee: number; aiUsage: number; earned: number; perRun: number;
+}
+export interface Earnings {
+  month: string; buyersPaid: number; platformFee: number; feePercent: number; aiUsage: number; tax: number;
+  earned: number; available: number; byAgent: EarningsAgent[];
+}
+export interface OrgMoney {
+  orgId: string; name: string; type: OrgType; feePercent: number | null; effectiveFeePercent: number;
+  billingMode: BillingMode | null; effectiveBillingMode: BillingMode; creditLimit: number | null;
+  walletBalance: number; payableBalance: number;
+}
+export interface OrgMoneyPatch { feePercent?: number; billingMode?: BillingMode; creditLimit?: number }
+export interface PlatformAccounts { accounts: { kind: LedgerAccountKind; balance: number }[]; totalsCheck: boolean }
+export interface AdjustmentBody { requestId: string; amount: number; note: string }

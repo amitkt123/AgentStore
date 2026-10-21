@@ -24,3 +24,7 @@ it("keeps Agents active inside a Studio route", () => {
   render(<Rail items={developerRailItems()} activePath="/developer/agents/a1/versions/v1" />);
   expect(screen.getByRole("link", { name: "Agents" })).toHaveAttribute("aria-current", "page");
 });
+
+it("gives buyers a Billing item after Files", () => {
+  expect(buyerRailItems(0).map((i) => i.href)).toEqual(["/home", "/store", "/runs", "/files", "/billing"]);
+});

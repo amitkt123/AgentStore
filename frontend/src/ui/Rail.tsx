@@ -11,6 +11,7 @@ export function buyerRailItems(needsYou: number): RailItem[] {
     { href: "/store", label: "Agent store", icon: "store" },
     { href: "/runs", label: "Runs", icon: "runs", badge: needsYou > 0 ? needsYou : undefined },
     { href: "/files", label: "Files", icon: "files" },
+    { href: "/billing", label: "Billing", icon: "wallet" },
   ];
 }
 
