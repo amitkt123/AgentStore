@@ -2,7 +2,7 @@
 
 The single place to see what is done and what is next. Update it in the same PR as any change that finishes, starts or reshapes a workstream. Gaps and risks stay in `docs/frontend-gaps.md` and `docs/known-issues.md`; this file links to them, it does not copy them.
 
-Last updated: 2026-10-21 (branch `feat/ws10a-ledger`, WS10a)
+Last updated: 2026-10-21 (master `7473c15`, CI pipeline PR)
 
 Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-and-sandbox-design.md` (workstreams in §5, milestones in §7). Specs and plans named below live in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
 
@@ -31,7 +31,7 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | WS10b money in and back (top-up, refunds, postpaid bills, reconciliation) | Not started | — | spec `2026-10-21-ws10-…` §2 | All; wallets are funded by `scripts/demo-fund-wallet` or admin adjustments today |
 | WS10c money out (payout accounts, withdrawals, admin payout console) | Not started | — | spec `2026-10-21-ws10-…` §3 | All |
 | WS11 release management (pinning UX, updates, rollout, delisting) | Not started | — | parent spec §5 | All |
-| WS12 platform infrastructure and operations | Partial | #33, #37 | parent spec §5 | Docs site, deploy, observability |
+| WS12 platform infrastructure and operations | Partial | #33, #37, CI PR | parent spec §5 | Docs site, deploy, observability. CI (`.github/workflows/ci.yml`) runs backend, runner, e2b-shim, frontend and CLI tests on every push and PR |
 | WS13 identity, workspaces, teams | Done | #4, #5 | `2026-09-23-ws13-…` | SSO; Google sign-in needs a client id (G10) |
 | WS14a notifications, email approval links | Done | #32, #33, #34 | `2026-09-30-ws14a-…` | — |
 | WS14b Slack, quiet hours, weekly digest | Not started | — | `2026-09-23-ws14-…` | All |
