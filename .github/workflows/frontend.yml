@@ -1,0 +1,31 @@
+name: Frontend
+
+on:
+  # PRs to master that touch these paths only
+  pull_request:
+    branches: [master]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+
+# A newer push to the same PR cancels the older run
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Test and build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npm run build

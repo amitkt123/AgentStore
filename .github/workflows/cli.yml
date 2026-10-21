@@ -1,0 +1,33 @@
+name: CLI
+
+on:
+  # PRs to master that touch these paths only
+  pull_request:
+    branches: [master]
+    paths:
+      - "cli/**"
+      - "backend/src/main/resources/manifest/manifest-schema.json"
+      - ".github/workflows/cli.yml"
+
+# A newer push to the same PR cancels the older run
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cli/package-lock.json
+      - name: Typecheck, test and build
+        working-directory: cli
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
