@@ -31,5 +31,6 @@ export function formatDate(iso: string | null): string {
 
 /** Rupees with Indian digit grouping and always two decimals: 100000 -> ₹1,00,000.00. */
 export function formatInr(n: number): string {
-  return "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const text = Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 && text !== "0.00" ? "-₹" : "₹") + text;
 }

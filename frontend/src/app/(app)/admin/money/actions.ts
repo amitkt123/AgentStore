@@ -17,12 +17,18 @@ export async function saveSettingsAction(orgId: string, patch: OrgMoneyPatch): P
   } catch (e) { return fail(e); }
 }
 
-// A fresh requestId per submit; the form disables its button while one is in flight.
-export async function adjustWalletAction(orgId: string, amount: number, note: string): Promise<{ org: OrgMoney } | { error: string }> {
+// The form owns requestId and reuses it on retry, so a repeat of a posted adjustment is a server-side replay.
+// Once the post has succeeded this never reports failure: a failed refetch only costs the fresh balance.
+export async function adjustWalletAction(
+  orgId: string, amount: number, note: string, requestId: string,
+): Promise<{ org: OrgMoney | null; notice?: string } | { error: string }> {
   try {
-    await postAdjustment(orgId, { requestId: crypto.randomUUID(), amount, note });
-    const org = await getOrgMoney(orgId);
-    revalidatePath("/admin/money");
-    return { org };
+    await postAdjustment(orgId, { requestId, amount, note });
   } catch (e) { return fail(e); }
+  revalidatePath("/admin/money");
+  try {
+    return { org: await getOrgMoney(orgId) };
+  } catch {
+    return { org: null, notice: "Adjustment saved; refresh to see the new balance" };
+  }
 }

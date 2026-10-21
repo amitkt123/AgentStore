@@ -8,18 +8,19 @@ import { adjustWalletAction, saveSettingsAction } from "@/app/(app)/admin/money/
 import { formatInr } from "@/lib/format";
 import type { BillingMode, OrgMoney, OrgMoneyPatch, PlatformAccounts } from "@/lib/api/types";
 
-type Result = { org: OrgMoney } | { error: string };
+type Result = { org: OrgMoney | null; notice?: string } | { error: string };
+const GENERIC = "Something went wrong; try again";
 type Status = { kind: "ok" | "error"; text: string } | null;
 
 // A form action in flight blocks a second submit (React 18 does not hold isPending across async work).
-function useSubmit() {
+function useSubmit(onFail: (text: string) => void) {
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const submit = async (fn: () => Promise<void>) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
-    try { await fn(); } finally { busyRef.current = false; setBusy(false); }
+    try { await fn(); } catch { onFail(GENERIC); } finally { busyRef.current = false; setBusy(false); }
   };
   return { busy, submit };
 }
@@ -88,7 +89,7 @@ function SettingsForm({ org, onChange }: { org: OrgMoney; onChange: (o: OrgMoney
   const [mode, setMode] = useState<BillingMode>(org.effectiveBillingMode);
   const [limit, setLimit] = useState("");
   const [status, setStatus] = useState<Status>(null);
-  const { busy, submit } = useSubmit();
+  const { busy, submit } = useSubmit((text) => setStatus({ kind: "error", text }));
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +104,7 @@ function SettingsForm({ org, onChange }: { org: OrgMoney; onChange: (o: OrgMoney
     }
     if (Object.keys(patch).length === 0) { setStatus({ kind: "error", text: "Nothing to change" }); return; }
     void submit(async () => {
-      const res: Result = await saveSettingsAction(org.orgId, patch);
+      const res = await saveSettingsAction(org.orgId, patch);
       if ("error" in res) { setStatus({ kind: "error", text: res.error }); return; }
       onChange(res.org);
       setStatus({ kind: "ok", text: "Saved" });
@@ -131,7 +132,9 @@ function AdjustForm({ org, onChange }: { org: OrgMoney; onChange: (o: OrgMoney) 
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<Status>(null);
-  const { busy, submit } = useSubmit();
+  const { busy, submit } = useSubmit((text) => setStatus({ kind: "error", text }));
+  // One id per attempt: kept across failed submits so a retry is a server-side replay, renewed on success or edit.
+  const requestId = useRef<string | null>(null);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,19 +146,21 @@ function AdjustForm({ org, onChange }: { org: OrgMoney; onChange: (o: OrgMoney) 
     }
     if (!note.trim()) { setStatus({ kind: "error", text: "A note is required" }); return; }
     void submit(async () => {
-      const res: Result = await adjustWalletAction(org.orgId, value, note.trim());
+      requestId.current ??= crypto.randomUUID();
+      const res: Result = await adjustWalletAction(org.orgId, value, note.trim(), requestId.current);
       if ("error" in res) { setStatus({ kind: "error", text: res.error }); return; }
-      onChange(res.org);
+      requestId.current = null;
+      if (res.org) onChange(res.org);
       setAmount("");
       setNote("");
-      setStatus({ kind: "ok", text: "Wallet adjusted" });
+      setStatus({ kind: "ok", text: res.notice ?? "Wallet adjusted" });
     });
   };
 
   return (
     <form className={styles.form} onSubmit={onSubmit} aria-label="Adjust wallet">
-      <Field label="Amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} hint="Negative debits the wallet" />
-      <Field label="Note" value={note} onChange={(e) => setNote(e.target.value)} />
+      <Field label="Amount" type="number" step="0.01" value={amount} onChange={(e) => { requestId.current = null; setAmount(e.target.value); }} hint="Negative debits the wallet" />
+      <Field label="Note" value={note} onChange={(e) => { requestId.current = null; setNote(e.target.value); }} />
       <Button type="submit" loading={busy}>Adjust wallet</Button>
       <Message status={status} />
     </form>

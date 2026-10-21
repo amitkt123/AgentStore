@@ -27,7 +27,7 @@ it("renders platform balances formatted", () => {
   render(<AdminMoneyView accounts={accounts} org={null} />);
   expect(screen.getByText("PLATFORM_REVENUE")).toBeInTheDocument();
   expect(screen.getByText("₹1,500.00")).toBeInTheDocument();
-  expect(screen.getByText("₹-1,500.50")).toBeInTheDocument();
+  expect(screen.getByText("-₹1,500.50")).toBeInTheDocument();
   expect(screen.queryByText("Ledger does not balance")).not.toBeInTheDocument();
 });
 
@@ -74,7 +74,7 @@ it("offers wallet adjustment for buyer orgs only and submits it", async () => {
   await userEvent.type(screen.getByLabelText("Amount"), "100");
   await userEvent.type(screen.getByLabelText("Note"), "goodwill");
   await userEvent.click(screen.getByRole("button", { name: "Adjust wallet" }));
-  expect(adjust).toHaveBeenCalledWith(ORG, 100, "goodwill");
+  expect(adjust).toHaveBeenCalledWith(ORG, 100, "goodwill", expect.stringMatching(/^[0-9a-f-]{36}$/));
   expect(await screen.findByText("Wallet adjusted")).toBeInTheDocument();
   unmount();
   render(<AdminMoneyView accounts={accounts} org={org({ type: "DEVELOPER" })} orgQuery={ORG} />);
@@ -88,4 +88,55 @@ it("shows an adjustment error inline", async () => {
   await userEvent.type(screen.getByLabelText("Note"), "fix");
   await userEvent.click(screen.getByRole("button", { name: "Adjust wallet" }));
   expect(await screen.findByText("Debit exceeds the available balance of 250.00")).toBeInTheDocument();
+});
+
+const typeAdjust = async (amount: string, note: string) => {
+  const a = screen.getByLabelText("Amount"), n = screen.getByLabelText("Note");
+  await userEvent.clear(a); await userEvent.type(a, amount);
+  await userEvent.clear(n); await userEvent.type(n, note);
+};
+
+it("reuses the requestId when retrying after an error, and uses a new one after success", async () => {
+  adjust.mockResolvedValueOnce({ error: "boom" }).mockResolvedValueOnce({ org: org({ walletBalance: 350 }) }).mockResolvedValueOnce({ org: org() });
+  render(<AdminMoneyView accounts={accounts} org={org()} orgQuery={ORG} />);
+  await typeAdjust("100", "a");
+  await userEvent.click(screen.getByRole("button", { name: "Adjust wallet" }));
+  await screen.findByText("boom");
+  await userEvent.click(screen.getByRole("button", { name: "Adjust wallet" }));
+  await screen.findByText("Wallet adjusted");
+  await typeAdjust("100", "a");
+  await userEvent.click(screen.getByRole("button", { name: "Adjust wallet" }));
+  await screen.findByText("Wallet adjusted");
+  const ids = adjust.mock.calls.map((c) => c[3]);
+  expect(ids[0]).toBe(ids[1]);
+  expect(ids[2]).not.toBe(ids[1]);
+});
+
+it("uses a new requestId after the amount or note changes", async () => {
+  adjust.mockResolvedValue({ error: "boom" });
+  render(<AdminMoneyView accounts={accounts} org={org()} orgQuery={ORG} />);
+  await typeAdjust("100", "a");
+  await userEvent.click(screen.getByRole("button", { name: "Adjust wallet" }));
+  await screen.findByText("boom");
+  await typeAdjust("200", "a");
+  await userEvent.click(screen.getByRole("button", { name: "Adjust wallet" }));
+  await userEvent.click(screen.getByRole("button", { name: "Adjust wallet" }));
+  expect(adjust.mock.calls[1][3]).not.toBe(adjust.mock.calls[0][3]);
+  expect(adjust.mock.calls[2][3]).toBe(adjust.mock.calls[1][3]);
+});
+
+it("shows a generic error when an action throws", async () => {
+  save.mockRejectedValue(new Error("network"));
+  render(<AdminMoneyView accounts={accounts} org={org()} orgQuery={ORG} />);
+  await userEvent.selectOptions(screen.getByLabelText("Billing mode"), "POSTPAID");
+  await userEvent.click(screen.getByRole("button", { name: "Save settings" }));
+  expect(await screen.findByText("Something went wrong; try again")).toBeInTheDocument();
+});
+
+it("tells the admin to refresh when the post succeeded but the refetch did not", async () => {
+  adjust.mockResolvedValue({ org: null, notice: "Adjustment saved; refresh to see the new balance" });
+  render(<AdminMoneyView accounts={accounts} org={org()} orgQuery={ORG} />);
+  await typeAdjust("100", "a");
+  await userEvent.click(screen.getByRole("button", { name: "Adjust wallet" }));
+  expect(await screen.findByText("Adjustment saved; refresh to see the new balance")).toBeInTheDocument();
 });
