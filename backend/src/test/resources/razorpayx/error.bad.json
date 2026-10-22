@@ -1,0 +1,1 @@
+{ "error": { "code": "BAD_REQUEST_ERROR", "description": "The IFSC is invalid for account 123456789012", "source": "NA", "step": "NA", "reason": "NA", "metadata": {} } }

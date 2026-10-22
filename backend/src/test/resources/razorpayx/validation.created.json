@@ -1,0 +1,2 @@
+{ "id": "fav_00000000000001", "entity": "fund_account.validation", "status": "created", "amount": 100, "currency": "INR",
+  "results": { "account_status": null, "registered_name": null } }

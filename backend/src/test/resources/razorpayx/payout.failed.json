@@ -1,0 +1,27 @@
+{
+  "entity": "event",
+  "account_id": "acc_BFQ7uQEaa7j2z7",
+  "event": "payout.failed",
+  "contains": ["payout"],
+  "payload": {
+    "payout": {
+      "entity": {
+        "id": "pout_00000000000001",
+        "entity": "payout",
+        "fund_account_id": "fa_00000000000001",
+        "amount": 12345,
+        "currency": "INR",
+        "fees": 590,
+        "tax": 90,
+        "status": "failed",
+        "utr": null,
+        "mode": "IMPS",
+        "purpose": "payout",
+        "reference_id": "9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+        "failure_reason": "Beneficiary bank is offline",
+        "created_at": 1597078866
+      }
+    }
+  },
+  "created_at": 1597078900
+}

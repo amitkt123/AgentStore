@@ -1,0 +1,1 @@
+{ "error": { "code": "BAD_REQUEST_ERROR", "description": "Your account does not have enough balance to carry out the payout operation. Insufficient funds.", "source": "NA", "step": "NA", "reason": "NA", "metadata": {} } }
