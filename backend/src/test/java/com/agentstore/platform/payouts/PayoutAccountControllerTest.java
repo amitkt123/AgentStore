@@ -91,6 +91,7 @@ class PayoutAccountControllerTest extends AbstractIntegrationTest {
                 byte[].class, org.getId());
         assertThat(new String(stored)).doesNotContain("123456789012");
         assertThat(summary(org).getBody().get("blockedReason")).isEqualTo("INSUFFICIENT_EARNINGS");
+        assertThat(summary(org).getBody().get("verifiedName")).isEqualTo("Amit Tiwari");
     }
 
     @Test

@@ -4,9 +4,8 @@ import { ResponsiveTable } from "@/ui/ResponsiveTable";
 import { formatInr } from "@/lib/format";
 import { statementUrl } from "@/lib/api/money";
 import { PayoutAccountPanel } from "./PayoutAccountPanel";
-import { WithdrawForm } from "./WithdrawForm";
+import { WithdrawSection } from "./WithdrawSection";
 import { WithdrawalHistory } from "./WithdrawalHistory";
-import { accountLabel } from "./labels";
 import type { Earnings, EarningsAgent, PayoutsSummary, Withdrawal } from "@/lib/api/types";
 
 function blockedText(p: PayoutsSummary): string | null {
@@ -47,16 +46,9 @@ export function EarningsView({ earnings, payouts, withdrawals }: { earnings: Ear
         ) : (
           <p className={`${styles.availableValue} mono`}>{formatInr(earnings.available)}</p>
         )}
-        {!owes && payouts.canWithdraw && payouts.account && (
-          <WithdrawForm
-            available={payouts.available}
-            dailyLimitLeft={Math.max(0, payouts.dailyLimit - payouts.withdrawnToday)}
-            accountLabel={accountLabel(payouts.account)}
-          />
-        )}
-        {!owes && blocked && <p className={styles.blocked}>{blocked}</p>}
+        <WithdrawSection payouts={payouts} blocked={blocked} owes={owes} />
       </section>
-      <PayoutAccountPanel account={payouts.account} attemptsLeft={payouts.validationAttemptsLeft} />
+      <PayoutAccountPanel account={payouts.account} attemptsLeft={payouts.validationAttemptsLeft} verifiedName={payouts.verifiedName} />
       <WithdrawalHistory withdrawals={withdrawals} simulate={payouts.provider === "fake"} />
       <div className={styles.bar}>
         <MonthNav basePath="/developer/earnings" month={earnings.month} />

@@ -42,6 +42,45 @@ it("explains a name mismatch", () => {
   )).toBeInTheDocument();
 });
 
+it("compares against the verified legal name, not what was typed", () => {
+  render(<PayoutAccountPanel verifiedName="Asha Rao Pvt Ltd" account={{ ...base, holderName: "A Rao", status: "FAILED", failureReason: "NAME_MISMATCH", validatedName: "RAVI KUMAR", nameMatch: false }} attemptsLeft={2} />);
+  expect(screen.getByText(/which does not match Asha Rao Pvt Ltd\./)).toBeInTheDocument();
+});
+
+it("turns a failure code into plain text", () => {
+  render(<PayoutAccountPanel account={{ ...base, status: "FAILED", failureReason: "VALIDATION_FAILED", validatedName: null, nameMatch: null }} attemptsLeft={2} />);
+  expect(screen.queryByText("VALIDATION_FAILED")).not.toBeInTheDocument();
+  expect(screen.getByText(/The bank could not verify this account/)).toBeInTheDocument();
+});
+
+it("closes the form after a replacement is saved and shows the new status", async () => {
+  savePayoutAccount.mockResolvedValue({ account: base });
+  const user = userEvent.setup();
+  const failed = { ...base, status: "FAILED" as const, failureReason: "Account closed", validatedName: null, nameMatch: null };
+  const { rerender } = render(<PayoutAccountPanel account={failed} attemptsLeft={2} />);
+  await user.click(screen.getByRole("button", { name: "Try another account" }));
+  await user.click(screen.getByRole("button", { name: "UPI" }));
+  await user.type(screen.getByLabelText("Name on account"), "Asha Rao");
+  await user.type(screen.getByLabelText("UPI ID"), "asha@okhdfc");
+  await user.click(screen.getByRole("button", { name: "Verify account" }));
+  await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
+  rerender(<PayoutAccountPanel account={{ ...base, status: "PENDING", validatedName: null, nameMatch: null }} attemptsLeft={1} />);
+  expect(screen.getByText("Checking your account…")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Verify account" })).not.toBeInTheDocument();
+});
+
+it("shows a generic message when saving throws, and can retry", async () => {
+  savePayoutAccount.mockRejectedValue(new Error("network"));
+  const user = userEvent.setup();
+  render(<PayoutAccountPanel account={null} attemptsLeft={3} />);
+  await user.click(screen.getByRole("button", { name: "UPI" }));
+  await user.type(screen.getByLabelText("Name on account"), "Asha Rao");
+  await user.type(screen.getByLabelText("UPI ID"), "asha@okhdfc");
+  await user.click(screen.getByRole("button", { name: "Verify account" }));
+  expect(await screen.findByText("Something went wrong. Try again.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Verify account" })).toBeEnabled();
+});
+
 it("shows the reason and offers another account for other failures", async () => {
   const user = userEvent.setup();
   render(<PayoutAccountPanel account={{ ...base, status: "FAILED", failureReason: "Account closed", validatedName: null, nameMatch: null }} attemptsLeft={2} />);

@@ -6,7 +6,7 @@ import { Button } from "@/ui/Button";
 import { Field } from "@/ui/Field";
 import { Segmented } from "@/ui/Segmented";
 import { savePayoutAccount } from "@/app/(app)/developer/earnings/actions";
-import { accountLabel } from "./labels";
+import { GENERIC_ERROR, accountLabel, failureText } from "./labels";
 import type { PayoutAccount, PayoutAccountBody, PayoutAccountType } from "@/lib/api/types";
 
 const IFSC = /^[A-Z]{4}0[A-Z0-9]{6}$/;
@@ -15,7 +15,7 @@ const ACCOUNT_NUMBER = /^\d{9,18}$/;
 
 const triesLeft = (n: number) => `${n} ${n === 1 ? "try" : "tries"} left today`;
 
-function AccountForm({ attemptsLeft }: { attemptsLeft: number }) {
+function AccountForm({ attemptsLeft, onDone }: { attemptsLeft: number; onDone: () => void }) {
   const router = useRouter();
   const [type, setType] = useState<PayoutAccountType>("BANK");
   const [holder, setHolder] = useState("");
@@ -48,8 +48,11 @@ function AccountForm({ attemptsLeft }: { attemptsLeft: number }) {
     try {
       const res = await savePayoutAccount(body);
       if ("error" in res) { setSubmitError(res.error); return; }
-      setNumber("");
+      setHolder(""); setNumber(""); setIfsc(""); setVpa("");
+      onDone();
       router.refresh();
+    } catch {
+      setSubmitError(GENERIC_ERROR);
     } finally { busyRef.current = false; setBusy(false); }
   };
 
@@ -78,13 +81,13 @@ function AccountForm({ attemptsLeft }: { attemptsLeft: number }) {
   );
 }
 
-export function PayoutAccountPanel({ account, attemptsLeft }: { account: PayoutAccount | null; attemptsLeft: number }) {
+export function PayoutAccountPanel({ account, attemptsLeft, verifiedName = null }: { account: PayoutAccount | null; attemptsLeft: number; verifiedName?: string | null }) {
   const [replacing, setReplacing] = useState(false);
   const retry = (label: string) => <Button type="button" variant="ghost" onClick={() => setReplacing(true)}>{label}</Button>;
 
   let body: React.ReactNode;
   if (!account || replacing) {
-    body = <AccountForm attemptsLeft={attemptsLeft} />;
+    body = <AccountForm attemptsLeft={attemptsLeft} onDone={() => setReplacing(false)} />;
   } else if (account.status === "PENDING") {
     body = <p>Checking your account…</p>;
   } else if (account.status === "VERIFIED") {
@@ -98,14 +101,14 @@ export function PayoutAccountPanel({ account, attemptsLeft }: { account: PayoutA
   } else if (account.failureReason === "NAME_MISMATCH") {
     body = (
       <>
-        <p>{`The bank says this account belongs to ${account.validatedName}, which does not match ${account.holderName}. Karya will review it, or add a different account.`}</p>
+        <p>{`The bank says this account belongs to ${account.validatedName}, which does not match ${verifiedName ?? account.holderName}. Karya will review it, or add a different account.`}</p>
         {retry("Add a different account")}
       </>
     );
   } else {
     body = (
       <>
-        <p>{account.failureReason}</p>
+        <p>{failureText(account.failureReason)}</p>
         {retry("Try another account")}
       </>
     );

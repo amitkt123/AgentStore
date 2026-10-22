@@ -203,7 +203,8 @@ public class PayoutAccountService {
         long used = accounts.countByOrgIdAndCreatedAtGreaterThanEqual(orgId, start);
         int left = (int) Math.max(0, props.validationAttemptsPerDay() - used);
         return new PayoutsSummaryResponse(account.map(PayoutAccountView::of).orElse(null), available,
-                props.withdrawalMin(), limit, withdrawn, blocked == null, blocked, left, provider.name());
+                props.withdrawalMin(), limit, withdrawn, blocked == null, blocked, left, provider.name(),
+                verifications.findByOrgId(orgId).map(d -> d.getLegalName()).orElse(null));
     }
 
     private static String orgBlock(Org org) {

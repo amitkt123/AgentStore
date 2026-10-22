@@ -1,11 +1,13 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { EarningsView } from "./EarningsView";
 import type { Earnings, PayoutAccount, PayoutsSummary, Withdrawal } from "@/lib/api/types";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+const { withdraw } = vi.hoisted(() => ({ withdraw: vi.fn() }));
 vi.mock("@/app/(app)/developer/earnings/actions", () => ({
-  savePayoutAccount: vi.fn(), withdraw: vi.fn(), simulatePayoutAction: vi.fn(),
+  savePayoutAccount: vi.fn(), withdraw, simulatePayoutAction: vi.fn(),
 }));
 
 const account: PayoutAccount = {
@@ -15,7 +17,7 @@ const account: PayoutAccount = {
 };
 const payouts: PayoutsSummary = {
   account, available: 6000.5, minimum: 100, dailyLimit: 200000, withdrawnToday: 0, canWithdraw: true,
-  blockedReason: null, validationAttemptsLeft: 3, provider: "razorpayx",
+  blockedReason: null, validationAttemptsLeft: 3, provider: "razorpayx", verifiedName: "Asha Rao",
 };
 const history: Withdrawal[] = [];
 const view = (e: Earnings, p: Partial<PayoutsSummary> = {}) => (
@@ -96,4 +98,15 @@ it("renders the payout account panel and the history", () => {
   }]} />);
   expect(screen.getByText("Bank ••1234 · HDFC0001234")).toBeInTheDocument();
   expect(screen.getByText("UTR UTR9")).toBeInTheDocument();
+});
+
+it("keeps the Withdrawal requested notice when the balance drops to zero and the form goes away", async () => {
+  withdraw.mockResolvedValue({ withdrawal: {} });
+  const user = userEvent.setup();
+  const { rerender } = render(view(earnings));
+  await user.click(screen.getByRole("button", { name: "Withdraw" }));
+  await user.click(screen.getByRole("button", { name: "Confirm" }));
+  rerender(view({ ...earnings, available: 0 }, { available: 0, canWithdraw: false, blockedReason: "INSUFFICIENT_EARNINGS" }));
+  expect(screen.queryByRole("button", { name: "Withdraw" })).not.toBeInTheDocument();
+  expect(screen.getByText("Withdrawal requested.")).toBeInTheDocument();
 });

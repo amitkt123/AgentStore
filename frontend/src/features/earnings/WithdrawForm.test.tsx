@@ -9,7 +9,8 @@ vi.mock("@/app/(app)/developer/earnings/actions", () => ({ withdraw: (...a: unkn
 
 import { WithdrawForm } from "./WithdrawForm";
 
-const props = { available: 6000.5, dailyLimitLeft: 5000, accountLabel: "Bank ••1234" };
+const onDone = vi.fn();
+const props = { onDone, available: 6000.5, dailyLimitLeft: 5000, accountLabel: "Bank ••1234" };
 
 beforeEach(() => { vi.clearAllMocks(); });
 
@@ -39,8 +40,19 @@ it("asks for confirmation naming the account before sending", async () => {
   expect(withdraw).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Confirm" }));
   expect(withdraw).toHaveBeenCalledWith(5000, expect.stringMatching(/^[0-9a-f-]{36}$/));
-  expect(await screen.findByText("Withdrawal requested.")).toBeInTheDocument();
+  await vi.waitFor(() => expect(onDone).toHaveBeenCalled());
   expect(refresh).toHaveBeenCalled();
+  expect(screen.getByLabelText("Amount (₹)")).toHaveValue(5000);
+});
+
+it("shows a generic message when the request throws, and can retry", async () => {
+  withdraw.mockRejectedValue(new Error("network"));
+  const user = userEvent.setup();
+  render(<WithdrawForm {...props} />);
+  await user.click(screen.getByRole("button", { name: "Withdraw" }));
+  await user.click(screen.getByRole("button", { name: "Confirm" }));
+  expect(await screen.findByText("Something went wrong. Try again.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Confirm" })).toBeEnabled();
 });
 
 it("can go back from the confirmation", async () => {

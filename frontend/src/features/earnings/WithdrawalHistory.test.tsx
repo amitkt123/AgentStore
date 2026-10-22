@@ -65,3 +65,13 @@ it("shows a simulate error", async () => {
   await user.click(screen.getByRole("menuitem", { name: "Failed" }));
   expect(await screen.findByText("Not simulatable")).toBeInTheDocument();
 });
+
+it("shows a generic message when simulating throws", async () => {
+  simulatePayoutAction.mockRejectedValue(new Error("network"));
+  const user = userEvent.setup();
+  render(<WithdrawalHistory withdrawals={rows} simulate />);
+  await user.click(screen.getByRole("button", { name: "Simulate" }));
+  await user.click(screen.getByRole("menuitem", { name: "Failed" }));
+  expect(await screen.findByText("Something went wrong. Try again.")).toBeInTheDocument();
+  expect(screen.getByRole("menuitem", { name: "Failed" })).toBeEnabled();
+});

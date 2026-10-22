@@ -170,7 +170,7 @@ export interface PayoutAccountBody {
 }
 export interface PayoutsSummary {
   account: PayoutAccount | null; available: number; minimum: number; dailyLimit: number; withdrawnToday: number;
-  canWithdraw: boolean; blockedReason: string | null; validationAttemptsLeft: number; provider: string;
+  canWithdraw: boolean; blockedReason: string | null; validationAttemptsLeft: number; provider: string; verifiedName: string | null;
 }
 export type WithdrawalStatus = "REQUESTED" | "PROCESSING" | "PROCESSED" | "REVERSED" | "FAILED";
 export interface Withdrawal {

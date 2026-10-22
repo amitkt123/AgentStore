@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import styles from "./earnings.module.css";
 import { Button } from "@/ui/Button";
 import { Pill, type Tone } from "@/ui/Pill";
+import { GENERIC_ERROR } from "./labels";
 import { simulatePayoutAction } from "@/app/(app)/developer/earnings/actions";
 import { formatDate, formatInr } from "@/lib/format";
 import type { PayoutSimulateOutcome, Withdrawal } from "@/lib/api/types";
@@ -23,11 +24,16 @@ function SimulateMenu({ id }: { id: string }) {
   const run = async (outcome: PayoutSimulateOutcome) => {
     setBusy(true);
     setError(null);
-    const res = await simulatePayoutAction(id, outcome);
-    setBusy(false);
-    if ("error" in res) { setError(res.error); return; }
-    setOpen(false);
-    router.refresh();
+    try {
+      const res = await simulatePayoutAction(id, outcome);
+      if ("error" in res) { setError(res.error); return; }
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setError(GENERIC_ERROR);
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <span className={styles.simulate}>
