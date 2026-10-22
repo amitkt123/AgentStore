@@ -157,3 +157,24 @@ export interface Bill {
   id: string; period: string; amount: number; status: "OPEN" | "PAID" | "OVERDUE"; dueAt: string; paidAt: string | null;
 }
 export type SimulateOutcome = "PAID" | "FAILED";
+
+export type PayoutAccountType = "BANK" | "VPA";
+export type PayoutAccountStatus = "PENDING" | "VERIFIED" | "FAILED";
+export interface PayoutAccount {
+  id: string; type: PayoutAccountType; accountLast4: string | null; ifsc: string | null; vpa: string | null;
+  holderName: string; validatedName: string | null; nameMatch: boolean | null; status: PayoutAccountStatus;
+  failureReason: string | null; createdAt: string; verifiedAt: string | null;
+}
+export interface PayoutAccountBody {
+  type: PayoutAccountType; accountNumber?: string; ifsc?: string; vpa?: string; holderName: string;
+}
+export interface PayoutsSummary {
+  account: PayoutAccount | null; available: number; minimum: number; dailyLimit: number; withdrawnToday: number;
+  canWithdraw: boolean; blockedReason: string | null; validationAttemptsLeft: number; provider: string;
+}
+export type WithdrawalStatus = "REQUESTED" | "PROCESSING" | "PROCESSED" | "REVERSED" | "FAILED";
+export interface Withdrawal {
+  id: string; amount: number; mode: string; status: WithdrawalStatus; utr: string | null; accountLabel: string | null;
+  failureReason: string | null; createdAt: string; processedAt: string | null;
+}
+export type PayoutSimulateOutcome = "PROCESSED" | "REVERSED" | "FAILED";

@@ -1,7 +1,7 @@
 import { api, json } from "./http";
 import type {
   AdjustmentBody, BankTransferDetails, Bill, BillingSummary, Checkout, Earnings, OrgMoney, OrgMoneyPatch, PaymentMethod,
-  PaymentOptions, PaymentOrder, PlatformAccounts, Refund, Refundable, SimulateOutcome, Wallet,
+  PaymentOptions, PaymentOrder, PayoutAccount, PayoutAccountBody, PayoutSimulateOutcome, PayoutsSummary, PlatformAccounts, Refund, Refundable, SimulateOutcome, Wallet, Withdrawal,
 } from "./types";
 
 const withMonth = (path: string, month?: string) => (month ? `${path}?month=${encodeURIComponent(month)}` : path);
@@ -34,3 +34,13 @@ export const payBill = (orgId: string, billId: string, method: PaymentMethod) =>
   api<Checkout>(`/api/v1/orgs/${orgId}/bills/${billId}/pay`, { method: "POST", body: json({ method }) });
 export const simulatePayment = (orderId: string, outcome: SimulateOutcome) =>
   api<{ outcome: string; order: PaymentOrder }>("/api/v1/dev/payments/simulate", { method: "POST", body: json({ orderId, outcome }) });
+
+export const getPayoutsSummary = () => api<PayoutsSummary>("/api/v1/developer/payouts");
+export const addPayoutAccount = (body: PayoutAccountBody) =>
+  api<PayoutAccount>("/api/v1/developer/payout-account", { method: "POST", body: json(body) });
+// 201 for a new withdrawal, 200 when the requestId was already used: both return the withdrawal.
+export const createWithdrawal = (body: { requestId: string; amount: number }) =>
+  api<Withdrawal>("/api/v1/developer/withdrawals", { method: "POST", body: json(body) });
+export const listWithdrawals = () => api<Withdrawal[]>("/api/v1/developer/withdrawals?limit=50");
+export const simulatePayout = (withdrawalId: string, outcome: PayoutSimulateOutcome) =>
+  api<unknown>("/api/v1/dev/payouts/simulate", { method: "POST", body: json({ withdrawalId, outcome }) });

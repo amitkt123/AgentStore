@@ -11,3 +11,20 @@
 .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .download { color: var(--b); text-decoration: none; }
 .download:hover { text-decoration: underline; }
+.panel { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 16px; background: var(--s); border: 1px solid var(--l); }
+.panel h2, .section h2 { margin: 0; font-size: 16px; }
+.panel h3 { margin: 0; font-size: 14px; }
+.panel p { margin: 0; }
+.section { display: flex; flex-direction: column; gap: 10px; }
+.form { display: flex; flex-direction: column; gap: 10px; max-width: 420px; }
+.actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.note { margin: 0; color: var(--ink3); font-size: 13px; }
+.blocked { margin: 0; color: var(--ink3); }
+.ok { margin: 0; color: var(--ok); background: var(--okS); border-radius: 10px; padding: 10px 14px; }
+.err { margin: 0; color: var(--bad); font-size: 13px; }
+.history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.history li { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.simulate { position: relative; display: inline-flex; gap: 8px; align-items: center; }
+.menu { display: flex; flex-direction: column; border: 1px solid var(--l); border-radius: 10px; background: var(--s); padding: 4px; }
+.menu button { background: none; border: 0; text-align: left; padding: 6px 10px; min-height: 32px; cursor: pointer; color: var(--ink); }
+.menu button:hover { background: var(--l); }
