@@ -37,3 +37,8 @@ it("gives ADMIN a Money rail", async () => {
   expect(adminRailItems()).toEqual([{ href: "/admin/money", label: "Money", icon: "wallet" }]);
   expect(railItemsFor("ADMIN", 0)).toEqual(adminRailItems());
 });
+
+it("shows each item's label as visible text", () => {
+  render(<Rail items={items} activePath="/home" />);
+  expect(screen.getByText("Workspace")).toBeVisible();
+});
