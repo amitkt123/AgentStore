@@ -9,3 +9,4 @@
 .panel dd { margin: 2px 0 0; font-weight: 600; }
 .cta { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; border-radius: 10px; background: var(--b); color: #fff; font-weight: 600; text-decoration: none; }
 @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+.note { display: block; font-size: 11px; color: var(--ink3); margin-top: 2px; }
