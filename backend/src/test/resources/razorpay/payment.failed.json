@@ -1,0 +1,41 @@
+{
+  "entity": "event",
+  "account_id": "acc_BFQ7uQEaa7j2z7",
+  "event": "payment.failed",
+  "contains": ["payment"],
+  "payload": {
+    "payment": {
+      "entity": {
+        "id": "pay_DESmIfJmK8Lx7o",
+        "entity": "payment",
+        "amount": 100000,
+        "currency": "INR",
+        "status": "failed",
+        "order_id": "order_DESm9TQZs6bOdY",
+        "invoice_id": null,
+        "international": false,
+        "method": "card",
+        "amount_refunded": 0,
+        "refund_status": null,
+        "captured": false,
+        "description": null,
+        "card_id": "card_DESmIgAXPGcgOh",
+        "bank": null,
+        "wallet": null,
+        "vpa": null,
+        "email": "gaurav.kumar@example.com",
+        "contact": "+919876543210",
+        "notes": [],
+        "fee": null,
+        "tax": null,
+        "error_code": "BAD_REQUEST_ERROR",
+        "error_description": "Payment processing failed because of incorrect OTP",
+        "error_source": "customer",
+        "error_step": "payment_authentication",
+        "error_reason": "incorrect_otp",
+        "created_at": 1567674640
+      }
+    }
+  },
+  "created_at": 1567674644
+}

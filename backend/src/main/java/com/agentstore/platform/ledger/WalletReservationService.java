@@ -1,5 +1,6 @@
 package com.agentstore.platform.ledger;
 
+import com.agentstore.platform.payments.BillingCycleService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
@@ -20,13 +21,16 @@ public class WalletReservationService {
 
     private final WalletRepository walletRepository;
     private final BillingModeService billingModeService;
+    private final BillingCycleService billingCycle;
 
     @PersistenceContext
     private EntityManager entityManager;
 
-    public WalletReservationService(WalletRepository walletRepository, BillingModeService billingModeService) {
+    public WalletReservationService(WalletRepository walletRepository, BillingModeService billingModeService,
+                                    BillingCycleService billingCycle) {
         this.walletRepository = walletRepository;
         this.billingModeService = billingModeService;
+        this.billingCycle = billingCycle;
     }
 
     @Transactional
@@ -47,6 +51,10 @@ public class WalletReservationService {
         Wallet wallet;
         if (mode == BillingMode.POSTPAID) {
             wallet = locked.orElseThrow();
+            // Bill payments set a bill PAID under this same lock, so the answer holds until commit.
+            if (billingCycle.hasOverdueBill(orgId)) {
+                throw new InsufficientFundsException("A bill is overdue; pay it to start new runs");
+            }
             // Charges to the receivable take this wallet lock first, so what is owed cannot move under us.
             BigDecimal committed = billingModeService.owed(orgId).add(wallet.getReserved()).add(amount);
             if (committed.compareTo(billingModeService.creditLimit(orgId)) > 0) {

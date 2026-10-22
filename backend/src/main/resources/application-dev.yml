@@ -8,6 +8,11 @@ spring:
     username: agentstore
     password: ${DB_PASSWORD:agentstore}
 agentstore:
+  money:
+    payments:
+      provider: fake
+      fake:
+        webhook-secret: fake-webhook-secret
   secrets:
     # dev-only all-zero key; real environments must set SECRET_ENCRYPTION_KEY
     encryption-key-base64: ${SECRET_ENCRYPTION_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}

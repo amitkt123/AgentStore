@@ -22,8 +22,8 @@ Mockup elements omitted because the backend has no data or route for them. Updat
 | G16 | Studio "what it did" half and flow canvas | Need sandbox run endpoints that are not on master; deferred to P3c. The Studio shows a note instead |
 | G17 | Validator and submit-failure reasons | `POST /agents/{a}/versions` 400 and `POST …/submit` 403/409 carry no message (the app hides `ResponseStatusException` reasons). The UI shows fixed sentences per status; a `{code, message}` body from the backend would let it show the real reason |
 | G18 | "What this patch changed" | `ManifestPatchResponse.diff` is computed against the LIVE version, not the previous draft, so the UI builds its confirmation from the request. A diff against the prior draft would let it show real before/after |
-| G19 | Billing "Add money", "Bank transfer details", top-up history, "Get money back" | No top-up or refund backend; arrives with WS10b |
-| G20 | Billing bills list and "Pay" in postpaid mode | No bill backend; arrives with WS10b. Postpaid shows Credit limit, Owed and Available only |
+| G19 | Billing "Add money", "Bank transfer details", top-up history, "Get money back" | Resolved in WS10b |
+| G20 | Billing bills list and "Pay" in postpaid mode | Resolved in WS10b |
 | G21 | Earnings "Withdraw", "Payout account", withdrawal history | No payout backend; arrives with WS10c |
 | G22 | Tax invoices on Billing | GST tax invoices are a WS10 non-goal (legal question, spec §8 Q6); the postpaid bill in WS10b is a statement, not a tax invoice |
 

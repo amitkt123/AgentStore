@@ -2,6 +2,7 @@ import { vi } from "vitest";
 vi.mock("next/headers", () => ({ cookies: () => ({ get: () => ({ value: "tok" }) }) }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 import {
+  createRefund, createTopUp, getBankTransferDetails, getPaymentOptions, getRefundable, listBills, listRefunds, listTopUps, payBill, simulatePayment,
   getBillingSummary, getEarnings, getOrgMoney, getPlatformAccounts, getWallet, patchOrgMoney, postAdjustment, statementUrl,
 } from "./money";
 
@@ -59,4 +60,36 @@ it("posts a wallet adjustment", async () => {
   expect(f.mock.calls[0][0]).toBe("http://be/api/v1/admin/orgs/o1/wallet/adjustments");
   expect(f.mock.calls[0][1].method).toBe("POST");
   expect(JSON.parse(f.mock.calls[0][1].body)).toEqual({ requestId: "r1", amount: 500, note: "top up" });
+});
+
+it("calls each money-in and money-back endpoint with the right path and method", async () => {
+  const f = stub();
+  await getPaymentOptions("o1");
+  await listTopUps("o1");
+  await createTopUp("o1", { amount: 500, method: "UPI" });
+  await getBankTransferDetails("o1");
+  await getRefundable("o1");
+  await getRefundable("o1", 250.5);
+  await createRefund("o1", { requestId: "r1", amount: 100 });
+  await listRefunds("o1");
+  await listBills("o1");
+  await payBill("o1", "b1", "CARD");
+  await simulatePayment("p1", "PAID");
+  const calls = f.mock.calls.map((c) => [c[1]?.method ?? "GET", c[0]]);
+  expect(calls).toEqual([
+    ["GET", "http://be/api/v1/orgs/o1/wallet/payment-options"],
+    ["GET", "http://be/api/v1/orgs/o1/wallet/topups"],
+    ["POST", "http://be/api/v1/orgs/o1/wallet/topups"],
+    ["GET", "http://be/api/v1/orgs/o1/wallet/bank-transfer-details"],
+    ["GET", "http://be/api/v1/orgs/o1/wallet/refundable"],
+    ["GET", "http://be/api/v1/orgs/o1/wallet/refundable?amount=250.5"],
+    ["POST", "http://be/api/v1/orgs/o1/wallet/refunds"],
+    ["GET", "http://be/api/v1/orgs/o1/wallet/refunds"],
+    ["GET", "http://be/api/v1/orgs/o1/bills"],
+    ["POST", "http://be/api/v1/orgs/o1/bills/b1/pay"],
+    ["POST", "http://be/api/v1/dev/payments/simulate"],
+  ]);
+  expect(JSON.parse(f.mock.calls[2][1].body)).toEqual({ amount: 500, method: "UPI" });
+  expect(JSON.parse(f.mock.calls[9][1].body)).toEqual({ method: "CARD" });
+  expect(JSON.parse(f.mock.calls[10][1].body)).toEqual({ orderId: "p1", outcome: "PAID" });
 });

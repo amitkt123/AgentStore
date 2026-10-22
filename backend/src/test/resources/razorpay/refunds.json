@@ -1,0 +1,32 @@
+{
+  "entity": "collection",
+  "count": 2,
+  "items": [
+    {
+      "id": "rfnd_FP8QHiV938haTz",
+      "entity": "refund",
+      "amount": 12550,
+      "currency": "INR",
+      "payment_id": "pay_29QQoUBi66xm2f",
+      "notes": [],
+      "receipt": "9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+      "created_at": 1761094800,
+      "status": "processed",
+      "speed_processed": "normal",
+      "speed_requested": "normal"
+    },
+    {
+      "id": "rfnd_FP8R8EGjGbPkVb",
+      "entity": "refund",
+      "amount": 5000,
+      "currency": "INR",
+      "payment_id": "pay_G8VQzjPLoAvm6D",
+      "notes": [],
+      "receipt": null,
+      "created_at": 1761095000,
+      "status": "pending",
+      "speed_processed": "normal",
+      "speed_requested": "normal"
+    }
+  ]
+}

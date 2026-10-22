@@ -25,4 +25,17 @@ public interface LedgerPostingRepository extends JpaRepository<LedgerPosting, UU
                              com.agentstore.platform.ledger.LedgerAccountKind.BUYER_RECEIVABLE)
               and t.createdAt >= :from""")
     BigDecimal runChargesSince(@Param("orgId") UUID orgId, @Param("from") Instant from);
+
+    /**
+     * What the org's runs were charged on credit in [{@code from}, {@code to}): minus its RUN_CHARGE postings on its
+     * BUYER_RECEIVABLE, by the transaction's {@code created_at}.
+     */
+    @Query("""
+            select coalesce(-sum(p.amount), 0) from LedgerPosting p, LedgerTransaction t, LedgerAccount a
+            where p.transactionId = t.id and p.accountId = a.id
+              and t.type = com.agentstore.platform.ledger.LedgerTransactionType.RUN_CHARGE
+              and a.orgId = :orgId and a.kind = com.agentstore.platform.ledger.LedgerAccountKind.BUYER_RECEIVABLE
+              and t.createdAt >= :from and t.createdAt < :to""")
+    BigDecimal receivableRunChargesBetween(@Param("orgId") UUID orgId, @Param("from") Instant from,
+                                           @Param("to") Instant to);
 }

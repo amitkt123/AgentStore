@@ -28,7 +28,7 @@ Do not start the backend without the `runner` profile: Spring then uses a fake b
 
 ## Buyer
 
-1. Sign up as a buyer and fund the wallet: `scripts/demo-fund-wallet.sh you@example.com 10000` (no top-up exists yet). The script logs in as the demo admin
+1. Sign up as a buyer and fund the wallet: `scripts/demo-fund-wallet.sh you@example.com 10000` (or use Add money on Billing; in dev the fake payment provider is used, see `docs/payments.md`). The script logs in as the demo admin
    (`ADMIN_EMAIL`/`ADMIN_PASSWORD`, default `demo-admin@example.com` / `Demo-pass-12345`, so run
    `demo-make-admin.sh` first) and adds the amount through `POST /api/v1/admin/orgs/{orgId}/wallet/adjustments`; it prints
    the new balance. Running it again adds again.
@@ -71,6 +71,6 @@ decided have nothing left to commit them and are DISCARDED.
 ## Known gaps
 
 - A connection needs at least one scope, so an agent with no scopes cannot be connected.
-- Wallet top-up and payouts do not exist; use the script above.
+- Payouts do not exist (WS10c). Top-ups work through the fake provider in dev; the script above is still the quick way to fund a wallet.
 - Run outputs from `complete(outputs=...)` are not listed under Outputs; only written files are.
 - The Studio's "what it did" half and the flow canvas are not built (P3c).

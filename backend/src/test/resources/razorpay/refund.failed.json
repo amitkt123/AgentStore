@@ -1,0 +1,41 @@
+{
+  "entity": "event",
+  "account_id": "acc_BFQ7uQEaa7j2z7",
+  "event": "refund.failed",
+  "contains": ["refund", "payment"],
+  "payload": {
+    "refund": {
+      "entity": {
+        "id": "rfnd_FP8R8EGjGbPkVb",
+        "entity": "refund",
+        "amount": 10000,
+        "currency": "INR",
+        "payment_id": "pay_G8VaL2Z68LRtDs",
+        "notes": [],
+        "receipt": "aaaaaaaa-0000-0000-0000-000000000001",
+        "acquirer_data": { "arn": null },
+        "created_at": 1597078124,
+        "batch_id": null,
+        "status": "failed",
+        "speed_processed": "normal",
+        "speed_requested": "optimum"
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_G8VaL2Z68LRtDs",
+        "entity": "payment",
+        "amount": 20000,
+        "currency": "INR",
+        "status": "captured",
+        "order_id": "order_G8VXOp0qX2cmfS",
+        "method": "card",
+        "amount_refunded": 0,
+        "refund_status": null,
+        "captured": true,
+        "created_at": 1597077000
+      }
+    }
+  },
+  "created_at": 1597078200
+}

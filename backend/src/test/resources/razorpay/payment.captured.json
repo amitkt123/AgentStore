@@ -1,0 +1,40 @@
+{
+  "entity": "event",
+  "account_id": "acc_BFQ7uQEaa7j2z7",
+  "event": "payment.captured",
+  "contains": ["payment"],
+  "payload": {
+    "payment": {
+      "entity": {
+        "id": "pay_DESlfW9H8K9uqM",
+        "entity": "payment",
+        "amount": 50050,
+        "currency": "INR",
+        "base_amount": 50050,
+        "status": "captured",
+        "order_id": "order_DESlLckIVRkHWj",
+        "invoice_id": null,
+        "international": false,
+        "method": "upi",
+        "amount_refunded": 0,
+        "amount_transferred": 0,
+        "refund_status": null,
+        "captured": true,
+        "description": null,
+        "card_id": null,
+        "bank": null,
+        "wallet": null,
+        "vpa": "gaurav.kumar@exampleupi",
+        "email": "gaurav.kumar@example.com",
+        "contact": "+919876543210",
+        "notes": [],
+        "fee": 1181,
+        "tax": 180,
+        "error_code": null,
+        "error_description": null,
+        "created_at": 1567674599
+      }
+    }
+  },
+  "created_at": 1567674606
+}

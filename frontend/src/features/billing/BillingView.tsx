@@ -3,7 +3,22 @@ import { MonthNav } from "@/ui/MonthNav";
 import { EmptyState } from "@/ui/EmptyState";
 import { ResponsiveTable } from "@/ui/ResponsiveTable";
 import { formatInr } from "@/lib/format";
-import type { BillingLine, BillingSummary, Wallet } from "@/lib/api/types";
+import { AddMoney } from "./AddMoney";
+import { Bills } from "./Bills";
+import { GetMoneyBack } from "./GetMoneyBack";
+import { TopUpHistory } from "./TopUpHistory";
+import type {
+  Bill, BillingLine, BillingSummary, PaymentOptions, PaymentOrder, Refund, Refundable, Wallet,
+} from "@/lib/api/types";
+
+/** Each part is null when its optional call failed; that hides only its own panel. */
+export interface PaymentPanels {
+  options: PaymentOptions | null;
+  topUps: PaymentOrder[] | null;
+  refundable: Refundable | null;
+  refunds: Refund[] | null;
+  bills: Bill[] | null;
+}
 
 function figures(wallet: Wallet): [string, number][] {
   if (wallet.mode === "POSTPAID") {
@@ -12,7 +27,7 @@ function figures(wallet: Wallet): [string, number][] {
   return [["Balance", wallet.balance], ["On hold", wallet.held], ["Available", wallet.available], ["Spent this month", wallet.spentThisMonth]];
 }
 
-export function BillingView({ wallet, summary }: { wallet: Wallet; summary: BillingSummary }) {
+export function BillingView({ wallet, summary, payments }: { wallet: Wallet; summary: BillingSummary; payments?: PaymentPanels }) {
   return (
     <div className={styles.wrap}>
       <dl className={styles.figures}>
@@ -23,6 +38,19 @@ export function BillingView({ wallet, summary }: { wallet: Wallet; summary: Bill
           </div>
         ))}
       </dl>
+      {payments && wallet.mode === "PREPAID" && (
+        <>
+          {payments.options && <AddMoney options={payments.options} balance={wallet.balance} />}
+          {payments.topUps && <TopUpHistory topUps={payments.topUps} />}
+        </>
+      )}
+      {/* Prepaid always shows the panel (its zero state explains why); postpaid only when it holds refundable top-ups. */}
+      {payments?.refundable && (wallet.mode === "PREPAID" || payments.refundable.refundable > 0) && (
+        <GetMoneyBack refundable={payments.refundable} refunds={payments.refunds ?? []} />
+      )}
+      {payments?.bills && wallet.mode === "POSTPAID" && (
+        <Bills bills={payments.bills} owed={wallet.owed} methods={payments.options?.methods} />
+      )}
       <MonthNav basePath="/billing" month={summary.month} />
       {summary.agents.length === 0 ? (
         <EmptyState title="No charges this month." />

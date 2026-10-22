@@ -144,13 +144,26 @@ public class LedgerService {
     @Transactional(propagation = Propagation.MANDATORY)
     public LedgerTransaction post(LedgerTransactionType type, String idempotencyKey, UUID runId, UUID orgId,
                                   Map<String, Object> reference, List<Posting> postings) {
+        return postWithResult(type, idempotencyKey, runId, orgId, reference, postings).transaction();
+    }
+
+    /** What {@link #postWithResult} did: {@code created} is false when the key replayed an existing transaction. */
+    public record PostResult(LedgerTransaction transaction, boolean created) {}
+
+    /**
+     * {@link #post}, also reporting whether this call created the transaction. Callers that dual-write outside the
+     * ledger (such as {@code wallet.balance}) gate that write on {@code created}, so a replay cannot apply it twice.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public PostResult postWithResult(LedgerTransactionType type, String idempotencyKey, UUID runId, UUID orgId,
+                                     Map<String, Object> reference, List<Posting> postings) {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(idempotencyKey, "idempotencyKey");
         Map<UUID, BigDecimal> byAccount = validatedTotals(postings);
 
         var existing = ledgerTransactionRepository.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
-            return existing.get();
+            return new PostResult(existing.get(), false);
         }
 
         LedgerTransaction transaction = new LedgerTransaction();
@@ -181,7 +194,7 @@ public class LedgerService {
             balance.setBalance(balance.getBalance().add(entry.getValue()).setScale(2, RoundingMode.UNNECESSARY));
             balance.setVersion(balance.getVersion() + 1);
         }
-        return transaction;
+        return new PostResult(transaction, true);
     }
 
     @Transactional(readOnly = true)

@@ -60,6 +60,23 @@ class LedgerServicePostTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void postWithResultReportsWhetherItCreated() {
+        UUID[] a = freshAccounts();
+        String key = "test:" + UUID.randomUUID();
+        List<Posting> lines = List.of(new Posting(a[0], new BigDecimal("3.00")), new Posting(a[1], new BigDecimal("-3.00")));
+
+        LedgerService.PostResult first = tx.execute(s -> ledgerService.postWithResult(LedgerTransactionType.ADJUSTMENT,
+                key, null, null, null, lines));
+        LedgerService.PostResult replay = tx.execute(s -> ledgerService.postWithResult(LedgerTransactionType.ADJUSTMENT,
+                key, null, null, null, lines));
+
+        assertThat(first.created()).isTrue();
+        assertThat(replay.created()).isFalse();
+        assertThat(replay.transaction().getId()).isEqualTo(first.transaction().getId());
+        assertThat(ledgerService.balanceOf(a[0])).isEqualByComparingTo("3.00");
+    }
+
+    @Test
     void postRejectsUnbalancedAndScale() {
         UUID[] a = freshAccounts();
         assertThatThrownBy(() -> post("test:" + UUID.randomUUID(),

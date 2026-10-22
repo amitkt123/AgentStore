@@ -130,3 +130,30 @@ export interface PlatformAccounts {
   walletsMatchLedger: boolean;
 }
 export interface AdjustmentBody { requestId: string; amount: number; note: string }
+
+export type PaymentMethod = "UPI" | "CARD" | "NETBANKING" | "BANK_TRANSFER";
+export interface PaymentOptions {
+  provider: string; methods: PaymentMethod[]; topUpMin: number; topUpDailyLimit: number; topUpRemainingToday: number;
+}
+export interface PaymentOrder {
+  id: string; purpose: "TOPUP" | "BILL"; method: PaymentMethod; amount: number;
+  status: "CREATED" | "PAID" | "FAILED" | "EXPIRED"; refundedAmount: number; createdAt: string; paidAt: string | null;
+}
+export interface Checkout {
+  order: PaymentOrder; provider: string; providerOrderId: string; checkout: Record<string, unknown>;
+}
+export interface BankTransferDetails { accountNumber: string; ifsc: string; beneficiaryName: string }
+export interface RefundPlanPart { paymentOrderId: string; method: PaymentMethod; paidAt: string | null; amount: number }
+export interface Refundable { refundable: number; parts: RefundPlanPart[] }
+export interface RefundPart {
+  id: string; paymentOrderId: string; method: PaymentMethod; amount: number;
+  status: "PENDING" | "PROCESSING" | "DONE" | "FAILED"; failureReason: string | null;
+}
+export interface Refund {
+  id: string; amount: number; status: "REQUESTED" | "PROCESSING" | "DONE" | "PARTLY_FAILED" | "FAILED";
+  parts: RefundPart[]; createdAt: string;
+}
+export interface Bill {
+  id: string; period: string; amount: number; status: "OPEN" | "PAID" | "OVERDUE"; dueAt: string; paidAt: string | null;
+}
+export type SimulateOutcome = "PAID" | "FAILED";
