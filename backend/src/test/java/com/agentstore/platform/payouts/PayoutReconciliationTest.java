@@ -84,6 +84,19 @@ class PayoutReconciliationTest extends WithdrawalTestSupport {
     }
 
     @Test
+    void payoutExactlyOneHourOldIsUnmatched() {
+        Instant now = Instant.parse("2026-03-10T12:00:00Z");
+        LocalDate day = LocalDate.of(2026, 3, 10);
+        String exact = "fake_pout_ext_" + UUID.randomUUID();
+        fake().addExternalPayout(new ProviderPayout(exact, UUID.randomUUID().toString(), new BigDecimal("50.00"),
+                BigDecimal.ZERO, "PROCESSED", "U", null, now.minus(Duration.ofHours(1))));
+
+        reconciliation.check(day, now);
+
+        assertThat(kinds(day, exact)).containsExactly("PAYOUT_UNMATCHED");
+    }
+
+    @Test
     void statusDisagreementIsMismatch() {
         UUID id = withdrawal("400.00");
         String pid = payoutId(id);

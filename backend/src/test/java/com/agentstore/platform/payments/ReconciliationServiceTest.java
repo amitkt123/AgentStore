@@ -240,6 +240,25 @@ class ReconciliationServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void payoutProviderFailureDoesNotAbortTheRun() {
+        FakePayoutProvider payouts = (FakePayoutProvider) payoutProvider;
+        String settlement = uniq("setl_");
+        fake().seedSettlement(settlement, new BigDecimal("11.80"), AT);
+        payouts.setFailFetch(true);
+        try {
+            int found = reconciliation.reconcile(DAY, AT);
+
+            assertThat(found).isGreaterThanOrEqualTo(1);
+            assertThat(issues()).anySatisfy(i -> assertThat(i).containsEntry("kind", "PAYOUT_FETCH_FAILED")
+                    .containsEntry("provider_ref", "fake"));
+            assertThat(jdbc.queryForObject("select count(*) from ledger_transaction where idempotency_key = ?",
+                    Integer.class, "gateway-fee:" + settlement)).isEqualTo(1);
+        } finally {
+            payouts.reset();
+        }
+    }
+
+    @Test
     void feesPostedOnce() {
         String settlement = uniq("setl_");
         fake().seedSettlement(settlement, new BigDecimal("23.60"), AT);

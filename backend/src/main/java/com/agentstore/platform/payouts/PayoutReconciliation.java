@@ -1,6 +1,7 @@
 package com.agentstore.platform.payouts;
 
 import com.agentstore.platform.payments.ReconciliationIssues;
+import com.agentstore.platform.payments.ReconciliationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,7 +29,7 @@ public class PayoutReconciliation {
 
     private static final Logger log = LoggerFactory.getLogger(PayoutReconciliation.class);
     /** A provider payout younger than this may not be committed locally yet, so it is not flagged as unmatched. */
-    static final Duration UNMATCHED_GRACE = Duration.ofHours(1);
+    static final Duration UNMATCHED_GRACE = ReconciliationService.UNMATCHED_REFUND_GRACE;
 
     private final PayoutProvider provider;
     private final ReconciliationIssues issues;
@@ -38,6 +39,10 @@ public class PayoutReconciliation {
         this.provider = provider;
         this.issues = issues;
         this.jdbc = jdbc;
+    }
+
+    public String providerName() {
+        return provider.name();
     }
 
     /** Checks {@code day} as of {@code now}; returns how many issues it found (new or already recorded). */

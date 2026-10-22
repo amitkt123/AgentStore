@@ -39,6 +39,7 @@ public class FakePayoutProvider implements PayoutProvider {
     private final Map<String, ProviderPayout> payoutsByKey = new ConcurrentHashMap<>();
     private final String webhookSecret;
     private volatile boolean unavailableCleared;
+    private volatile boolean failFetch;
 
     public FakePayoutProvider(PayoutProperties.Fake fake) {
         if (fake == null || fake.webhookSecret() == null || fake.webhookSecret().isBlank()) {
@@ -121,6 +122,7 @@ public class FakePayoutProvider implements PayoutProvider {
 
     @Override
     public List<ProviderPayout> fetchPayouts(LocalDate dayUtc) {
+        if (failFetch) throw new PayoutProviderUnavailableException("Fake provider listing is unavailable");
         return payoutsById.values().stream()
                 .filter(p -> p.createdAt().atZone(ZoneOffset.UTC).toLocalDate().equals(dayUtc))
                 .toList();
@@ -179,6 +181,11 @@ public class FakePayoutProvider implements PayoutProvider {
         return true;
     }
 
+    /** While true, {@link #fetchPayouts} throws, as a provider outage would; {@link #reset} clears it. */
+    public void setFailFetch(boolean fail) {
+        failFetch = fail;
+    }
+
     /** Lists a payout that did not come through {@link #createPayout}, as one made outside Karya would be. */
     public synchronized void addExternalPayout(ProviderPayout payout) {
         payoutsById.put(payout.payoutId(), payout);
@@ -195,6 +202,7 @@ public class FakePayoutProvider implements PayoutProvider {
     /** Forgets everything and restores the failure rules; tests that need a clean slate call this. */
     public void reset() {
         unavailableCleared = false;
+        failFetch = false;
         fundAccounts.clear();
         validations.clear();
         payoutsById.clear();
