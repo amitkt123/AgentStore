@@ -121,7 +121,7 @@ it("saves the agreement and then submits for review", async () => {
   expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
   await userEvent.click(screen.getByRole("checkbox", { name: /accept it/ }));
   await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
-  expect(save).toHaveBeenCalledWith("AGREEMENT", { agreementVersion: "2.1" });
+  expect(save).toHaveBeenCalledWith("AGREEMENT", { agreementVersion: "2.2" });
   expect(submit).toHaveBeenCalledTimes(1);
   expect(await screen.findByText(/Sent to Karya/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /submit for review/i })).not.toBeInTheDocument();

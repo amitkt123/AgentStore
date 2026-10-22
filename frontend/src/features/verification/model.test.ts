@@ -11,7 +11,7 @@ it("normalises what is typed before it is sent", () => {
   expect(fieldsFor("TAX_IDS", d)).toEqual({ pan: "ABCDE1234F", gstin: "22ABCDE1234F1Z5" });
   expect(fieldsFor("PHONE", d)).toEqual({ phone: "+919920012208" });
   expect(fieldsFor("ABOUT", d)).toEqual({ entityType: "INDIVIDUAL", legalName: "Asha", displayName: "Asha", country: "IN", city: "Pune" });
-  expect(fieldsFor("AGREEMENT", d)).toEqual({ agreementVersion: "2.1" });
+  expect(fieldsFor("AGREEMENT", d)).toEqual({ agreementVersion: "2.2" });
 });
 
 it("sends nothing for a tax or phone step the user left alone", () => {

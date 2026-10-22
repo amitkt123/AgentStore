@@ -104,8 +104,8 @@ class DeveloperVerificationApiTest extends AbstractStorageIntegrationTest {
         assertThat(afterPhone.getBody().get("phoneMasked")).isEqualTo("3210");
         assertThat(afterPhone.getBody().get("currentStep")).isEqualTo("AGREEMENT");
 
-        var afterAgreement = patch(dev, "AGREEMENT", Map.of("agreementVersion", "2.1"));
-        assertThat(afterAgreement.getBody().get("agreementVersion")).isEqualTo("2.1");
+        var afterAgreement = patch(dev, "AGREEMENT", Map.of("agreementVersion", "2.2"));
+        assertThat(afterAgreement.getBody().get("agreementVersion")).isEqualTo("2.2");
         assertThat(afterAgreement.getBody().get("agreementAcceptedAt")).isNotNull();
         assertThat(afterAgreement.getBody().get("currentStep")).isEqualTo("AGREEMENT");
     }
@@ -287,7 +287,7 @@ class DeveloperVerificationApiTest extends AbstractStorageIntegrationTest {
                 "entityType", "LLP"));
         patch(dev, "TAX_IDS", Map.of("pan", "ABCDE1234F"));
         patch(dev, "PHONE", Map.of("phone", "9876543210"));
-        patch(dev, "AGREEMENT", Map.of("agreementVersion", "2.1"));
+        patch(dev, "AGREEMENT", Map.of("agreementVersion", "2.2"));
         uploadPanDocument(dev, "image/jpeg", "fake-jpeg-bytes".getBytes());
     }
 
@@ -364,7 +364,7 @@ class DeveloperVerificationApiTest extends AbstractStorageIntegrationTest {
                 "city", "Pune", "entityType", "LLP"));
         var tax = patch(dev, "TAX_IDS", Map.of("pan", rawPan, "gstin", rawGstin));
         var phone = patch(dev, "PHONE", Map.of("phone", rawPhone));
-        var agreement = patch(dev, "AGREEMENT", Map.of("agreementVersion", "2.1"));
+        var agreement = patch(dev, "AGREEMENT", Map.of("agreementVersion", "2.2"));
         var doc = uploadPanDocument(dev, "image/jpeg", "fake-jpeg-bytes".getBytes());
         var submitted = submit(dev);
         var fetched = call(HttpMethod.GET, base(), null, dev);

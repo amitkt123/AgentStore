@@ -11,7 +11,7 @@ it.each([
   ["displayName must be at most 100 characters", "displayName"],
   ["city must not be blank", "city"],
   ["entityType must be one of [INDIVIDUAL]", "entityType"],
-  ["agreementVersion must be 2.1", "agreementVersion"],
+  ["agreementVersion must be 2.2", "agreementVersion"],
 ])("puts the INVALID_FIELD '%s' under %s in plain words", (message, field) => {
   const f = toFailure(e(400, "INVALID_FIELD", message));
   expect(f.field).toBe(field);

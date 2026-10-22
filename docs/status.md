@@ -2,14 +2,14 @@
 
 The single place to see what is done and what is next. Update it in the same PR as any change that finishes, starts or reshapes a workstream. Gaps and risks stay in `docs/frontend-gaps.md` and `docs/known-issues.md`; this file links to them, it does not copy them.
 
-Last updated: 2026-10-22 (WS10b money in and back done, manual Razorpay test-mode check pending)
+Last updated: 2026-10-22 (WS10c money out done, manual RazorpayX test-mode check pending)
 
 Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-and-sandbox-design.md` (workstreams in §5, milestones in §7). Specs and plans named below live in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
 
 ## Next up
 
-1. WS10c money out: payout accounts, withdrawals, admin payout console (spec `2026-10-21-ws10-money-in-and-out-design.md` §3); needs Razorpay test keys.
-2. The WS10b manual Razorpay test-mode check (`docs/payments.md`).
+1. The manual Razorpay (WS10b) and RazorpayX (WS10c) test-mode checks (`docs/payments.md`).
+2. WS16 disputes.
 
 ## Backend workstreams
 
@@ -30,7 +30,7 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | WS9 buyer trial runs | Not started | — | parent spec §5 | All |
 | WS10a double-entry ledger, revenue split, LLM cost deduction, postpaid mode, buyer statement, earnings | Done | #39 | spec `2026-10-21-ws10-money-in-and-out-design.md` §1, plan `2026-10-21-ws10a-…` | `wallet.balance` and `ledger_entry` still dual-written (`known-issues.md`) |
 | WS10b money in and back (top-up, refunds, postpaid bills, reconciliation) | Done (manual Razorpay test-mode check pending) | this PR | spec `2026-10-21-ws10-…` §2, plan `2026-10-21-ws10b-money-in-and-back.md` | Run the checklist in `docs/payments.md` once Razorpay test keys exist |
-| WS10c money out (payout accounts, withdrawals, admin payout console) | Not started | — | spec `2026-10-21-ws10-…` §3 | All |
+| WS10c money out (payout accounts, withdrawals, admin payout console) | Done (manual RazorpayX test-mode check pending) | this PR | spec `2026-10-21-ws10-…` §3 | Run the RazorpayX checklist in `docs/payments.md`; known gaps in `known-issues.md` |
 | WS11 release management (pinning UX, updates, rollout, delisting) | Not started | — | parent spec §5 | All |
 | WS12 platform infrastructure and operations | Partial | #33, #37, #40, #42, #43, #44 | parent spec §5 | Docs site, deploy, observability. CI is one workflow per project (`.github/workflows/{backend,runner,e2b-shim,frontend,cli,sdk}.yml`), each run only on pull requests to master that touch its paths (backend also on `contracts/` and `sdk/`; CLI also on the backend manifest schema); actions pinned to Node 24 majors (checkout v7, setup-node v7, setup-java v6, setup-python v7) |
 | WS13 identity, workspaces, teams | Done | #4, #5 | `2026-09-23-ws13-…` | SSO; Google sign-in needs a client id (G10) |
@@ -51,9 +51,9 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | P3b agents list and Studio | Done | #36 | `2026-10-01-p3b-…` | — |
 | P3c Studio "what it did" half and flow canvas | Not started | — | none | All (G16) |
 | Buyer Billing page `/billing` | Done (WS10a, WS10b) | #39, this PR | plans `2026-10-21-ws10a-…`, `2026-10-21-ws10b-…` | — |
-| Developer Earnings page `/developer/earnings` | Done (WS10a) | #39 | plan `2026-10-21-ws10a-…` | Withdraw, payout account (WS10c) |
-| Admin Money page `/admin/money` (fee, credit limit, billing mode, wallet adjustments, platform accounts, ledger checks) | Done (WS10a) | #39 | plan `2026-10-21-ws10a-…` | Withdrawals, freezes, reconciliation screen (WS10c). Reconciliation issues exist as an API only (WS10b): `POST /api/v1/admin/payments/reconciliation/run?date=`, `GET /api/v1/admin/payments/reconciliation?date=` |
-| FE-3 developer money (earnings, payouts) | Partly superseded by the Earnings page above | — | plan `2026-09-23-fe3-…` | Payouts (WS10c) |
+| Developer Earnings page `/developer/earnings` | Done (WS10a, WS10c) | #39, this PR | plan `2026-10-21-ws10a-…` | — |
+| Admin Money page `/admin/money` (fee, credit limit, billing mode, wallet adjustments, platform accounts, ledger checks) | Done (WS10a, WS10c) | #39, this PR | plan `2026-10-21-ws10a-…` | — (payouts, freezes and reconciliation screens added in WS10c) |
+| FE-3 developer money (earnings, payouts) | Superseded by the Earnings page above | — | plan `2026-09-23-fe3-…` | — |
 | FE-4 admin consoles | Not started | — | plan `2026-09-23-fe4-…` | All |
 
 ## Small fixes waiting
