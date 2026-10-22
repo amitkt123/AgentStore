@@ -26,6 +26,8 @@ import java.util.regex.Pattern;
 @Service
 public class PayoutAccountService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PayoutAccountService.class);
+
     private static final Pattern ACCOUNT_NUMBER = Pattern.compile("^\\d{9,18}$");
     private static final Pattern IFSC = Pattern.compile("^[A-Z]{4}0[A-Z0-9]{6}$");
     private static final Pattern VPA = Pattern.compile("^[a-zA-Z0-9.\\-_]{2,256}@[a-zA-Z]{2,64}$");
@@ -86,6 +88,17 @@ public class PayoutAccountService {
         }
 
         UUID id = tx.execute(status -> {
+            // Serialise concurrent adds for the org, then recheck the cap under the lock.
+            Org locked = orgs.findByIdForUpdate(orgId).orElseThrow(notVerified());
+            String nowBlocked = orgBlock(locked);
+            if (nowBlocked != null) throw blockedException(nowBlocked);
+            if (accounts.countByOrgIdAndCreatedAtGreaterThanEqual(orgId, startOfTodayUtc())
+                    >= props.validationAttemptsPerDay()) {
+                log.info("Payout account attempt for org {} refused after provider calls; orphaned provider contact {} "
+                        + "fund account {}", orgId, contactId, fundAccountId);
+                throw new PayoutApiException(HttpStatus.TOO_MANY_REQUESTS, "VALIDATION_LIMIT_REACHED",
+                        "Too many payout account attempts today; try again tomorrow");
+            }
             accounts.findByOrgIdAndReplacedAtIsNull(orgId).ifPresent(old -> {
                 old.setReplacedAt(Instant.now());
                 accounts.saveAndFlush(old);
@@ -114,7 +127,10 @@ public class PayoutAccountService {
         return PayoutAccountView.of(accounts.findById(id).orElseThrow());
     }
 
-    /** Idempotent: only a PENDING account is changed, and a PENDING validation changes nothing. */
+    /**
+     * Idempotent: only a PENDING account is changed, and a PENDING validation changes nothing. A replaced (no longer
+     * active) PENDING row is still resolved, since it is the row the provider validated, but it never becomes active.
+     */
     @Transactional
     public void applyValidation(UUID accountId, PayoutProvider.ProviderValidation v) {
         PayoutAccount a = accounts.findByIdForUpdate(accountId).orElse(null);
@@ -138,6 +154,7 @@ public class PayoutAccountService {
                 a.setFailureReason(v.failureReason() == null ? "VALIDATION_FAILED" : v.failureReason());
             }
             default -> {
+                if (!"PENDING".equals(v.status())) log.warn("Ignoring unknown payout validation status {}", v.status());
                 return;
             }
         }

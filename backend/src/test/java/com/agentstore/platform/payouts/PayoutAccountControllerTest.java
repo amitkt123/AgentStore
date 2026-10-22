@@ -142,6 +142,7 @@ class PayoutAccountControllerTest extends AbstractIntegrationTest {
     void buyerGets403() {
         var r = addBank(developer(true), "123456789012", "HDFC0001234", UserRole.BUYER_ADMIN);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(r.getBody()).isNotNull();
     }
 
     @Test
@@ -197,5 +198,35 @@ class PayoutAccountControllerTest extends AbstractIntegrationTest {
         assertThat(s.getBody().get("validationAttemptsLeft")).isEqualTo(3);
         assertThat(s.getBody().get("provider")).isEqualTo("fake");
         assertThat(new java.math.BigDecimal(s.getBody().get("minimum").toString())).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void concurrentAddsNeverFiveHundredAndLeaveOneActiveAccount() throws Exception {
+        Org org = developer(true);
+        int n = 6;
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(n);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var futures = new java.util.ArrayList<java.util.concurrent.Future<HttpStatusCode>>();
+        for (int i = 0; i < n; i++) {
+            String number = "12345678" + (1000 + i) + "5";
+            futures.add(pool.submit(() -> {
+                start.await();
+                return addBank(org, number, "HDFC0001234", UserRole.DEVELOPER).getStatusCode();
+            }));
+        }
+        start.countDown();
+        int created = 0;
+        for (var f : futures) {
+            HttpStatusCode code = f.get();
+            assertThat(code.is5xxServerError()).as("status %s", code).isFalse();
+            assertThat(code.value()).isIn(201, 429);
+            if (code.value() == 201) created++;
+        }
+        pool.shutdown();
+        assertThat(created).isEqualTo(3);
+        assertThat(jdbc.queryForObject("select count(*) from payout_account where org_id = ? and replaced_at is null",
+                Long.class, org.getId())).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("select count(*) from payout_account where org_id = ?",
+                Long.class, org.getId())).isEqualTo(3L);
     }
 }
