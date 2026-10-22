@@ -24,12 +24,13 @@ export function EarningsView({ earnings }: { earnings: Earnings }) {
         ))}
       </dl>
       <section className={styles.available}>
-        <h2>Available to withdraw</h2>
+        <h2>Your balance with Karya</h2>
         {earnings.available < 0 ? (
           <p className={styles.owe}>{`You owe ${formatInr(-earnings.available)}; it comes out of future earnings`}</p>
         ) : (
           <p className={`${styles.availableValue} mono`}>{formatInr(earnings.available)}</p>
         )}
+        <p className={styles.soon}>Withdrawals open once payouts are live.</p>
       </section>
       <div className={styles.bar}>
         <MonthNav basePath="/developer/earnings" month={earnings.month} />

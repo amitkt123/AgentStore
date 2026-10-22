@@ -3,14 +3,14 @@ import {
 } from "@/lib/api/money";
 import { ApiError } from "@/lib/api/http";
 import { getSession } from "@/lib/session";
-import { BillingView } from "@/features/billing/BillingView";
+import { BillingView, type PaymentPanels } from "@/features/billing/BillingView";
 import { parseMonth } from "@/lib/month";
 import { ErrorState } from "@/ui/ErrorState";
 
-// The payment panels are optional: an API error hides that panel instead of failing the page.
-async function optional<T>(call: () => Promise<T>): Promise<T | null> {
+// The payment panels are optional: an API error drops that panel, names it in `failed`, and the page still renders.
+async function optional<T>(call: () => Promise<T>, failed: string[], name: string): Promise<T | null> {
   try { return await call(); } catch (e) {
-    if (e instanceof ApiError) return null;
+    if (e instanceof ApiError) { failed.push(name); return null; }
     throw e;
   }
 }
@@ -28,16 +28,19 @@ export default async function Page({ searchParams }: { searchParams: { month?: s
   try {
     const month = parseMonth(searchParams.month);
     const orgId = session.orgId;
+    const failed: string[] = [];
     const [wallet, summary, options, topUps, refundable, refunds, bills] = await Promise.all([
       getWallet(orgId),
       getBillingSummary(orgId, month),
-      optional(() => getPaymentOptions(orgId)),
-      optional(() => listTopUps(orgId)),
-      optional(() => getRefundable(orgId)),
-      optional(() => listRefunds(orgId)),
-      optional(() => listBills(orgId)),
+      optional(() => getPaymentOptions(orgId), failed, "options"),
+      optional(() => listTopUps(orgId), failed, "topUps"),
+      optional(() => getRefundable(orgId), failed, "refundable"),
+      optional(() => listRefunds(orgId), failed, "refunds"),
+      optional(() => listBills(orgId), failed, "bills"),
     ]);
-    const payments = { options, topUps, refundable, refunds, bills };
+    // A prepaid org never has bills, so a bills failure there is noise.
+    const shown = failed.filter((k) => !(k === "bills" && wallet.mode === "PREPAID")) as NonNullable<PaymentPanels["failed"]>;
+    const payments: PaymentPanels = { options, topUps, refundable, refunds, bills, failed: shown };
     return (
       <>
         <h1>Billing</h1>

@@ -103,9 +103,9 @@ it.each([
   ["IN_REVIEW", /in review/],
   ["LIVE", /is live/],
   ["REJECTED", /was rejected/],
-] as const)("keeps Submit disabled for a %s version, even when ready", (status, note) => {
+] as const)("shows no Submit button for a %s version, only why", (status, note) => {
   ui(<SubmitBar agentId="a1" versionId="v1" status={status} ready />);
-  expect(screen.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Submit for review" })).toBeNull();
   expect(screen.getByText(note)).toBeInTheDocument();
 });
 
