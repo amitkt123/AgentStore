@@ -144,4 +144,35 @@ class PayoutReconciliationTest extends WithdrawalTestSupport {
 
         assertThat(kinds(dayOf(pid), pid)).containsExactly("PAYOUT_MISMATCH");
     }
+    @Test
+    void secondPayoutForAWithdrawalIsDuplicate() {
+        UUID id = withdrawal("400.00");
+        String pid = payoutId(id);
+        String dup = "fake_pout_dup_" + UUID.randomUUID();
+        fake().addExternalPayout(new ProviderPayout(dup, id.toString(), new BigDecimal("400.00"), BigDecimal.ZERO,
+                "PROCESSING", null, null, fake().fetchPayout(pid).orElseThrow().createdAt()));
+        jdbc.update("delete from reconciliation_issue where provider_ref = ?", dup);
+
+        run(pid);
+
+        assertThat(kinds(dayOf(pid), dup)).containsExactly("PAYOUT_DUPLICATE");
+        assertThat(kinds(dayOf(pid), pid)).isEmpty();
+    }
+
+    @Test
+    void payoutForAWithdrawalThatRecordedNoneIsDuplicateUnlessStillRequested() {
+        Org org = readyDeveloper("5000.00");
+        UUID failed = id(withdraw(org, UUID.randomUUID(), "300.00"));
+        UUID requested = id(withdraw(org, UUID.randomUUID(), "200.00"));
+        jdbc.update("update withdrawal set status = 'FAILED', provider_payout_id = null where id = ?", failed);
+        jdbc.update("update withdrawal set status = 'REQUESTED', provider_payout_id = null where id = ?", requested);
+        String failedPid = fake().payoutForKey(failed.toString()).orElseThrow().payoutId();
+        String requestedPid = fake().payoutForKey(requested.toString()).orElseThrow().payoutId();
+        jdbc.update("delete from reconciliation_issue where provider_ref in (?, ?)", failedPid, requestedPid);
+
+        reconciliation.check(dayOf(failedPid), Instant.now());
+
+        assertThat(kinds(dayOf(failedPid), failedPid)).containsExactly("PAYOUT_DUPLICATE");
+        assertThat(kinds(dayOf(requestedPid), requestedPid)).isEmpty();
+    }
 }

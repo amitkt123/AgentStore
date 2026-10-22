@@ -62,7 +62,7 @@ public class PayoutReconciliation {
     private int checkPayout(LocalDate day, PayoutProvider.ProviderPayout p, Instant now) {
         UUID withdrawalId = withdrawalId(p.idempotencyKey());
         List<Map<String, Object>> local = withdrawalId == null ? List.of() : jdbc.queryForList(
-                "select status, amount from withdrawal where id = ?", withdrawalId);
+                "select status, amount, provider_payout_id from withdrawal where id = ?", withdrawalId);
         if (local.isEmpty()) {
             if (p.createdAt() != null && p.createdAt().isAfter(now.minus(UNMATCHED_GRACE))) return 0;
             return flag(day, "PAYOUT_UNMATCHED", p.payoutId(), detail("idempotencyKey", p.idempotencyKey(),
@@ -70,6 +70,14 @@ public class PayoutReconciliation {
         }
         String status = (String) local.get(0).get("status");
         BigDecimal ours = (BigDecimal) local.get(0).get("amount");
+        String recorded = (String) local.get(0).get("provider_payout_id");
+        // Not the payout this withdrawal recorded: a second payout under our reference. A REQUESTED withdrawal with
+        // none recorded yet is waiting for its submit to land (timeout then retry), so its payout is not a duplicate.
+        if (recorded != null ? !recorded.equals(p.payoutId()) : !"REQUESTED".equals(status)) {
+            return flag(day, "PAYOUT_DUPLICATE", p.payoutId(), detail("withdrawalId", withdrawalId,
+                    "recordedPayoutId", recorded, "localStatus", status, "providerStatus", p.status(),
+                    "amount", p.amount()));
+        }
         int found = 0;
         if (!statusAgrees(p.status(), status)) {
             found += flag(day, "PAYOUT_MISMATCH", p.payoutId(), detail("withdrawalId", withdrawalId,
