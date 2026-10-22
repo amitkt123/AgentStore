@@ -2,7 +2,7 @@
 
 The single place to see what is done and what is next. Update it in the same PR as any change that finishes, starts or reshapes a workstream. Gaps and risks stay in `docs/frontend-gaps.md` and `docs/known-issues.md`; this file links to them, it does not copy them.
 
-Last updated: 2026-10-22 (WS10b money in and back done, manual Razorpay test-mode check pending)
+Last updated: 2026-10-22 (UI/UX roadmap and UX-1 plan written; WS10b done, manual Razorpay test-mode check pending)
 
 Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-and-sandbox-design.md` (workstreams in §5, milestones in §7). Specs and plans named below live in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
 
@@ -55,6 +55,8 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | Admin Money page `/admin/money` (fee, credit limit, billing mode, wallet adjustments, platform accounts, ledger checks) | Done (WS10a) | #39 | plan `2026-10-21-ws10a-…` | Withdrawals, freezes, reconciliation screen (WS10c). Reconciliation issues exist as an API only (WS10b): `POST /api/v1/admin/payments/reconciliation/run?date=`, `GET /api/v1/admin/payments/reconciliation?date=` |
 | FE-3 developer money (earnings, payouts) | Partly superseded by the Earnings page above | — | plan `2026-09-23-fe3-…` | Payouts (WS10c) |
 | FE-4 admin consoles | Not started | — | plan `2026-09-23-fe4-…` | All |
+| UX-1 portal polish (frontend only) | Not started | — | spec `2026-10-22-ux-roadmap.md`, plan `2026-10-22-ux1-portal-polish.md` | All |
+| UX-2 to UX-5 (store cards, approvals, Home, trust evidence) | Not started | — | spec `2026-10-22-ux-roadmap.md` | All; UX-4 and UX-5 wait on WS8, WS9, WS11 and others |
 
 ## Small fixes waiting
 
