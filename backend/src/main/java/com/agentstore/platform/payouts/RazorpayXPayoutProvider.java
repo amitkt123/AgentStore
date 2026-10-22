@@ -155,7 +155,16 @@ public class RazorpayXPayoutProvider implements PayoutProvider {
     }
 
     private static ProviderValidation toValidation(JsonNode v) {
+        return toValidation(v, false);
+    }
+
+    /**
+     * {@code completedEvent}: the entity came in a {@code fund_account.validation.completed} webhook, so a missing
+     * {@code status} is read as completed and the outcome comes from {@code results.account_status}.
+     */
+    private static ProviderValidation toValidation(JsonNode v, boolean completedEvent) {
         String status = text(v, "status");
+        if (status == null && completedEvent) status = "completed";
         JsonNode results = v.path("results");
         String accountStatus = text(results, "account_status");
         String mapped;
@@ -248,12 +257,13 @@ public class RazorpayXPayoutProvider implements PayoutProvider {
         };
     }
 
-    /** The fee we absorb: RazorpayX's {@code fees} plus {@code tax}, in rupees; null when RazorpayX sent neither. */
+    /**
+     * The fee we absorb, in rupees. RazorpayX's {@code fees} already includes {@code tax} (fees 590 = 500 + tax 90),
+     * so it is used alone; {@code tax} is only a fallback when {@code fees} is absent. Null when RazorpayX sent neither.
+     */
     private static BigDecimal fees(JsonNode p) {
         BigDecimal fees = rupees(p, "fees");
-        BigDecimal tax = rupees(p, "tax");
-        if (fees == null && tax == null) return null;
-        return (fees == null ? BigDecimal.ZERO : fees).add(tax == null ? BigDecimal.ZERO : tax);
+        return fees != null ? fees : rupees(p, "tax");
     }
 
     private static String failureReason(JsonNode p) {
@@ -315,17 +325,17 @@ public class RazorpayXPayoutProvider implements PayoutProvider {
                     JsonNode payout = payload.path("payout").path("entity");
                     yield new PayoutWebhookEvent(eventId, kind, text(payout, "id"), null, rupees(payout, "amount"),
                             fees(payout), text(payout, "utr"), null, kind == PayoutWebhookEvent.Kind.PAYOUT_FAILED
-                            ? orElse(failureReason(payout), "Payout failed") : null);
+                            ? orElse(failureReason(payout), "Payout failed") : null, text(payout, "reference_id"));
                 }
                 case VALIDATION_COMPLETED, VALIDATION_FAILED -> {
                     JsonNode v = validationEntity(payload);
-                    ProviderValidation mapped = toValidation(v);
+                    ProviderValidation mapped = toValidation(v, kind == PayoutWebhookEvent.Kind.VALIDATION_COMPLETED);
                     boolean ok = kind == PayoutWebhookEvent.Kind.VALIDATION_COMPLETED && "COMPLETED".equals(mapped.status());
                     yield new PayoutWebhookEvent(eventId, ok ? PayoutWebhookEvent.Kind.VALIDATION_COMPLETED
                             : PayoutWebhookEvent.Kind.VALIDATION_FAILED, null, text(v, "id"), null, null, null,
-                            ok ? mapped.registeredName() : null, ok ? null : orElse(mapped.failureReason(), "Validation failed"));
+                            ok ? mapped.registeredName() : null, ok ? null : orElse(mapped.failureReason(), "Validation failed"), null);
                 }
-                case OTHER -> new PayoutWebhookEvent(eventId, kind, null, null, null, null, null, null, null);
+                case OTHER -> new PayoutWebhookEvent(eventId, kind, null, null, null, null, null, null, null, null);
             };
         } catch (ArithmeticException e) {
             throw new PayoutProviderRejectedException("RazorpayX webhook amount is not a whole number of paise");

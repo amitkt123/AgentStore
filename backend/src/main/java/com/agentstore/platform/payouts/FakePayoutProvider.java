@@ -141,7 +141,7 @@ public class FakePayoutProvider implements PayoutProvider {
             Map<String, Object> m = JSON.readValue(body, new TypeReference<Map<String, Object>>() {});
             return new PayoutWebhookEvent(str(m, "eventId"), PayoutWebhookEvent.Kind.valueOf(str(m, "kind")),
                     str(m, "payoutId"), str(m, "validationId"), dec(m, "amount"), dec(m, "fees"), str(m, "utr"),
-                    str(m, "registeredName"), str(m, "failureReason"));
+                    str(m, "registeredName"), str(m, "failureReason"), str(m, "referenceId"));
         } catch (IOException | RuntimeException e) {
             throw new PayoutProviderRejectedException("Unparseable fake webhook body", e);
         }

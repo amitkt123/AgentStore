@@ -199,7 +199,7 @@ class RazorpayXPayoutProviderTest {
         assertThat(p.payoutId()).isEqualTo("pout_00000000000001");
         assertThat(p.idempotencyKey()).isEqualTo("9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f");
         assertThat(p.amount()).isEqualByComparingTo("1234.56");
-        assertThat(p.fees()).isEqualByComparingTo("6.80");
+        assertThat(p.fees()).isEqualByComparingTo("5.90");
         assertThat(p.status()).isEqualTo("PROCESSING");
         assertThat(p.utr()).isNull();
         assertThat(p.createdAt()).isEqualTo(Instant.ofEpochSecond(1597078866L));
@@ -336,7 +336,7 @@ class RazorpayXPayoutProviderTest {
         assertThat(processed.eventId()).isEqualTo("evt_123");
         assertThat(processed.payoutId()).isEqualTo("pout_00000000000001");
         assertThat(processed.amount()).isEqualByComparingTo("123.45");
-        assertThat(processed.fees()).isEqualByComparingTo("6.80");
+        assertThat(processed.fees()).isEqualByComparingTo("5.90");
         assertThat(processed.utr()).isEqualTo("928374650123");
 
         assertThat(parse("payout.reversed.json").kind()).isEqualTo(Kind.PAYOUT_REVERSED);
@@ -358,6 +358,35 @@ class RazorpayXPayoutProviderTest {
 
         assertThat(parse("validation.failed.json").kind()).isEqualTo(Kind.VALIDATION_FAILED);
         assertThat(parse("payout.initiated.json").kind()).isEqualTo(Kind.OTHER);
+    }
+
+    @Test
+    void feesAlreadyIncludeTaxAndTaxIsOnlyAFallback() {
+        // RazorpayX's fees (590) already include tax (90): the fee we absorb is 5.90, not 6.80.
+        assertThat(parse("payout.processed.json").fees()).isEqualByComparingTo("5.90");
+        String noFees = fixture("payout.processed.json").replace("\"fees\": 590,", "");
+        PayoutWebhookEvent e = provider.parseWebhook(noFees.getBytes(StandardCharsets.UTF_8), eventHeaders());
+        assertThat(e.fees()).isEqualByComparingTo("0.90");
+        String neither = noFees.replace("\"tax\": 90,", "");
+        assertThat(provider.parseWebhook(neither.getBytes(StandardCharsets.UTF_8), eventHeaders()).fees()).isNull();
+    }
+
+    @Test
+    void payoutEventCarriesReferenceId() {
+        assertThat(parse("payout.processed.json").referenceId()).isEqualTo("9b7d0c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f");
+    }
+
+    @Test
+    void validationCompletedWithoutStatusUsesAccountStatus() {
+        String active = fixture("validation.completed.json").replace("\"status\": \"completed\",", "");
+        PayoutWebhookEvent ok = provider.parseWebhook(active.getBytes(StandardCharsets.UTF_8), eventHeaders());
+        assertThat(ok.kind()).isEqualTo(Kind.VALIDATION_COMPLETED);
+        assertThat(ok.registeredName()).isEqualTo("ASHA K SHARMA");
+
+        String invalid = active.replace("\"account_status\": \"active\"", "\"account_status\": \"invalid\"");
+        PayoutWebhookEvent bad = provider.parseWebhook(invalid.getBytes(StandardCharsets.UTF_8), eventHeaders());
+        assertThat(bad.kind()).isEqualTo(Kind.VALIDATION_FAILED);
+        assertThat(bad.registeredName()).isNull();
     }
 
     @Test

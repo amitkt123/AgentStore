@@ -12,7 +12,9 @@ public record PayoutWebhookEvent(
         BigDecimal fees,
         String utr,
         String registeredName,
-        String failureReason) {
+        String failureReason,
+        /** Our withdrawal id as the provider echoes it (RazorpayX {@code reference_id}); null for validations. */
+        String referenceId) {
 
     public enum Kind {
         PAYOUT_PROCESSED, PAYOUT_REVERSED, PAYOUT_FAILED, VALIDATION_COMPLETED, VALIDATION_FAILED, OTHER
