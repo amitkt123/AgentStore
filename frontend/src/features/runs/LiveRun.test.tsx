@@ -33,3 +33,20 @@ it("explains a terminal run and shows no gate buttons", () => {
   expect(screen.getByText(/you rejected the approval/i)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
 });
+
+it("folds a decided approval below the flow on a finished run", () => {
+  const s = snap({ status: "COMPLETED", terminalReason: null }, [{ ...gate, status: "APPROVED", decidedAt: "2026-09-29T10:06:00Z", decidedByUserId: "u1", decidedVia: "WEB" }]);
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  const { container } = render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  const folded = container.querySelector("details");
+  expect(folded).not.toBeNull();
+  expect(folded!.querySelector("summary")).toHaveTextContent("Post 142 entries?");
+  expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+});
+
+it("shows what the agent logged next to the step", () => {
+  const s = snap({ steps: [{ kind: "AGENT_LOG", source: "AGENT", detail: '{"message":"Reading the bank statement"}', createdAt: "2026-09-29T10:05:00Z" }] });
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  expect(screen.getByText("Reading the bank statement")).toBeInTheDocument();
+});

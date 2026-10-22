@@ -2,7 +2,7 @@
 import styles from "./LiveRun.module.css";
 import { useRunPolling } from "./useRunPolling";
 import { isTerminal, statusPill, terminalText } from "./status";
-import { stepText } from "./stepText";
+import { stepNote, stepText } from "./stepText";
 import { FlowBlocks } from "@/features/flow/FlowBlocks";
 import { toBlockViews } from "@/features/flow/blocks";
 import { GateCard } from "@/features/gates/GateCard";
@@ -33,16 +33,24 @@ export function LiveRun({ runRef, initial, manifest, canDecide }: { runRef: stri
       </header>
       {error && <p role="status" className={styles.note}>{error}</p>}
       {why && isTerminal(detail.status) && <p className={styles.why}>{why}</p>}
-      <FlowBlocks blocks={views} />
       {pending.map((g) => <GateCard key={g.gateId} runRef={runRef} gate={g} canDecide={canDecide} />)}
-      {gates.filter((g) => g.status !== "PENDING").map((g) => <GateCard key={g.gateId} runRef={runRef} gate={g} canDecide={canDecide} />)}
+      <FlowBlocks blocks={views} />
+      {gates.filter((g) => g.status !== "PENDING").map((g) => (
+        <details key={g.gateId} className={styles.decided}>
+          <summary>{g.summary}</summary>
+          <GateCard runRef={runRef} gate={g} canDecide={canDecide} />
+        </details>
+      ))}
       <div className={styles.cols}>
         <section aria-labelledby="tl">
           <h2 id="tl">Timeline</h2>
           <p className={styles.sub}>Recorded by Karya as it happens, not reported by the agent.</p>
           <ol className={styles.steps}>
             {detail.steps.map((s, i) => (
-              <li key={i}><span className="mono">{formatWhen(s.createdAt)}</span> {stepText(s)}</li>
+              <li key={i}>
+                <span className="mono">{formatWhen(s.createdAt)}</span>
+                <span>{stepText(s)}{stepNote(s) && <span className={styles.stepNote} title={stepNote(s, Infinity) ?? undefined}>{stepNote(s)}</span>}</span>
+              </li>
             ))}
           </ol>
         </section>
