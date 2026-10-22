@@ -2,7 +2,7 @@
 
 The single place to see what is done and what is next. Update it in the same PR as any change that finishes, starts or reshapes a workstream. Gaps and risks stay in `docs/frontend-gaps.md` and `docs/known-issues.md`; this file links to them, it does not copy them.
 
-Last updated: 2026-10-22 (WS10c money out done, manual RazorpayX test-mode check pending)
+Last updated: 2026-10-22 (WS10c money out done incl. final-review fixes, manual RazorpayX test-mode check pending)
 
 Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-and-sandbox-design.md` (workstreams in §5, milestones in §7). Specs and plans named below live in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
 
@@ -52,7 +52,9 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | P3c Studio "what it did" half and flow canvas | Not started | — | none | All (G16) |
 | Buyer Billing page `/billing` | Done (WS10a, WS10b) | #39, this PR | plans `2026-10-21-ws10a-…`, `2026-10-21-ws10b-…` | — |
 | Developer Earnings page `/developer/earnings` | Done (WS10a, WS10c) | #39, this PR | plan `2026-10-21-ws10a-…` | — |
-| Admin Money page `/admin/money` (fee, credit limit, billing mode, wallet adjustments, platform accounts, ledger checks) | Done (WS10a, WS10c) | #39, this PR | plan `2026-10-21-ws10a-…` | — (payouts, freezes and reconciliation screens added in WS10c) |
+| Admin Money page `/admin/money` (fee, credit limit, billing mode, wallet adjustments, platform accounts, ledger checks, money freezes) | Done (WS10a, WS10c) | #39, this PR | plan `2026-10-21-ws10a-…` | — |
+| Admin Payouts page `/admin/payouts` (open withdrawals, name-mismatch payout accounts to approve) | Done (WS10c) | this PR | plan `2026-10-22-ws10c-…` | — |
+| Admin Reconciliation page `/admin/reconciliation` (payment and payout issues by day, resolve) | Done (WS10c) | this PR | plan `2026-10-22-ws10c-…` | — |
 | FE-3 developer money (earnings, payouts) | Superseded by the Earnings page above | — | plan `2026-09-23-fe3-…` | — |
 | FE-4 admin consoles | Not started | — | plan `2026-09-23-fe4-…` | All |
 
