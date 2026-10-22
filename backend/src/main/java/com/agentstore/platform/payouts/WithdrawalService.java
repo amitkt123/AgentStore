@@ -2,7 +2,6 @@ package com.agentstore.platform.payouts;
 
 import com.agentstore.platform.events.DomainEventPublisher;
 import com.agentstore.platform.ledger.LedgerAccountBalance;
-import com.agentstore.platform.identity.OrgRepository;
 import com.agentstore.platform.ledger.LedgerAccountBalanceRepository;
 import com.agentstore.platform.ledger.LedgerAccountKind;
 import com.agentstore.platform.ledger.LedgerAccounts;
@@ -16,6 +15,7 @@ import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -76,7 +76,8 @@ public class WithdrawalService {
     private final DomainEventPublisher events;
     private final ReconciliationIssues issues;
     private final TransactionTemplate tx;
-    private final OrgRepository orgs;
+    /** Lazy: the webhook processor depends on this service (for {@link #reverse}). */
+    private final ObjectProvider<PayoutWebhookProcessor> settler;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -86,8 +87,8 @@ public class WithdrawalService {
                              LedgerAccounts ledgerAccounts, LedgerAccountBalanceRepository balances,
                              LedgerTransactionRepository ledgerTransactions, LedgerService ledger,
                              DomainEventPublisher events, ReconciliationIssues issues, TransactionTemplate tx,
-                             OrgRepository orgs) {
-        this.orgs = orgs;
+                             ObjectProvider<PayoutWebhookProcessor> settler) {
+        this.settler = settler;
         this.withdrawals = withdrawals;
         this.payoutAccounts = payoutAccounts;
         this.accountService = accountService;
@@ -226,9 +227,11 @@ public class WithdrawalService {
             log.info("Withdrawal {} is not REQUESTED; not submitted", withdrawalId);
             return;
         }
-        // A freeze is an investigation: stay REQUESTED (no reversal) so an unfreeze resumes it.
-        if (orgs.isMoneyFrozen(s.orgId()).orElse(false)) {
-            log.info("Withdrawal {} not submitted: money is frozen for org {}", withdrawalId, s.orgId());
+        // A freeze is an investigation, and a revoked verification may be restored: stay REQUESTED (no reversal) so
+        // lifting the block resumes it. Read fresh, just before the provider call.
+        String blocked = accountService.orgBlockOf(s.orgId());
+        if (blocked != null) {
+            log.info("Withdrawal {} not submitted: {} for org {}", withdrawalId, blocked, s.orgId());
             return;
         }
         PayoutProvider.ProviderPayout payout;
@@ -251,25 +254,51 @@ public class WithdrawalService {
                     "Provider rejected the payout: " + e.getMessage(), true));
             return;
         }
-        tx.executeWithoutResult(st -> recordSubmitted(withdrawalId, payout));
+        Boolean recorded = tx.execute(st -> recordSubmitted(withdrawalId, payout));
+        // A retry after a timeout can get back a payout that already finished (its webhook may have been missed or
+        // may have come before the payout id was recorded): settle it now rather than wait for the 24h poll.
+        // settle runs in its own transaction; we are outside any.
+        if (Boolean.TRUE.equals(recorded) && isTerminal(payout.status())) {
+            settler.getObject().settle(withdrawalId, payout);
+        }
     }
 
-    private void recordSubmitted(UUID withdrawalId, PayoutProvider.ProviderPayout payout) {
+    private static boolean isTerminal(String status) {
+        return "PROCESSED".equals(status) || "REVERSED".equals(status) || "FAILED".equals(status);
+    }
+
+    /** Returns true when the withdrawal now carries this payout and is still open (REQUESTED or PROCESSING). */
+    private boolean recordSubmitted(UUID withdrawalId, PayoutProvider.ProviderPayout payout) {
         Withdrawal w = withdrawals.findByIdForUpdate(withdrawalId).orElseThrow();
         if (w.getStatus() != WithdrawalStatus.REQUESTED) {
+            boolean ours = payout.payoutId() != null && payout.payoutId().equals(w.getProviderPayoutId());
             if (w.getStatus() == WithdrawalStatus.REVERSED || w.getStatus() == WithdrawalStatus.FAILED) {
-                log.error("Withdrawal {} is {} but the provider made payout {}", withdrawalId, w.getStatus(),
-                        payout.payoutId());
-            } else {
-                log.info("Withdrawal {} already {}; payout {} left as recorded", withdrawalId, w.getStatus(),
-                        payout.payoutId());
+                boolean moneyBack = "FAILED".equals(payout.status()) || "REVERSED".equals(payout.status());
+                if (!ours && !moneyBack) {
+                    // We gave the money back, and the provider has a payout for it that may still pay out.
+                    log.error("Withdrawal {} is {} but the provider made payout {}; double payment risk", withdrawalId,
+                            w.getStatus(), payout.payoutId());
+                    Map<String, Object> detail = new LinkedHashMap<>();
+                    detail.put("withdrawalId", withdrawalId.toString());
+                    detail.put("status", w.getStatus().name());
+                    detail.put("amount", payout.amount() == null ? null : payout.amount().toPlainString());
+                    detail.put("providerStatus", payout.status());
+                    issues.record("PAYOUT_AFTER_REVERSAL", payout.payoutId(), detail);
+                } else {
+                    log.info("Withdrawal {} already {}; payout {} ({}) left alone", withdrawalId, w.getStatus(),
+                            payout.payoutId(), payout.status());
+                }
+                return false;
             }
-            return;
+            log.info("Withdrawal {} already {}; payout {} left as recorded", withdrawalId, w.getStatus(),
+                    payout.payoutId());
+            return w.getStatus() == WithdrawalStatus.PROCESSING && ours;
         }
         w.setStatus(WithdrawalStatus.PROCESSING);
         w.setProviderPayoutId(payout.payoutId());
         w.setSubmittedAt(Instant.now());
         withdrawals.save(w);
+        return true;
     }
 
     // ---- reversing ----

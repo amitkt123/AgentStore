@@ -316,4 +316,86 @@ class PayoutWebhookProcessorTest extends WithdrawalTestSupport {
         deliver(processedEvent(mismatch, "149.00", "0.00", "UTR0011"));
         assertLedgerChecks();
     }
+    // ---- a payout created behind a timeout (final review item 3b) and stored payloads (item 2) ----
+
+    /** A withdrawal whose createPayout timed out after the provider made the payout: REQUESTED, no payout id. */
+    private Sent requestedBehindTimeout(String amount) {
+        Org org = readyDeveloper("1000.00");
+        fake().timeoutAfterNextCreate();
+        UUID id = id(withdraw(org, UUID.randomUUID(), amount));
+        assertThat(status(id)).isEqualTo("REQUESTED");
+        assertThat(payoutId(id)).isNull();
+        return new Sent(org, id, fake().payoutForKey(id.toString()).orElseThrow().payoutId());
+    }
+
+    @Test
+    void processedWebhookBeforeRetryFindsWithdrawalByReference() {
+        BigDecimal clearing0 = platformBalance(LedgerAccountKind.PAYOUT_CLEARING);
+        BigDecimal rzpx0 = platformBalance(LedgerAccountKind.RAZORPAYX_BALANCE);
+        Sent s = requestedBehindTimeout("400.00");
+
+        assertThat(deliver(processedEvent(s, "400.00", "0.00", "UTR0100")))
+                .isEqualTo(WebhookProcessor.Outcome.PROCESSED);
+
+        assertThat(status(s.withdrawalId())).isEqualTo("PROCESSED");
+        assertThat(payoutId(s.withdrawalId())).isEqualTo(s.payoutId());
+        assertThat(jdbc.queryForObject("select utr from withdrawal where id = ?", String.class, s.withdrawalId()))
+                .isEqualTo("UTR0100");
+        assertThat(payableBalance(s.org())).isEqualByComparingTo("600.00");
+        assertThat(platformBalance(LedgerAccountKind.PAYOUT_CLEARING)).isEqualByComparingTo(clearing0);
+        assertThat(platformBalance(LedgerAccountKind.RAZORPAYX_BALANCE).subtract(rzpx0)).isEqualByComparingTo("400.00");
+        assertThat(ledgerTx("withdrawal-paid:" + s.withdrawalId())).isEqualTo(1L);
+        assertLedgerChecks();
+
+        // the retry job's resubmit now finds nothing to do
+        withdrawals.submit(s.withdrawalId());
+        assertThat(status(s.withdrawalId())).isEqualTo("PROCESSED");
+        assertThat(ledgerTx("withdrawal-paid:" + s.withdrawalId())).isEqualTo(1L);
+        assertLedgerChecks();
+    }
+
+    @Test
+    void failedWebhookBeforeRetryFindsWithdrawalByReferenceAndRestoresPayable() {
+        BigDecimal clearing0 = platformBalance(LedgerAccountKind.PAYOUT_CLEARING);
+        Sent s = requestedBehindTimeout("400.00");
+
+        assertThat(deliver(event(PayoutWebhookEvent.Kind.PAYOUT_FAILED, s.payoutId(), "failureReason", "IFSC closed")))
+                .isEqualTo(WebhookProcessor.Outcome.PROCESSED);
+
+        assertThat(status(s.withdrawalId())).isEqualTo("FAILED");
+        assertThat(payoutId(s.withdrawalId())).isEqualTo(s.payoutId());
+        assertThat(payableBalance(s.org())).isEqualByComparingTo("1000.00");
+        assertThat(platformBalance(LedgerAccountKind.PAYOUT_CLEARING)).isEqualByComparingTo(clearing0);
+        withdrawals.submit(s.withdrawalId());
+        assertThat(status(s.withdrawalId())).isEqualTo("FAILED");
+        assertLedgerChecks();
+    }
+
+    @Test
+    void referenceToWithdrawalWithAnotherPayoutIsIgnored() {
+        Sent s = processing("400.00");
+        String other = "fake_pout_other_" + UUID.randomUUID();
+
+        assertThat(deliver(event(PayoutWebhookEvent.Kind.PAYOUT_PROCESSED, other, "amount", "400.00",
+                "referenceId", s.withdrawalId().toString()))).isEqualTo(WebhookProcessor.Outcome.IGNORED);
+
+        assertThat(status(s.withdrawalId())).isEqualTo("PROCESSING");
+        assertThat(payoutId(s.withdrawalId())).isEqualTo(s.payoutId());
+        assertThat(ledgerTx("withdrawal-paid:" + s.withdrawalId())).isZero();
+    }
+
+    @Test
+    void storedPayloadHasNoFullAccountNumberOrVpa() {
+        String payoutId = "fake_pout_x_" + UUID.randomUUID();
+        Map<String, Object> fundAccount = Map.of("id", "fa_1",
+                "bank_account", Map.of("account_number", "765432123456789", "ifsc", "HDFC0000053", "name", "Asha"),
+                "vpa", Map.of("address", "asha.sharma@exampleupi"));
+
+        deliver(event(PayoutWebhookEvent.Kind.OTHER, payoutId, "fund_account", fundAccount));
+
+        String stored = jdbc.queryForObject("select payload::text from payment_webhook_event "
+                + "where provider = 'payouts:fake' and payload->>'payoutId' = ?", String.class, payoutId);
+        assertThat(stored).doesNotContain("765432123456789").doesNotContain("asha.sharma@exampleupi")
+                .contains("6789").contains("HDFC0000053");
+    }
 }

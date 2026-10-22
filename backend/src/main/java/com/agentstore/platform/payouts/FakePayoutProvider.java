@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * In-memory provider for dev and tests. One shared bean per Spring context. Deterministic rules: the registered
@@ -40,6 +41,8 @@ public class FakePayoutProvider implements PayoutProvider {
     private final String webhookSecret;
     private volatile boolean unavailableCleared;
     private volatile boolean failFetch;
+    private volatile boolean timeoutAfterNextCreate;
+    private volatile Consumer<String> beforeNextCreate;
 
     public FakePayoutProvider(PayoutProperties.Fake fake) {
         if (fake == null || fake.webhookSecret() == null || fake.webhookSecret().isBlank()) {
@@ -97,6 +100,11 @@ public class FakePayoutProvider implements PayoutProvider {
     @Override
     public synchronized ProviderPayout createPayout(String fundAccountId, BigDecimal amount, PayoutMode mode,
                                                     String idempotencyKey) {
+        Consumer<String> hook = beforeNextCreate;
+        if (hook != null) {
+            beforeNextCreate = null;
+            hook.accept(idempotencyKey);
+        }
         ProviderPayout existing = payoutsByKey.get(idempotencyKey);
         if (existing != null) return existing;
         if (amount.compareTo(new BigDecimal("999.99")) == 0) {
@@ -112,6 +120,10 @@ public class FakePayoutProvider implements PayoutProvider {
                 new BigDecimal("0.00"), "PROCESSING", null, null, Instant.now());
         payoutsById.put(p.payoutId(), p);
         payoutsByKey.put(idempotencyKey, p);
+        if (timeoutAfterNextCreate) {
+            timeoutAfterNextCreate = false;
+            throw new PayoutProviderUnavailableException("Fake provider timed out after creating the payout");
+        }
         return p;
     }
 
@@ -149,7 +161,8 @@ public class FakePayoutProvider implements PayoutProvider {
 
     /**
      * Builds a signed event for tests and the dev simulate endpoint. {@code fields} may carry amount, fees, utr,
-     * registeredName and failureReason; {@code id} is the payout id (PAYOUT_*) or validation id (VALIDATION_*).
+     * registeredName, failureReason and referenceId (a payout the fake knows gets its idempotency key, as RazorpayX
+     * echoes {@code reference_id}); {@code id} is the payout id (PAYOUT_*) or validation id (VALIDATION_*).
      */
     public SignedEvent signedEvent(PayoutWebhookEvent.Kind kind, String id, Map<String, Object> fields) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -158,6 +171,8 @@ public class FakePayoutProvider implements PayoutProvider {
         boolean validation = kind == PayoutWebhookEvent.Kind.VALIDATION_COMPLETED
                 || kind == PayoutWebhookEvent.Kind.VALIDATION_FAILED;
         m.put(validation ? "validationId" : "payoutId", id);
+        ProviderPayout known = validation || id == null ? null : payoutsById.get(id);
+        if (known != null && known.idempotencyKey() != null) m.put("referenceId", known.idempotencyKey());
         if (fields != null) m.putAll(fields);
         try {
             byte[] body = JSON.writeValueAsBytes(m);
@@ -179,6 +194,24 @@ public class FakePayoutProvider implements PayoutProvider {
         payoutsById.put(payoutId, moved);
         payoutsByKey.put(p.idempotencyKey(), moved);
         return true;
+    }
+
+    /**
+     * The next {@link #createPayout} that creates a payout then throws {@link PayoutProviderUnavailableException}, as a
+     * read timeout after RazorpayX accepted the request would. A retry with the same key gets that payout back.
+     */
+    public void timeoutAfterNextCreate() {
+        timeoutAfterNextCreate = true;
+    }
+
+    /** Runs {@code hook} (given the idempotency key) at the start of the next {@link #createPayout}, once. */
+    public void beforeNextCreate(Consumer<String> hook) {
+        beforeNextCreate = hook;
+    }
+
+    /** The payout created under {@code idempotencyKey}, if any. */
+    public Optional<ProviderPayout> payoutForKey(String idempotencyKey) {
+        return Optional.ofNullable(payoutsByKey.get(idempotencyKey));
     }
 
     /** While true, {@link #fetchPayouts} throws, as a provider outage would; {@link #reset} clears it. */
@@ -203,6 +236,8 @@ public class FakePayoutProvider implements PayoutProvider {
     public void reset() {
         unavailableCleared = false;
         failFetch = false;
+        timeoutAfterNextCreate = false;
+        beforeNextCreate = null;
         fundAccounts.clear();
         validations.clear();
         payoutsById.clear();

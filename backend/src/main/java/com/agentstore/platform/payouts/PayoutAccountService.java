@@ -207,6 +207,16 @@ public class PayoutAccountService {
                 verifications.findByOrgId(orgId).map(d -> d.getLegalName()).orElse(null));
     }
 
+    /**
+     * Why the org may not move money out now (DEVELOPER_NOT_VERIFIED or MONEY_FROZEN), or null. A fresh read in its
+     * own transaction when called outside one; the submit path re-checks it before every provider call.
+     */
+    @Transactional(readOnly = true)
+    public String orgBlockOf(UUID orgId) {
+        Org org = orgs.findById(orgId).orElse(null);
+        return org == null ? "DEVELOPER_NOT_VERIFIED" : orgBlock(org);
+    }
+
     private static String orgBlock(Org org) {
         if (org.getType() != OrgType.DEVELOPER || org.getDeveloperVerifiedAt() == null) return "DEVELOPER_NOT_VERIFIED";
         if (org.getMoneyFrozenAt() != null) return "MONEY_FROZEN";

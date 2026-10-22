@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -105,10 +104,12 @@ public class PayoutWebhookProcessor {
         }
 
         String stored = EVENT_PROVIDER_PREFIX + providerName;
+        // Stored with bank account numbers and UPI addresses masked; the signature was checked on the raw bytes.
+        String payload = PayoutPayloadRedactor.redact(body);
         // A concurrent delivery of the same event blocks here on the unique index until the first one commits.
         int inserted = jdbc.update("insert into payment_webhook_event (id, provider, event_id, type, payload) "
                         + "values (gen_random_uuid(), ?, ?, ?, ?::jsonb) on conflict (provider, event_id) do nothing",
-                stored, event.eventId(), event.kind().name(), new String(body, StandardCharsets.UTF_8));
+                stored, event.eventId(), event.kind().name(), payload);
         if (inserted == 0) {
             return Outcome.DUPLICATE;
         }
@@ -149,13 +150,96 @@ public class PayoutWebhookProcessor {
     private Outcome payoutEvent(PayoutWebhookEvent event) {
         Optional<Withdrawal> found = event.payoutId() == null ? Optional.empty()
                 : withdrawals.findByProviderPayoutId(event.payoutId());
-        if (found.isEmpty()) {
+        if (found.isPresent()) {
+            return apply(found.get(), event.kind(), event.payoutId(), event.amount(), event.fees(), event.utr(),
+                    event.failureReason());
+        }
+        Withdrawal byReference = event.payoutId() == null ? null
+                : withdrawalId(event.referenceId()).flatMap(withdrawals::findById).orElse(null);
+        if (byReference == null) {
             log.warn("Payout event {} ({}) for unknown payout {}; stored only", event.eventId(), event.kind(),
                     event.payoutId());
             return Outcome.IGNORED;
         }
-        return apply(found.get(), event.kind(), event.payoutId(), event.amount(), event.fees(), event.utr(),
-                event.failureReason());
+        return applyByReference(byReference, event);
+    }
+
+    /**
+     * A payout event for a withdrawal that has not recorded this payout yet: createPayout timed out after the
+     * provider made the payout, and the event beat the retry. The provider echoes our withdrawal id as the
+     * reference, so a REQUESTED or PROCESSING withdrawal with no (or this) payout id records it and is settled.
+     * {@code w} is a plain read. Lock order is kept: a reversal goes through {@code reverse} first (payable, then the
+     * withdrawal row) and records the payout id afterwards; the processed path locks only the withdrawal row.
+     */
+    private Outcome applyByReference(Withdrawal w, PayoutWebhookEvent event) {
+        String payoutId = event.payoutId();
+        if (!recordablePayout(w, payoutId)) {
+            if (event.kind() == PayoutWebhookEvent.Kind.PAYOUT_PROCESSED
+                    && (w.getStatus() == WithdrawalStatus.REVERSED || w.getStatus() == WithdrawalStatus.FAILED)
+                    && w.getProviderPayoutId() == null) {
+                // Paid for a withdrawal we already gave back: a double payment.
+                log.error("Payout {} PROCESSED for withdrawal {} that is already {}; not settled, double payment risk",
+                        payoutId, w.getId(), w.getStatus());
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("withdrawalId", w.getId().toString());
+                detail.put("status", w.getStatus().name());
+                detail.put("amount", event.amount() == null ? null : event.amount().toPlainString());
+                detail.put("utr", event.utr());
+                issues.record("PAYOUT_AFTER_REVERSAL", payoutId, detail);
+                return Outcome.IGNORED;
+            }
+            log.warn("Payout {} ({}) references withdrawal {} ({}, payout {}); ignored", payoutId, event.kind(),
+                    w.getId(), w.getStatus(), w.getProviderPayoutId());
+            return Outcome.IGNORED;
+        }
+        log.info("Payout {} ({}) matched withdrawal {} by reference before it was recorded", payoutId, event.kind(),
+                w.getId());
+        switch (event.kind()) {
+            case PAYOUT_PROCESSED -> {
+                entityManager.refresh(w, LockModeType.PESSIMISTIC_WRITE);
+                if (!recordablePayout(w, payoutId)) {
+                    log.warn("Withdrawal {} moved on to {} (payout {}); payout {} ignored", w.getId(), w.getStatus(),
+                            w.getProviderPayoutId(), payoutId);
+                    return Outcome.IGNORED;
+                }
+                record(w, payoutId);
+                withdrawals.saveAndFlush(w);
+                return paid(w, payoutId, event.amount(), event.fees(), event.utr());
+            }
+            case PAYOUT_REVERSED, PAYOUT_FAILED -> {
+                boolean failed = event.kind() == PayoutWebhookEvent.Kind.PAYOUT_FAILED;
+                Outcome outcome = reversed(w, failed ? WithdrawalStatus.FAILED : WithdrawalStatus.REVERSED,
+                        event.failureReason(), failed ? "Payout failed at the provider" : "Payout reversed by the bank");
+                // reverse holds the withdrawal row lock now; note which payout it was.
+                Withdrawal after = withdrawals.findById(w.getId()).orElseThrow();
+                if (after.getProviderPayoutId() == null) {
+                    after.setProviderPayoutId(payoutId);
+                    withdrawals.save(after);
+                }
+                return outcome;
+            }
+            default -> throw new IllegalArgumentException("Not a payout outcome: " + event.kind());
+        }
+    }
+
+    private static boolean recordablePayout(Withdrawal w, String payoutId) {
+        boolean open = w.getStatus() == WithdrawalStatus.REQUESTED || w.getStatus() == WithdrawalStatus.PROCESSING;
+        return open && (w.getProviderPayoutId() == null || w.getProviderPayoutId().equals(payoutId));
+    }
+
+    private static void record(Withdrawal w, String payoutId) {
+        w.setProviderPayoutId(payoutId);
+        if (w.getStatus() == WithdrawalStatus.REQUESTED) w.setStatus(WithdrawalStatus.PROCESSING);
+        if (w.getSubmittedAt() == null) w.setSubmittedAt(Instant.now());
+    }
+
+    private static Optional<UUID> withdrawalId(String reference) {
+        if (reference == null) return Optional.empty();
+        try {
+            return Optional.of(UUID.fromString(reference));
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
     }
 
     /** The shared rules. {@code w} is a plain (unlocked) read. */
