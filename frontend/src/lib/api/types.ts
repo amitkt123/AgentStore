@@ -120,7 +120,7 @@ export interface Earnings {
 export interface OrgMoney {
   orgId: string; name: string; type: OrgType; feePercent: number | null; effectiveFeePercent: number;
   billingMode: BillingMode | null; effectiveBillingMode: BillingMode; creditLimit: number | null;
-  walletBalance: number; payableBalance: number;
+  walletBalance: number; payableBalance: number; moneyFrozenAt: string | null; moneyFrozenReason: string | null;
 }
 export interface OrgMoneyPatch { feePercent?: number; billingMode?: BillingMode; creditLimit?: number }
 export interface PlatformAccounts {
@@ -176,5 +176,11 @@ export type WithdrawalStatus = "REQUESTED" | "PROCESSING" | "PROCESSED" | "REVER
 export interface Withdrawal {
   id: string; amount: number; mode: string; status: WithdrawalStatus; utr: string | null; accountLabel: string | null;
   failureReason: string | null; createdAt: string; processedAt: string | null;
+}
+export interface AdminWithdrawal extends Withdrawal { orgId: string; orgName: string | null }
+export interface AdminPayoutAccount extends PayoutAccount { orgId: string; orgName: string | null; legalName: string | null }
+export interface ReconciliationIssue {
+  id: string; day: string; kind: string; providerRef: string | null; detail: Record<string, unknown> | null;
+  createdAt: string; resolvedAt: string | null;
 }
 export type PayoutSimulateOutcome = "PROCESSED" | "REVERSED" | "FAILED";

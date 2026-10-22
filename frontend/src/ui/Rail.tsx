@@ -25,7 +25,11 @@ export function developerRailItems(): RailItem[] {
 }
 
 export function adminRailItems(): RailItem[] {
-  return [{ href: "/admin/money", label: "Money", icon: "wallet" }];
+  return [
+    { href: "/admin/money", label: "Money", icon: "wallet" },
+    { href: "/admin/payouts", label: "Payouts", icon: "upload" },
+    { href: "/admin/reconciliation", label: "Reconciliation", icon: "check" },
+  ];
 }
 
 // Sandbox runs and Test files join developerRailItems in P3c.

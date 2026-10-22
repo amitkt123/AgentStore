@@ -1,0 +1,7 @@
+.wrap { display: flex; flex-direction: column; gap: 16px; }
+.bar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.bar > div { flex: 0 1 200px; }
+.detail { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.resolve { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.resolve > div { flex: 1 1 160px; }
+.err { color: var(--bad); margin: 0; }

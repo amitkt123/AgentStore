@@ -32,8 +32,13 @@ it("gives buyers a Billing item after Files", () => {
   expect(buyerRailItems(0).map((i) => i.href)).toEqual(["/home", "/store", "/runs", "/files", "/billing"]);
 });
 
-it("gives ADMIN a Money rail", async () => {
+it("gives ADMIN Money, Payouts and Reconciliation, and nobody else", async () => {
   const { adminRailItems } = await import("./Rail");
-  expect(adminRailItems()).toEqual([{ href: "/admin/money", label: "Money", icon: "wallet" }]);
+  expect(adminRailItems().map((i) => [i.href, i.label])).toEqual([
+    ["/admin/money", "Money"], ["/admin/payouts", "Payouts"], ["/admin/reconciliation", "Reconciliation"],
+  ]);
+  for (const role of ["BUYER_ADMIN", "BUYER_APPROVER", "DEVELOPER"] as const) {
+    expect(railItemsFor(role, 0).some((i) => i.href.startsWith("/admin"))).toBe(false);
+  }
   expect(railItemsFor("ADMIN", 0)).toEqual(adminRailItems());
 });

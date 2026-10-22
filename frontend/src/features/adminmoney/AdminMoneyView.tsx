@@ -4,8 +4,8 @@ import styles from "./adminmoney.module.css";
 import { Button } from "@/ui/Button";
 import { Field } from "@/ui/Field";
 import { ResponsiveTable } from "@/ui/ResponsiveTable";
-import { adjustWalletAction, saveSettingsAction } from "@/app/(app)/admin/money/actions";
-import { formatInr } from "@/lib/format";
+import { adjustWalletAction, freezeOrgAction, saveSettingsAction, unfreezeOrgAction } from "@/app/(app)/admin/money/actions";
+import { formatDate, formatInr } from "@/lib/format";
 import type { BillingMode, OrgMoney, OrgMoneyPatch, PlatformAccounts } from "@/lib/api/types";
 
 type Result = { org: OrgMoney | null; notice?: string } | { error: string };
@@ -84,6 +84,7 @@ function OrgPanel({ org, onChange }: { org: OrgMoney; onChange: (o: OrgMoney) =>
           <div key={label} className={styles.fact}><dt>{label}</dt><dd>{value}</dd></div>
         ))}
       </dl>
+      <FreezePanel org={org} onChange={onChange} />
       <SettingsForm org={org} onChange={onChange} />
       {org.type === "BUYER" && <AdjustForm org={org} onChange={onChange} />}
     </>
@@ -172,6 +173,49 @@ function AdjustForm({ org, onChange }: { org: OrgMoney; onChange: (o: OrgMoney) 
       <Field label="Amount" type="number" step="0.01" value={amount} onChange={(e) => { requestId.current = null; setAmount(e.target.value); }} hint="Negative debits the wallet" />
       <Field label="Note" value={note} onChange={(e) => { requestId.current = null; setNote(e.target.value); }} />
       <Button type="submit" loading={busy}>Adjust wallet</Button>
+      <Message status={status} />
+    </form>
+  );
+}
+
+function FreezePanel({ org, onChange }: { org: OrgMoney; onChange: (o: OrgMoney) => void }) {
+  const [reason, setReason] = useState("");
+  const [status, setStatus] = useState<Status>(null);
+  const { busy, submit } = useSubmit((text) => setStatus({ kind: "error", text }));
+
+  const freeze = (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus(null);
+    if (!reason.trim()) { setStatus({ kind: "error", text: "A reason is required" }); return; }
+    void submit(async () => {
+      const res = await freezeOrgAction(org.orgId, reason.trim());
+      if ("error" in res) { setStatus({ kind: "error", text: res.error }); return; }
+      setReason("");
+      onChange(res.org);
+    });
+  };
+  const unfreeze = () => {
+    setStatus(null);
+    void submit(async () => {
+      const res = await unfreezeOrgAction(org.orgId);
+      if ("error" in res) { setStatus({ kind: "error", text: res.error }); return; }
+      onChange(res.org);
+    });
+  };
+
+  if (org.moneyFrozenAt) {
+    return (
+      <div className={styles.form}>
+        <p className={styles.warn} role="status">Frozen {formatDate(org.moneyFrozenAt)}: {org.moneyFrozenReason}</p>
+        <Button type="button" variant="ghost" loading={busy} onClick={unfreeze}>Unfreeze</Button>
+        <Message status={status} />
+      </div>
+    );
+  }
+  return (
+    <form className={styles.form} onSubmit={freeze} aria-label="Freeze money">
+      <Field label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} hint="Blocks withdrawals and refunds. Money can still come in." />
+      <Button type="submit" variant="danger" loading={busy}>Freeze money</Button>
       <Message status={status} />
     </form>
   );

@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { ApiError } from "@/lib/api/http";
-import { getOrgMoney, patchOrgMoney, postAdjustment } from "@/lib/api/money";
+import { freezeOrg, getOrgMoney, patchOrgMoney, postAdjustment, unfreezeOrg } from "@/lib/api/money";
 import type { OrgMoney, OrgMoneyPatch } from "@/lib/api/types";
 
 const fail = (e: unknown): { error: string } => {
@@ -31,4 +31,20 @@ export async function adjustWalletAction(
   } catch {
     return { org: null, notice: "Adjustment saved; refresh to see the new balance" };
   }
+}
+
+export async function freezeOrgAction(orgId: string, reason: string): Promise<{ org: OrgMoney } | { error: string }> {
+  try {
+    const org = await freezeOrg(orgId, reason);
+    revalidatePath("/admin/money");
+    return { org };
+  } catch (e) { return fail(e); }
+}
+
+export async function unfreezeOrgAction(orgId: string): Promise<{ org: OrgMoney } | { error: string }> {
+  try {
+    const org = await unfreezeOrg(orgId);
+    revalidatePath("/admin/money");
+    return { org };
+  } catch (e) { return fail(e); }
 }

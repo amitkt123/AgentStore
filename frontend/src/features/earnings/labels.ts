@@ -17,3 +17,8 @@ export function failureText(reason: string | null): string {
   if (FAILURE_TEXT[reason]) return FAILURE_TEXT[reason];
   return /^[A-Z][A-Z0-9_]+$/.test(reason) ? "The bank could not verify this account." : reason;
 }
+
+/** The exact withdrawal status, for admins (developers see the simpler Sending / Sent wording). */
+export const WITHDRAWAL_STATUS_LABEL: Record<string, string> = {
+  REQUESTED: "Requested", PROCESSING: "Processing", PROCESSED: "Processed", REVERSED: "Reversed", FAILED: "Failed",
+};
