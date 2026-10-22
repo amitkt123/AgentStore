@@ -9,7 +9,9 @@ import { GateCard } from "@/features/gates/GateCard";
 import { Pill } from "@/ui/Pill";
 import { ErrorState } from "@/ui/ErrorState";
 import { formatMoney, formatTime, formatWhen } from "@/lib/format";
-import type { Manifest, RunSnapshot } from "@/lib/api/types";
+import type { GateStatus, Manifest, RunSnapshot } from "@/lib/api/types";
+
+const GATE_OUTCOME: Record<GateStatus, string> = { PENDING: "Waiting", APPROVED: "Approved", REJECTED: "Rejected", EXPIRED: "Expired" };
 
 export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: { runRef: string; initial: RunSnapshot; manifest: Manifest | null; canDecide: boolean; viewerUserId?: string }) {
   const { data, error, forbidden } = useRunPolling<RunSnapshot>(`/api/runs/${encodeURIComponent(runRef)}`, {
@@ -36,8 +38,8 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
       {pending.map((g) => <GateCard key={g.gateId} runRef={runRef} gate={g} canDecide={canDecide} viewerUserId={viewerUserId} />)}
       <FlowBlocks blocks={views} />
       {gates.filter((g) => g.status !== "PENDING").map((g) => (
-        <details key={g.gateId} className={styles.decided}>
-          <summary>{g.summary}</summary>
+        <details key={g.gateId} className={styles.decided} open={!isTerminal(detail.status)}>
+          <summary>{`${GATE_OUTCOME[g.status]} · ${g.summary}`}</summary>
           <GateCard runRef={runRef} gate={g} canDecide={canDecide} viewerUserId={viewerUserId} />
         </details>
       ))}

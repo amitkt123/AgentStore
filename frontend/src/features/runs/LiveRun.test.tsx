@@ -40,7 +40,7 @@ it("folds a decided approval below the flow on a finished run", () => {
   const { container } = render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
   const folded = container.querySelector("details");
   expect(folded).not.toBeNull();
-  expect(folded!.querySelector("summary")).toHaveTextContent("Post 142 entries?");
+  expect(folded!.querySelector("summary")).toHaveTextContent("Approved · Post 142 entries?");
   expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
 });
 
@@ -49,4 +49,12 @@ it("shows what the agent logged next to the step", () => {
   vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
   render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
   expect(screen.getByText("Reading the bank statement")).toBeInTheDocument();
+});
+
+it("keeps a just-decided approval open while the run is still going", () => {
+  const s = snap({ status: "RUNNING" }, [{ ...gate, status: "APPROVED", decidedAt: "2026-09-29T10:06:00Z", decidedByUserId: "u1", decidedVia: "WEB" }]);
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  const { container } = render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide viewerUserId="u1" />);
+  expect(container.querySelector("details")).toHaveAttribute("open");
+  expect(screen.getByText(/you approved this/i)).toBeVisible();
 });
