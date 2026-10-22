@@ -11,7 +11,7 @@ import { ErrorState } from "@/ui/ErrorState";
 import { formatMoney, formatTime, formatWhen } from "@/lib/format";
 import type { Manifest, RunSnapshot } from "@/lib/api/types";
 
-export function LiveRun({ runRef, initial, manifest, canDecide }: { runRef: string; initial: RunSnapshot; manifest: Manifest | null; canDecide: boolean }) {
+export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: { runRef: string; initial: RunSnapshot; manifest: Manifest | null; canDecide: boolean; viewerUserId?: string }) {
   const { data, error, forbidden } = useRunPolling<RunSnapshot>(`/api/runs/${encodeURIComponent(runRef)}`, {
     intervalMs: 3000,
     initial,
@@ -33,12 +33,12 @@ export function LiveRun({ runRef, initial, manifest, canDecide }: { runRef: stri
       </header>
       {error && <p role="status" className={styles.note}>{error}</p>}
       {why && isTerminal(detail.status) && <p className={styles.why}>{why}</p>}
-      {pending.map((g) => <GateCard key={g.gateId} runRef={runRef} gate={g} canDecide={canDecide} />)}
+      {pending.map((g) => <GateCard key={g.gateId} runRef={runRef} gate={g} canDecide={canDecide} viewerUserId={viewerUserId} />)}
       <FlowBlocks blocks={views} />
       {gates.filter((g) => g.status !== "PENDING").map((g) => (
         <details key={g.gateId} className={styles.decided}>
           <summary>{g.summary}</summary>
-          <GateCard runRef={runRef} gate={g} canDecide={canDecide} />
+          <GateCard runRef={runRef} gate={g} canDecide={canDecide} viewerUserId={viewerUserId} />
         </details>
       ))}
       <div className={styles.cols}>

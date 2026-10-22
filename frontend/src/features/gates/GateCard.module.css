@@ -3,6 +3,7 @@
 .scroll { overflow-x: auto; }
 .scroll table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .scroll th, .scroll td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--l2); }
+.scroll th.num, .scroll td.num { text-align: right; }
 .more { font-size: 12px; }
 .actions { display: flex; gap: 10px; justify-content: flex-end; }
 .err { color: var(--bad) !important; }
