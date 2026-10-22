@@ -37,4 +37,14 @@ public interface WithdrawalRepository extends JpaRepository<Withdrawal, UUID> {
     @Query("select w.id from Withdrawal w where w.status = com.agentstore.platform.payouts.WithdrawalStatus.REQUESTED "
             + "and w.createdAt < :before order by w.createdAt, w.id")
     List<UUID> requestedIdsBefore(@Param("before") Instant before, Pageable page);
+
+    /** PROCESSING withdrawals submitted before {@code before}, oldest first: the ones the maintenance poll checks. */
+    @Query("select w.id from Withdrawal w where w.status = com.agentstore.platform.payouts.WithdrawalStatus.PROCESSING "
+            + "and w.submittedAt is not null and w.submittedAt < :before order by w.submittedAt, w.id")
+    List<UUID> processingIdsSubmittedBefore(@Param("before") Instant before, Pageable page);
+
+    /** Admin list: newest first, each filter optional. */
+    @Query("select w from Withdrawal w where (:status is null or w.status = :status) "
+            + "and (:orgId is null or w.orgId = :orgId) order by w.createdAt desc, w.id desc")
+    List<Withdrawal> findForAdmin(@Param("status") WithdrawalStatus status, @Param("orgId") UUID orgId, Pageable page);
 }
