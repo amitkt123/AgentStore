@@ -2,6 +2,7 @@ package com.agentstore.platform.payouts;
 
 import com.agentstore.platform.events.DomainEventPublisher;
 import com.agentstore.platform.ledger.LedgerAccountBalance;
+import com.agentstore.platform.identity.OrgRepository;
 import com.agentstore.platform.ledger.LedgerAccountBalanceRepository;
 import com.agentstore.platform.ledger.LedgerAccountKind;
 import com.agentstore.platform.ledger.LedgerAccounts;
@@ -61,7 +62,7 @@ public class WithdrawalService {
 
     private record Created(UUID withdrawalId, boolean created) {}
 
-    private record Submission(UUID withdrawalId, String fundAccountId, BigDecimal amount, PayoutMode mode) {}
+    private record Submission(UUID orgId, UUID withdrawalId, String fundAccountId, BigDecimal amount, PayoutMode mode) {}
 
     private final WithdrawalRepository withdrawals;
     private final PayoutAccountRepository payoutAccounts;
@@ -75,6 +76,7 @@ public class WithdrawalService {
     private final DomainEventPublisher events;
     private final ReconciliationIssues issues;
     private final TransactionTemplate tx;
+    private final OrgRepository orgs;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -83,7 +85,9 @@ public class WithdrawalService {
                              PayoutAccountService accountService, PayoutProvider provider, PayoutProperties props,
                              LedgerAccounts ledgerAccounts, LedgerAccountBalanceRepository balances,
                              LedgerTransactionRepository ledgerTransactions, LedgerService ledger,
-                             DomainEventPublisher events, ReconciliationIssues issues, TransactionTemplate tx) {
+                             DomainEventPublisher events, ReconciliationIssues issues, TransactionTemplate tx,
+                             OrgRepository orgs) {
+        this.orgs = orgs;
         this.withdrawals = withdrawals;
         this.payoutAccounts = payoutAccounts;
         this.accountService = accountService;
@@ -216,10 +220,15 @@ public class WithdrawalService {
             Withdrawal w = withdrawals.findById(withdrawalId).orElse(null);
             if (w == null || w.getStatus() != WithdrawalStatus.REQUESTED) return null;
             PayoutAccount account = payoutAccounts.findById(w.getPayoutAccountId()).orElseThrow();
-            return new Submission(withdrawalId, account.getProviderFundAccountId(), w.getAmount(), w.getMode());
+            return new Submission(w.getOrgId(), withdrawalId, account.getProviderFundAccountId(), w.getAmount(), w.getMode());
         });
         if (s == null) {
             log.info("Withdrawal {} is not REQUESTED; not submitted", withdrawalId);
+            return;
+        }
+        // A freeze is an investigation: stay REQUESTED (no reversal) so an unfreeze resumes it.
+        if (orgs.isMoneyFrozen(s.orgId()).orElse(false)) {
+            log.info("Withdrawal {} not submitted: money is frozen for org {}", withdrawalId, s.orgId());
             return;
         }
         PayoutProvider.ProviderPayout payout;

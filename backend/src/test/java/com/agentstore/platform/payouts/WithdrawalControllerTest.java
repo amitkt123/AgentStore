@@ -180,6 +180,29 @@ class WithdrawalControllerTest extends WithdrawalTestSupport {
     }
 
     @Test
+    void freezeStopsRequestedWithdrawalFromBeingSubmittedUntilUnfrozen() {
+        Org org = readyDeveloper("2000.00");
+        UUID id = id(withdraw(org, UUID.randomUUID(), "777.77"));
+        assertThat(status(id)).isEqualTo("REQUESTED");
+        jdbc.update("update withdrawal set created_at = now() - interval '10 minutes' where id = ?", id);
+
+        jdbc.update("update org set money_frozen_at = now(), money_frozen_reason = 'review' where id = ?", org.getId());
+        fake().clearFailures();
+        withdrawals.submit(id);
+        withdrawals.submitDue();
+
+        assertThat(status(id)).isEqualTo("REQUESTED");
+        assertThat(providerPayouts(id)).isZero();
+        assertThat(payableBalance(org)).isEqualByComparingTo("1222.23");
+
+        jdbc.update("update org set money_frozen_at = null, money_frozen_reason = null where id = ?", org.getId());
+        withdrawals.submit(id);
+
+        assertThat(status(id)).isEqualTo("PROCESSING");
+        assertThat(providerPayouts(id)).isEqualTo(1);
+    }
+
+    @Test
     void retryJobSubmitsOnlyRequestedOlderThanRetryAfter() {
         Org org = readyDeveloper("2000.00");
         UUID old = id(withdraw(org, UUID.randomUUID(), "777.77"));

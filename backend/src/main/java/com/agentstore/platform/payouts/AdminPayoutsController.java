@@ -48,7 +48,7 @@ public class AdminPayoutsController implements PayoutApiController {
 
     /** Freezing an already frozen org changes nothing: the first time and reason stay. */
     @PostMapping("/api/v1/admin/orgs/{id}/money/freeze")
-    public OrgMoneySettingsResponse freeze(@PathVariable UUID id, @RequestBody FreezeRequest request) {
+    public OrgMoneySettingsResponse freeze(@PathVariable UUID id, @RequestBody(required = false) FreezeRequest request) {
         String reason = request == null || request.reason() == null ? "" : request.reason().trim();
         if (reason.isEmpty() || reason.length() > 500) {
             throw new PayoutApiException(HttpStatus.BAD_REQUEST, "INVALID_FIELD", "reason must be 1 to 500 characters");
@@ -107,7 +107,7 @@ public class AdminPayoutsController implements PayoutApiController {
 
     /** Only an active FAILED account whose failure is NAME_MISMATCH can be approved. */
     @PostMapping("/api/v1/admin/payout-accounts/{id}/approve")
-    public AdminPayoutAccountView approve(@PathVariable UUID id, @RequestBody ApproveAccountRequest request) {
+    public AdminPayoutAccountView approve(@PathVariable UUID id, @RequestBody(required = false) ApproveAccountRequest request) {
         String note = request == null || request.note() == null ? "" : request.note().trim();
         if (note.isEmpty() || note.length() > 500) {
             throw new PayoutApiException(HttpStatus.BAD_REQUEST, "INVALID_FIELD", "note must be 1 to 500 characters");

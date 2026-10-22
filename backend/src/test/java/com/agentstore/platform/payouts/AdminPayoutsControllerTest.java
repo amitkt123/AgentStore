@@ -88,6 +88,16 @@ class AdminPayoutsControllerTest extends WithdrawalTestSupport {
     }
 
     @Test
+    void missingBodyIsInvalidField() {
+        Org org = readyDeveloper("1000.00");
+        UUID accountId = activeAccountId(org);
+        assertCode(admin("/api/v1/admin/orgs/" + org.getId() + "/money/freeze", null),
+                HttpStatus.BAD_REQUEST, "INVALID_FIELD");
+        assertCode(admin("/api/v1/admin/payout-accounts/" + accountId + "/approve", null),
+                HttpStatus.BAD_REQUEST, "INVALID_FIELD");
+    }
+
+    @Test
     void nonAdminGets403OnEveryEndpoint() {
         Org org = readyDeveloper("1000.00");
         UUID anyId = UUID.randomUUID();

@@ -11,6 +11,10 @@ import java.util.UUID;
 
 public interface OrgRepository extends JpaRepository<Org, UUID> {
 
+    /** Whether the org's money is frozen, read from the database (not from an Org already loaded). */
+    @Query("select o.moneyFrozenAt is not null from Org o where o.id = :id")
+    Optional<Boolean> isMoneyFrozen(@Param("id") UUID id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Org o where o.id = :id")
     Optional<Org> findByIdForUpdate(@Param("id") UUID id);
