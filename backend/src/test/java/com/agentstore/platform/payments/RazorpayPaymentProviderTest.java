@@ -246,6 +246,18 @@ class RazorpayPaymentProviderTest {
     }
 
     @Test
+    void badCredentialsAreAnOutageNotARejection() {
+        // A wrong or revoked key is our configuration problem: never "payment unknown", never "refund rejected".
+        server.expect(requestTo(BASE + "/v1/payments/pay_y")).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        assertThatThrownBy(() -> provider.fetchPayment("pay_y")).isInstanceOf(PaymentProviderUnavailableException.class);
+
+        server.reset();
+        server.expect(requestTo(BASE + "/v1/payments/pay_y/refund")).andRespond(withStatus(HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> provider.refund("pay_y", new BigDecimal("10.00"), "receipt-0123456789"))
+                .isInstanceOf(PaymentProviderUnavailableException.class);
+    }
+
+    @Test
     void signatureVerification() throws Exception {
         byte[] body = fixture("payment.captured.json").getBytes(StandardCharsets.UTF_8);
         String sig = hmac(body, WEBHOOK_SECRET);

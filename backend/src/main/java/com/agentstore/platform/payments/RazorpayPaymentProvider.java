@@ -33,7 +33,7 @@ import java.util.function.Supplier;
 /**
  * Razorpay adapter. Rupees ({@link BigDecimal}) cross the seam; paise ({@code long}) exist only in here.
  *
- * <p>Errors: a definite 4xx answer becomes {@link PaymentProviderRejectedException}; a 5xx, 408, 429, timeout, I/O
+ * <p>Errors: a definite 4xx answer becomes {@link PaymentProviderRejectedException}; a 5xx, 401, 403, 408, 429, timeout, I/O
  * failure or unreadable 2xx answer becomes {@link PaymentProviderUnavailableException}. Messages carry only the
  * endpoint name, the status code and Razorpay's error {@code code}, never a request or response body or a secret.
  */
@@ -420,7 +420,8 @@ public class RazorpayPaymentProvider implements PaymentProvider {
             int status = e.getStatusCode().value();
             String code = errorCode(e.getResponseBodyAsByteArray());
             String message = "Razorpay " + endpoint + " answered " + status + (code == null ? "" : " " + code);
-            if (status >= 400 && status < 500 && status != 408 && status != 429) {
+            // 401/403 mean our keys are wrong or revoked, not that the request was: retry once they are fixed.
+            if (status >= 400 && status < 500 && status != 401 && status != 403 && status != 408 && status != 429) {
                 throw new PaymentProviderRejectedException(message);
             }
             throw new PaymentProviderUnavailableException(message);
