@@ -15,6 +15,8 @@ public interface PayoutAccountRepository extends JpaRepository<PayoutAccount, UU
 
     Optional<PayoutAccount> findByOrgIdAndReplacedAtIsNull(UUID orgId);
 
+    Optional<PayoutAccount> findByProviderValidationId(String providerValidationId);
+
     long countByOrgIdAndCreatedAtGreaterThanEqual(UUID orgId, Instant since);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

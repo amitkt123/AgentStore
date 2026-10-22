@@ -166,6 +166,20 @@ public class FakePayoutProvider implements PayoutProvider {
     }
 
     /**
+     * Moves a payout the fake already knows to {@code status} (PROCESSED, REVERSED or FAILED), so polling and
+     * reconciliation see what a simulated webhook said. Returns false for a payout the fake does not know.
+     */
+    public synchronized boolean markPayout(String payoutId, String status, String utr, String failureReason) {
+        ProviderPayout p = payoutsById.get(payoutId);
+        if (p == null) return false;
+        ProviderPayout moved = new ProviderPayout(p.payoutId(), p.idempotencyKey(), p.amount(), p.fees(), status,
+                utr == null ? p.utr() : utr, failureReason, p.createdAt());
+        payoutsById.put(payoutId, moved);
+        payoutsByKey.put(p.idempotencyKey(), moved);
+        return true;
+    }
+
+    /**
      * Makes 777.77 succeed from now on, as if the provider came back after a timeout. 999.99 is still refused for
      * balance: that rule stands for the platform's own provider balance, which a retry does not fix.
      */
