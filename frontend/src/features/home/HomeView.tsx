@@ -11,12 +11,14 @@ type Props = { fullName: string; role: UserRole; needsYou: RunListItem[]; connec
 export function HomeView({ fullName, role, needsYou, connections }: Props) {
   const first = fullName.split(/\s+/)[0];
   if (!isBuyer(role)) {
+    const admin = role === "ADMIN";
     return (
       <section>
         <h1>Welcome, {first}</h1>
         <EmptyState
-          title="Your console is coming back"
-          body="The developer console is being rebuilt. Until then, use the Karya CLI and your API keys to publish and manage agents."
+          title={admin ? "Platform money lives under Money" : "Your agents live under Agents"}
+          body={admin ? "Fees, credit limits, wallet adjustments and ledger checks." : "Create agents, push versions and submit them for review."}
+          action={admin ? <Link href="/admin/money">Go to Money</Link> : <Link href="/developer/agents">Go to Agents</Link>}
         />
       </section>
     );

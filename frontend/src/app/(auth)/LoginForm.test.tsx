@@ -18,3 +18,9 @@ it("renders labelled fields and a remember checkbox", () => {
   expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /create account/i })).toHaveAttribute("href", "/signup");
 });
+
+it("does not offer Google sign-in while it is not configured", () => {
+  render(<LoginForm next="/home" />);
+  expect(screen.queryByText(/continue with google/i)).toBeNull();
+  expect(screen.queryByText(/single sign-on/i)).toBeNull();
+});

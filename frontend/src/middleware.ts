@@ -8,11 +8,19 @@ const APPROVAL_LINK = /^\/approve\/[^/]+$/;
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  if (APPROVAL_LINK.test(path) || PUBLIC.some((p) => path === p || path.startsWith(p + "/"))) return NextResponse.next();
-
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const refresh = req.cookies.get(REFRESH_COOKIE)?.value;
   const now = Math.floor(Date.now() / 1000);
+
+  if (APPROVAL_LINK.test(path) || PUBLIC.some((p) => path === p || path.startsWith(p + "/"))) {
+    // A signed-in user on /login or /signup goes to their own home; every other public page stays open.
+    const to = !needsRefresh(token, now) ? gateTarget(decodeToken(token as string)?.role, path) : null;
+    if (!to) return NextResponse.next();
+    const url = req.nextUrl.clone();
+    url.pathname = to;
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 
   const gateFor = (tok: string) => gateTarget(decodeToken(tok)?.role, path);
   const redirectTo = (to: string) => {

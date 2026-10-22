@@ -4,7 +4,7 @@ import { ResponsiveTable } from "@/ui/ResponsiveTable";
 import { EmptyState } from "@/ui/EmptyState";
 import { statusPill } from "./status";
 import { toBlockViews } from "@/features/flow/blocks";
-import { formatMoney, formatTime } from "@/lib/format";
+import { formatMoney, formatWhen } from "@/lib/format";
 import type { RunListItem } from "@/lib/api/types";
 
 function reached(id: string | null): string {
@@ -24,7 +24,7 @@ export function RunsTable({ rows }: { rows: RunListItem[] }) {
         { key: "agent", header: "Agent", render: (r) => `${r.agent} ${r.version}` },
         { key: "reached", header: "Reached", render: (r) => reached(r.reachedBlock) },
         { key: "status", header: "Status", render: (r) => { const s = statusPill(r.status); return <Pill tone={s.tone}>{s.text}</Pill>; } },
-        { key: "started", header: "Started", render: (r) => <span className="mono">{formatTime(r.startedAt)}</span> },
+        { key: "started", header: "Started", render: (r) => <span className="mono">{formatWhen(r.startedAt)}</span> },
         { key: "cost", header: "Cost", render: (r) => <span className="mono">{formatMoney(r.charged)}</span> },
       ]}
     />

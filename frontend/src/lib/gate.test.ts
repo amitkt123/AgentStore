@@ -42,3 +42,11 @@ it("lets ADMIN into /admin, and only matches whole segments", () => {
   expect(gateTarget("ADMIN", "/admin/money")).toBeNull();
   expect(gateTarget("BUYER_ADMIN", "/administrators")).toBeNull();
 });
+
+it("sends a signed-in user past login and signup to their own home", () => {
+  expect(gateTarget("BUYER_ADMIN", "/login")).toBe("/home");
+  expect(gateTarget("BUYER_APPROVER", "/signup")).toBe("/home");
+  expect(gateTarget("DEVELOPER", "/signup")).toBe("/developer/agents");
+  expect(gateTarget("ADMIN", "/login")).toBe("/admin/money");
+  expect(gateTarget(undefined, "/login")).toBeNull();
+});

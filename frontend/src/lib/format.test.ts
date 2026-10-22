@@ -1,4 +1,4 @@
-import { formatInr, formatBytes, formatMoney, humanize, formatDate } from "./format";
+import { formatWhen, formatInr, formatBytes, formatMoney, humanize, formatDate } from "./format";
 
 it("formats rupees with Indian grouping", () => {
   expect(formatMoney(500)).toBe("₹500");
@@ -25,4 +25,12 @@ it("formatInr puts the minus sign before the rupee symbol", () => {
   expect(formatInr(-1500.5)).toBe("-₹1,500.50");
   expect(formatInr(1500)).toBe("₹1,500.00");
   expect(formatInr(0)).toBe("₹0.00");
+});
+
+describe("formatWhen", () => {
+  const now = new Date("2026-10-22T10:00:00");
+  it("shows only the time for today", () => expect(formatWhen("2026-10-22T08:47:00", now)).toBe("08:47"));
+  it("adds the date for an earlier day this year", () => expect(formatWhen("2026-10-21T14:17:00", now)).toBe("21 Oct, 14:17"));
+  it("adds the year for another year", () => expect(formatWhen("2025-10-21T14:17:00", now)).toBe("21 Oct 2025, 14:17"));
+  it("shows a dash for no time", () => expect(formatWhen(null, now)).toBe("–"));
 });

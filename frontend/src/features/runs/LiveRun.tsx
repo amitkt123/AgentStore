@@ -8,7 +8,7 @@ import { toBlockViews } from "@/features/flow/blocks";
 import { GateCard } from "@/features/gates/GateCard";
 import { Pill } from "@/ui/Pill";
 import { ErrorState } from "@/ui/ErrorState";
-import { formatMoney, formatTime } from "@/lib/format";
+import { formatMoney, formatTime, formatWhen } from "@/lib/format";
 import type { Manifest, RunSnapshot } from "@/lib/api/types";
 
 export function LiveRun({ runRef, initial, manifest, canDecide }: { runRef: string; initial: RunSnapshot; manifest: Manifest | null; canDecide: boolean }) {
@@ -42,7 +42,7 @@ export function LiveRun({ runRef, initial, manifest, canDecide }: { runRef: stri
           <p className={styles.sub}>Recorded by Karya as it happens, not reported by the agent.</p>
           <ol className={styles.steps}>
             {detail.steps.map((s, i) => (
-              <li key={i}><span className="mono">{formatTime(s.createdAt)}</span> {stepText(s)}</li>
+              <li key={i}><span className="mono">{formatWhen(s.createdAt)}</span> {stepText(s)}</li>
             ))}
           </ol>
         </section>

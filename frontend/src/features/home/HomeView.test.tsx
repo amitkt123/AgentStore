@@ -15,8 +15,8 @@ it("shows an empty state that points to the store when nothing is connected", ()
   expect(screen.getByRole("link", { name: /browse the agent store/i })).toHaveAttribute("href", "/store");
 });
 
-it("shows a holding message for developers and admins", () => {
-  render(<HomeView fullName="Dev Person" role="DEVELOPER" needsYou={[]} connections={[]} />);
-  expect(screen.getByText(/developer console is being rebuilt/i)).toBeInTheDocument();
-  expect(screen.queryByRole("link", { name: /agent store/i })).toBeNull();
+it("points an admin to Money instead of the old holding message", () => {
+  render(<HomeView fullName="Ada Admin" role="ADMIN" needsYou={[]} connections={[]} />);
+  expect(screen.getByRole("link", { name: /go to money/i })).toHaveAttribute("href", "/admin/money");
+  expect(screen.queryByText(/being rebuilt/i)).toBeNull();
 });
