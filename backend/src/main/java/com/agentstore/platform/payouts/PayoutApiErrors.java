@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Scoped to the payouts controllers; later tasks add them to {@code assignableTypes}. */
-@RestControllerAdvice(assignableTypes = {})
+/** Scoped to controllers implementing {@link PayoutApiController}. */
+@RestControllerAdvice(assignableTypes = PayoutApiController.class)
 public class PayoutApiErrors {
 
     @ExceptionHandler(PayoutApiException.class)

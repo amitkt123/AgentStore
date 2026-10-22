@@ -55,4 +55,24 @@ class PayoutsSchemaTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> jdbc.update(sql, org, account, request)).isInstanceOf(DataIntegrityViolationException.class);
         jdbc.update(sql, org, account, UUID.randomUUID());
     }
+
+    @Test
+    void vpaAccountShapeIsEnforced() {
+        UUID org = newOrg();
+        String sql = "insert into payout_account (id, org_id, type, vpa, account_last4, holder_name, status) "
+                + "values (gen_random_uuid(), ?, 'VPA', ?, ?, 'A Dev', 'PENDING')";
+        assertThatThrownBy(() -> jdbc.update(sql, org, null, null)).isInstanceOf(DataIntegrityViolationException.class);
+        jdbc.update("update payout_account set replaced_at = now() where org_id = ?", org);
+        jdbc.update(sql, org, "dev@upi", null);
+    }
+
+    @Test
+    void nonPositiveWithdrawalAmountIsRejected() {
+        UUID org = newOrg();
+        insertBank(org, "HDFC0001234", false);
+        UUID account = jdbc.queryForObject("select id from payout_account where org_id = ?", UUID.class, org);
+        assertThatThrownBy(() -> jdbc.update("insert into withdrawal (id, org_id, payout_account_id, request_id, amount, mode, status) "
+                + "values (gen_random_uuid(), ?, ?, gen_random_uuid(), 0, 'IMPS', 'REQUESTED')", org, account))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
 }
