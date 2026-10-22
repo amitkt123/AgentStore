@@ -24,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * In-memory provider for dev and tests. One shared bean per Spring context. Deterministic rules: the registered
  * name is the holder name unless the account number ends 0000 ("SOMEONE ELSE"); a VPA starting "fail" fails
  * validation; an account number ending 1111 leaves validation PENDING until {@link #fetchValidation}; a payout of
- * exactly 999.99 is refused for balance and 777.77 is unavailable.
+ * exactly 999.99 is refused for balance and 777.77 is unavailable (until {@link #clearFailures}).
  */
 public class FakePayoutProvider implements PayoutProvider {
 
@@ -38,6 +38,7 @@ public class FakePayoutProvider implements PayoutProvider {
     private final Map<String, ProviderPayout> payoutsById = new ConcurrentHashMap<>();
     private final Map<String, ProviderPayout> payoutsByKey = new ConcurrentHashMap<>();
     private final String webhookSecret;
+    private volatile boolean unavailableCleared;
 
     public FakePayoutProvider(PayoutProperties.Fake fake) {
         if (fake == null || fake.webhookSecret() == null || fake.webhookSecret().isBlank()) {
@@ -100,7 +101,7 @@ public class FakePayoutProvider implements PayoutProvider {
         if (amount.compareTo(new BigDecimal("999.99")) == 0) {
             throw new PayoutInsufficientBalanceException("Fake provider balance is too low");
         }
-        if (amount.compareTo(new BigDecimal("777.77")) == 0) {
+        if (!unavailableCleared && amount.compareTo(new BigDecimal("777.77")) == 0) {
             throw new PayoutProviderUnavailableException("Fake provider is unavailable");
         }
         if (!fundAccounts.containsKey(fundAccountId)) {
@@ -164,8 +165,17 @@ public class FakePayoutProvider implements PayoutProvider {
         }
     }
 
-    /** Forgets everything; tests that need a clean slate call this. */
+    /**
+     * Makes 777.77 succeed from now on, as if the provider came back after a timeout. 999.99 is still refused for
+     * balance: that rule stands for the platform's own provider balance, which a retry does not fix.
+     */
+    public void clearFailures() {
+        unavailableCleared = true;
+    }
+
+    /** Forgets everything and restores the failure rules; tests that need a clean slate call this. */
     public void reset() {
+        unavailableCleared = false;
         fundAccounts.clear();
         validations.clear();
         payoutsById.clear();

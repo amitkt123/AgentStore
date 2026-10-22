@@ -166,6 +166,23 @@ public class PayoutAccountService {
         return accounts.findByOrgIdAndReplacedAtIsNull(orgId);
     }
 
+    /**
+     * The guard every money-out path shares: the org is a verified developer, its money is not frozen, and its
+     * active payout account is VERIFIED. Returns that account. Joins the caller's transaction when there is one.
+     *
+     * @throws PayoutApiException DEVELOPER_NOT_VERIFIED (403), MONEY_FROZEN (409) or NO_VERIFIED_PAYOUT_ACCOUNT (409)
+     */
+    @Transactional
+    public PayoutAccount requireWithdrawable(UUID orgId) {
+        Org org = orgs.findById(orgId).orElseThrow(notVerified());
+        String blocked = orgBlock(org);
+        if (blocked != null) throw blockedException(blocked);
+        return accounts.findByOrgIdAndReplacedAtIsNull(orgId)
+                .filter(a -> a.getStatus() == PayoutAccountStatus.VERIFIED)
+                .orElseThrow(() -> new PayoutApiException(HttpStatus.CONFLICT, "NO_VERIFIED_PAYOUT_ACCOUNT",
+                        "Add a payout account and wait for it to be verified before withdrawing"));
+    }
+
     @Transactional(readOnly = true)
     public PayoutsSummaryResponse summary(UUID orgId) {
         Org org = orgs.findById(orgId).orElseThrow(notVerified());
@@ -198,14 +215,14 @@ public class PayoutAccountService {
     private static PayoutApiException blockedException(String code) {
         return code.equals("MONEY_FROZEN")
                 ? new PayoutApiException(HttpStatus.CONFLICT, code, "Money movement is frozen for this organisation")
-                : new PayoutApiException(HttpStatus.FORBIDDEN, code, "Only verified developers can add a payout account");
+                : new PayoutApiException(HttpStatus.FORBIDDEN, code, "Only verified developers can add payout accounts or withdraw");
     }
 
     private static java.util.function.Supplier<PayoutApiException> notVerified() {
         return () -> blockedException("DEVELOPER_NOT_VERIFIED");
     }
 
-    private static Instant startOfTodayUtc() {
+    static Instant startOfTodayUtc() {
         return LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC);
     }
 
