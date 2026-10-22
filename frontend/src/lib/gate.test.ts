@@ -1,4 +1,4 @@
-import { gateTarget } from "./gate";
+import { gateTarget, isExpiredLogin } from "./gate";
 
 it.each(["/home", "/store", "/store/a1/v1", "/runs", "/runs/R-1", "/files", "/connect/a/v"])("sends a developer away from buyer route %s", (path) => {
   expect(gateTarget("DEVELOPER", path)).toBe("/developer/verification");
@@ -49,4 +49,10 @@ it("sends a signed-in user past login and signup to their own home", () => {
   expect(gateTarget("DEVELOPER", "/signup")).toBe("/developer/agents");
   expect(gateTarget("ADMIN", "/login")).toBe("/admin/money");
   expect(gateTarget(undefined, "/login")).toBeNull();
+});
+
+it("lets a rejected session reach the login form instead of bouncing home", () => {
+  expect(isExpiredLogin("/login", new URLSearchParams("expired=1"))).toBe(true);
+  expect(isExpiredLogin("/login", new URLSearchParams("next=/runs"))).toBe(false);
+  expect(isExpiredLogin("/home", new URLSearchParams("expired=1"))).toBe(false);
 });

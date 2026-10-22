@@ -31,3 +31,13 @@ describe("decisionText", () => {
     expect(decisionText(g({ status: "REJECTED", decidedVia: "EMAIL_LINK" }), "u2")).toBe("Rejected at 14:17 by email link.");
   });
 });
+
+describe("cell keeps identifiers as written", () => {
+  it("does not group a whole-number string outside a money column", () => {
+    expect(cell("501001234567890", "account")).toEqual({ text: "501001234567890", numeric: false });
+    expect(cell("0042", "invoice")).toEqual({ text: "0042", numeric: false });
+  });
+  it("groups a whole-number string in a money column", () => expect(cell("185000", "debit")).toEqual({ text: "1,85,000", numeric: true }));
+  it("never reformats a string longer than 15 digits", () => expect(cell("12345678901234567.5", "amount")).toEqual({ text: "12345678901234567.5", numeric: false }));
+  it("does not group a whole number outside a money column", () => expect(cell(2026, "year")).toEqual({ text: "2026", numeric: true }));
+});

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { REFRESH_COOKIE, SESSION_COOKIE, cookieOptions, decodeToken, needsRefresh } from "@/lib/session";
-import { gateTarget } from "@/lib/gate";
+import { gateTarget, isExpiredLogin } from "@/lib/gate";
 
 const PUBLIC = ["/login", "/signup", "/verify", "/forgot", "/reset"];
 // An emailed approval link is /approve/{token}. The signed-in gate page is /approve/{run}/{gate}, which stays gated.
@@ -11,6 +11,14 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const refresh = req.cookies.get(REFRESH_COOKIE)?.value;
   const now = Math.floor(Date.now() / 1000);
+
+  if (isExpiredLogin(path, req.nextUrl.searchParams)) {
+    // The backend rejected this session; drop its cookies so the login form shows instead of bouncing back home.
+    const res = NextResponse.next();
+    res.cookies.set(SESSION_COOKIE, "", { ...cookieOptions(), maxAge: 0 });
+    res.cookies.set(REFRESH_COOKIE, "", { ...cookieOptions(), maxAge: 0 });
+    return res;
+  }
 
   if (APPROVAL_LINK.test(path) || PUBLIC.some((p) => path === p || path.startsWith(p + "/"))) {
     // A signed-in user on /login or /signup goes to their own home; every other public page stays open.

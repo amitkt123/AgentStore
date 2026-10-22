@@ -59,6 +59,7 @@ Developer and money
 | Unique agent names per developer org | 409 on duplicate name | New agent form |
 | Real reasons on version create/submit failures (G17) | `{code, message}` body | Studio |
 | Agent output summary on a finished run | Run detail gains outputs list (known gap in `docs/demo.md`) | LiveRun "Result" panel |
+| Show which version an added agent runs, and pin new connections to the version the buyer was looking at | `ConnectionSummaryResponse` gains `agentVersionId` and `versionNumber`; create takes the viewed `versionId`, or the store orders by `approvedAt` as connect does (UX-1's store picks the highest version number) | Store detail, Home |
 
 ### UX-3 Home and developer overview
 

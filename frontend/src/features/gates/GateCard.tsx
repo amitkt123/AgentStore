@@ -25,7 +25,7 @@ export function GateCard({ runRef, gate, canDecide, viewerUserId }: { runRef: st
     });
 
   const cols = gate.preview?.columns ?? (gate.preview?.rows[0] ? Object.keys(gate.preview.rows[0]) : []);
-  const numericCols = new Set(cols.filter((c) => gate.preview?.rows.some((r) => cell(r[c]).numeric)));
+  const numericCols = new Set(cols.filter((c) => gate.preview?.rows.some((r) => cell(r[c], c).numeric)));
 
   return (
     <section className={styles.card} aria-labelledby={`g-${gate.gateId}`}>
@@ -37,7 +37,7 @@ export function GateCard({ runRef, gate, canDecide, viewerUserId }: { runRef: st
             <thead><tr>{cols.map((c) => <th key={c} className={numericCols.has(c) ? styles.num : undefined}>{humanize(c)}</th>)}</tr></thead>
             <tbody>
               {gate.preview.rows.map((r, i) => (
-                <tr key={i}>{cols.map((c) => { const v = cell(r[c]); return <td key={c} className={`mono ${v.numeric ? styles.num : ""}`}>{v.text}</td>; })}</tr>
+                <tr key={i}>{cols.map((c) => { const v = cell(r[c], c); return <td key={c} className={`mono ${v.numeric ? styles.num : ""}`}>{v.text}</td>; })}</tr>
               ))}
             </tbody>
           </table>

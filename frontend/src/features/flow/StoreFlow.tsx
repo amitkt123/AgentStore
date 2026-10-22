@@ -35,8 +35,9 @@ export function StoreFlow({ agentId, versionId, detail, canConnect, connectionId
           </dl>
           {connectionId ? (
             <>
-              <p className={styles.sub}>This agent is already in your workspace.</p>
+              <p className={styles.sub}>This agent is already in your workspace. Runs use the version you added, which may be older than this page.</p>
               {canConnect && <RunNow connectionId={connectionId} />}
+              {canConnect && <Link href={`/connect/${agentId}/${versionId}`} className={styles.again}>Set it up again</Link>}
             </>
           ) : canConnect
             ? <Link href={`/connect/${agentId}/${versionId}`} className={styles.cta}>Add to workspace</Link>

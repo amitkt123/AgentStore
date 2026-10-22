@@ -63,4 +63,6 @@ it("offers Run now instead of a second add when the agent is already added", () 
   expect(screen.getByRole("button", { name: "Run now" })).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Add to workspace" })).toBeNull();
   expect(screen.getByText(/already in your workspace/i)).toBeInTheDocument();
+  expect(screen.getByText(/runs use the version you added/i)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Set it up again" })).toHaveAttribute("href", "/connect/a1/v1");
 });

@@ -18,3 +18,6 @@ export function gateTarget(role: UserRole | undefined, path: string): string | n
   if (role !== "ADMIN" && under(path, "/admin")) return role === "DEVELOPER" ? "/developer/verification" : "/home";
   return null;
 }
+
+/** /login?expired=1 is where a request the backend rejected (401) lands: the session cookies are stale, so clear them and show the form. */
+export const isExpiredLogin = (path: string, params: URLSearchParams): boolean => path === "/login" && params.has("expired");
