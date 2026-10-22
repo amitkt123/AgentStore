@@ -68,6 +68,11 @@ public class ReconciliationService {
 
     /** Reconciles {@code dayUtc}; returns how many issues it found (new or already recorded). Safe to repeat. */
     public int reconcile(LocalDate dayUtc) {
+        return reconcile(dayUtc, Instant.now());
+    }
+
+    /** {@link #reconcile(LocalDate)} as of {@code now}, which decides whether a provider refund is still too new to judge. */
+    int reconcile(LocalDate dayUtc, Instant now) {
         // Provider calls first, outside any transaction.
         List<PaymentProvider.ProviderPayment> payments = provider.fetchPayments(dayUtc);
         List<PaymentProvider.ProviderRefund> refunds = provider.fetchRefunds(dayUtc);
@@ -76,7 +81,7 @@ public class ReconciliationService {
         int found = 0;
         found += checkPayments(dayUtc, payments);
         found += checkPaidOrders(dayUtc, payments);
-        found += checkRefunds(dayUtc, refunds);
+        found += checkRefunds(dayUtc, refunds, now);
         postGatewayFees(settlements);
         found += checkLedger(dayUtc);
         return found;
@@ -129,13 +134,18 @@ public class ReconciliationService {
         return found;
     }
 
-    private int checkRefunds(LocalDate day, List<PaymentProvider.ProviderRefund> refunds) {
+    private int checkRefunds(LocalDate day, List<PaymentProvider.ProviderRefund> refunds, Instant now) {
         int found = 0;
         for (PaymentProvider.ProviderRefund r : refunds) {
             List<String> parts = jdbc.queryForList(
                     "select status from buyer_refund_part where provider_refund_id = ?", String.class, r.refundId());
             if (parts.isEmpty()) {
-                if (!awaitingLocalPart(r)) {
+                String otherRefundId = refundIdOfReceiptPart(r);
+                if (otherRefundId != null) {
+                    // The part named by the receipt already holds another provider refund: it was paid out twice.
+                    found += flag(day, "DUPLICATE_REFUND", r.refundId(), detail("paymentId", r.paymentId(),
+                            "amount", r.amount(), "refundPartId", r.receipt(), "partRefundId", otherRefundId));
+                } else if (!awaitingLocalPart(r, now)) {
                     found += flag(day, "REFUND_UNMATCHED", r.refundId(), detail("paymentId", r.paymentId(),
                             "amount", r.amount(), "providerStatus", r.status(), "receipt", r.receipt()));
                 }
@@ -151,20 +161,34 @@ public class ReconciliationService {
     }
 
     /**
-     * A provider refund with no part holding its id is ours when its receipt is a part id (the refund call timed out
-     * before we stored the id; the retry job settles it) and possibly ours when it is under an hour old (the
-     * submitting transaction may not have committed yet). Anything else was made outside Karya.
+     * A provider refund with no part holding its id is ours when its receipt is a part id that has no provider refund
+     * id yet (the refund call timed out before we stored it; the retry job settles it) and possibly ours when it is
+     * under an hour old at {@code now} (the submitting transaction may not have committed yet). Anything else was
+     * made outside Karya.
      */
-    private boolean awaitingLocalPart(PaymentProvider.ProviderRefund r) {
-        if (r.createdAt() != null && r.createdAt().isAfter(Instant.now().minus(UNMATCHED_REFUND_GRACE))) return true;
-        if (r.receipt() == null) return false;
-        UUID partId;
+    private boolean awaitingLocalPart(PaymentProvider.ProviderRefund r, Instant now) {
+        if (r.createdAt() != null && r.createdAt().isAfter(now.minus(UNMATCHED_REFUND_GRACE))) return true;
+        UUID partId = receiptPartId(r);
+        return partId != null
+                && count("select count(*) from buyer_refund_part where id = ? and provider_refund_id is null", partId) > 0;
+    }
+
+    /** The provider refund id already stored on the part named by {@code r}'s receipt, if that part has one. */
+    private String refundIdOfReceiptPart(PaymentProvider.ProviderRefund r) {
+        UUID partId = receiptPartId(r);
+        if (partId == null) return null;
+        List<String> ids = jdbc.queryForList("select provider_refund_id from buyer_refund_part "
+                + "where id = ? and provider_refund_id is not null", String.class, partId);
+        return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    private static UUID receiptPartId(PaymentProvider.ProviderRefund r) {
+        if (r.receipt() == null) return null;
         try {
-            partId = UUID.fromString(r.receipt());
+            return UUID.fromString(r.receipt());
         } catch (IllegalArgumentException e) {
-            return false;
+            return null;
         }
-        return count("select count(*) from buyer_refund_part where id = ?", partId) > 0;
     }
 
     private static boolean refundStatusAgrees(String provider, String local) {

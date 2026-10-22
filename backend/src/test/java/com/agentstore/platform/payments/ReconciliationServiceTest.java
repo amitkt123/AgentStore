@@ -183,30 +183,38 @@ class ReconciliationServiceTest extends AbstractIntegrationTest {
 
     @Test
     void providerRefundUnderAnHourOldIsNotFlaggedYet() {
-        LocalDate today = LocalDate.now(java.time.ZoneOffset.UTC);
-        Instant started = Instant.now();
-        Instant recent = started.minusSeconds(600);
-        if (!recent.atZone(java.time.ZoneOffset.UTC).toLocalDate().equals(today)) recent = started;
+        Instant now = Instant.parse("2026-01-15T12:00:00Z");
         String young = uniq("rfnd_");
         String old = uniq("rfnd_");
-        fake().seedRefund(young, uniq("pay_"), new BigDecimal("10.00"), "PROCESSED", null, recent);
-        Instant hourAgo = started.minusSeconds(7200);
-        boolean oldIsToday = hourAgo.atZone(java.time.ZoneOffset.UTC).toLocalDate().equals(today);
-        if (oldIsToday) fake().seedRefund(old, uniq("pay_"), new BigDecimal("10.00"), "PROCESSED", null, hourAgo);
-        try {
-            reconciliation.reconcile(today);
+        fake().seedRefund(young, uniq("pay_"), new BigDecimal("10.00"), "PROCESSED", null, now.minusSeconds(600));
+        fake().seedRefund(old, uniq("pay_"), new BigDecimal("10.00"), "PROCESSED", null, now.minusSeconds(7200));
 
-            assertThat(jdbc.queryForObject("select count(*) from reconciliation_issue where provider_ref = ?",
-                    Integer.class, young)).isZero();
-            if (oldIsToday) {
-                assertThat(jdbc.queryForObject("select count(*) from reconciliation_issue where provider_ref = ? "
-                        + "and kind = 'REFUND_UNMATCHED'", Integer.class, old)).isEqualTo(1);
-            }
-        } finally {
-            // Today's run also flagged other classes' data; drop only what it recorded.
-            jdbc.update("delete from reconciliation_issue where day = ? and created_at >= ?", Date.valueOf(today),
-                    java.sql.Timestamp.from(started));
-        }
+        reconciliation.reconcile(DAY, now);
+
+        assertThat(issues()).hasSize(1);
+        assertThat(issues().get(0)).containsEntry("kind", "REFUND_UNMATCHED").containsEntry("provider_ref", old);
+    }
+
+    @Test
+    void secondProviderRefundForAPartThatAlreadyHasOneIsFlaggedAsDuplicate() {
+        UUID org = org();
+        String ord = uniq("ord_"), pay = uniq("pay_");
+        PaymentOrder o = order(org, PaymentOrder.Status.PAID, ord, pay, "500.00", AT);
+        fake().seedPayment(pay, ord, new BigDecimal("500.00"), "captured", null, AT);
+        UUID refundId = UUID.randomUUID(), partId = UUID.randomUUID();
+        String first = uniq("rfnd_"), second = uniq("rfnd_");
+        jdbc.update("insert into buyer_refund (id, org_id, request_id, amount, status) values (?, ?, ?, 100, 'PROCESSING')",
+                refundId, org, uniq("req-"));
+        jdbc.update("insert into buyer_refund_part (id, refund_id, payment_order_id, amount, provider_refund_id, status) "
+                + "values (?, ?, ?, 100, ?, 'PROCESSING')", partId, refundId, o.getId(), first);
+        fake().seedRefund(first, pay, new BigDecimal("100.00"), "PENDING", partId.toString(), AT);
+        // The same part refunded again (same receipt, another provider refund id): money paid out twice.
+        fake().seedRefund(second, pay, new BigDecimal("100.00"), "PROCESSED", partId.toString(), AT);
+
+        reconciliation.reconcile(DAY);
+
+        assertThat(issues()).hasSize(1);
+        assertThat(issues().get(0)).containsEntry("kind", "DUPLICATE_REFUND").containsEntry("provider_ref", second);
     }
 
     @Test
