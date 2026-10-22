@@ -14,6 +14,7 @@ export function WithdrawSection({ payouts, blocked, owes }: { payouts: PayoutsSu
         <WithdrawForm
           available={payouts.available}
           dailyLimitLeft={Math.max(0, payouts.dailyLimit - payouts.withdrawnToday)}
+          minimum={payouts.minimum}
           accountLabel={accountLabel(payouts.account)}
           onDone={() => setNotice("Withdrawal requested.")}
         />

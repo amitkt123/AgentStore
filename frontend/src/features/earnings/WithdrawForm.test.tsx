@@ -10,7 +10,7 @@ vi.mock("@/app/(app)/developer/earnings/actions", () => ({ withdraw: (...a: unkn
 import { WithdrawForm } from "./WithdrawForm";
 
 const onDone = vi.fn();
-const props = { onDone, available: 6000.5, dailyLimitLeft: 5000, accountLabel: "Bank ••1234" };
+const props = { onDone, available: 6000.5, dailyLimitLeft: 5000, minimum: 100, accountLabel: "Bank ••1234" };
 
 beforeEach(() => { vi.clearAllMocks(); });
 
@@ -82,4 +82,46 @@ it("reuses the request id on a repeated submit and uses a new one for a new amou
   await user.click(screen.getByRole("button", { name: "Confirm" }));
   expect(withdraw).toHaveBeenLastCalledWith(300, expect.any(String));
   expect(withdraw.mock.calls[2][1]).not.toBe(first);
+});
+
+it("lets the user withdraw the full balance to the paisa (128.14 is not floored to 128.13)", async () => {
+  withdraw.mockResolvedValue({ withdrawal: {} });
+  const user = userEvent.setup();
+  render(<WithdrawForm {...props} available={128.14} />);
+  const input = screen.getByLabelText("Amount (₹)");
+  expect(input).toHaveValue(128.14);
+  expect(screen.getByRole("button", { name: "Withdraw" })).toBeEnabled();
+
+  await user.clear(input);
+  await user.type(input, "128.14");
+  expect(screen.queryByText(/You can withdraw up to/)).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Withdraw" }));
+  expect(screen.getByText("Send ₹128.14 to Bank ••1234?")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Confirm" }));
+  expect(withdraw).toHaveBeenCalledWith(128.14, expect.any(String));
+});
+
+it("caps at the daily limit left to the paisa", () => {
+  render(<WithdrawForm {...props} available={500} dailyLimitLeft={128.14} />);
+  expect(screen.getByLabelText("Amount (₹)")).toHaveValue(128.14);
+  expect(screen.getByRole("button", { name: "Withdraw" })).toBeEnabled();
+});
+
+it("refuses an amount below the minimum or with more than 2 decimals", async () => {
+  const user = userEvent.setup();
+  render(<WithdrawForm {...props} />);
+  const input = screen.getByLabelText("Amount (₹)");
+  await user.clear(input);
+  await user.type(input, "99.99");
+  expect(screen.getByRole("button", { name: "Withdraw" })).toBeDisabled();
+  expect(screen.getByText("The minimum withdrawal is ₹100.00")).toBeInTheDocument();
+
+  await user.clear(input);
+  await user.type(input, "100.001");
+  expect(screen.getByRole("button", { name: "Withdraw" })).toBeDisabled();
+  expect(screen.getByText("Use at most 2 decimal places")).toBeInTheDocument();
+
+  await user.clear(input);
+  await user.type(input, "100");
+  expect(screen.getByRole("button", { name: "Withdraw" })).toBeEnabled();
 });
