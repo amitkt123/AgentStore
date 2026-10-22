@@ -3,12 +3,13 @@ import styles from "./HomeView.module.css";
 import { EmptyState } from "@/ui/EmptyState";
 import { Pill } from "@/ui/Pill";
 import { formatMoney } from "@/lib/format";
-import { isBuyer, type UserRole } from "@/lib/roles";
+import { RunNow } from "@/features/runs/RunNow";
+import { canCreateConnections, isBuyer, type UserRole } from "@/lib/roles";
 import type { ConnectionSummary, RunListItem } from "@/lib/api/types";
 
-type Props = { fullName: string; role: UserRole; needsYou: RunListItem[]; connections: ConnectionSummary[] };
+type Props = { fullName: string; role: UserRole; needsYou: RunListItem[]; connections: ConnectionSummary[]; added?: string };
 
-export function HomeView({ fullName, role, needsYou, connections }: Props) {
+export function HomeView({ fullName, role, needsYou, connections, added }: Props) {
   const first = fullName.split(/\s+/)[0];
   if (!isBuyer(role)) {
     const admin = role === "ADMIN";
@@ -23,9 +24,13 @@ export function HomeView({ fullName, role, needsYou, connections }: Props) {
       </section>
     );
   }
+  const active = connections.filter((c) => c.status === "ACTIVE");
+  const justAdded = added ? active.find((c) => c.agentId === added) : undefined;
+  const canRun = canCreateConnections(role);
   return (
     <div className={styles.wrap}>
       <h1>Good day, {first}</h1>
+      {justAdded && <p role="status" className={styles.added}>{`${justAdded.agentName} is added. Run it when you're ready.`}</p>}
       <section aria-labelledby="needs">
         <h2 id="needs">Needs you</h2>
         {needsYou.length === 0 ? (
@@ -46,15 +51,15 @@ export function HomeView({ fullName, role, needsYou, connections }: Props) {
           </ul>
         )}
       </section>
-      {connections.length > 0 && (
+      {active.length > 0 && (
         <section aria-labelledby="agents">
           <h2 id="agents">Your agents</h2>
           <ul className={styles.list}>
-            {connections.map((c) => (
+            {active.map((c) => (
               <li key={c.id}>
-                <span>{c.agentName}</span>
-                <Pill tone={c.status === "ACTIVE" ? "ok" : "neutral"}>{c.status === "ACTIVE" ? "Active" : "Revoked"}</Pill>
-                <span className="mono">Up to {formatMoney(c.spendCap)} a run</span>
+                <Link href={`/store#agent-${c.agentId}`}>{c.agentName}</Link>
+                <span className={styles.cap}>Up to {formatMoney(c.spendCap)} a run</span>
+                {canRun && <RunNow connectionId={c.id} />}
               </li>
             ))}
           </ul>
