@@ -13,12 +13,15 @@ import java.util.UUID;
 
 public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID> {
 
-    /** Sum of the org's top-ups that count against the daily limit (CREATED or PAID) since {@code since}. */
+    /**
+     * Sum of the org's top-ups that count against the daily limit since {@code since}: PAID ones, and CREATED ones
+     * made after {@code openSince} (a checkout still open; one the buyer abandoned stops holding the limit).
+     */
     @Query("select coalesce(sum(o.amount), 0) from PaymentOrder o where o.orgId = :orgId "
-            + "and o.purpose = com.agentstore.platform.payments.PaymentOrder.Purpose.TOPUP "
-            + "and o.status in (com.agentstore.platform.payments.PaymentOrder.Status.CREATED, "
-            + "com.agentstore.platform.payments.PaymentOrder.Status.PAID) and o.createdAt >= :since")
-    BigDecimal topUpTotalSince(UUID orgId, Instant since);
+            + "and o.purpose = com.agentstore.platform.payments.PaymentOrder.Purpose.TOPUP and o.createdAt >= :since "
+            + "and (o.status = com.agentstore.platform.payments.PaymentOrder.Status.PAID "
+            + "or (o.status = com.agentstore.platform.payments.PaymentOrder.Status.CREATED and o.createdAt >= :openSince))")
+    BigDecimal topUpTotalSince(UUID orgId, Instant since, Instant openSince);
 
     @Query("select o from PaymentOrder o where o.orgId = :orgId "
             + "and o.purpose = com.agentstore.platform.payments.PaymentOrder.Purpose.TOPUP order by o.createdAt desc")

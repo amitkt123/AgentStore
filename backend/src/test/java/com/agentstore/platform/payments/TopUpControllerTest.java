@@ -163,6 +163,18 @@ class TopUpControllerTest extends AbstractIntegrationTest {
         assertThat(topUp(org.getId(), h, 100, "UPI").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
+    @Test
+    void abandonedCheckoutStopsCountingAfterThirtyMinutes() {
+        Org org = buyer();
+        HttpHeaders h = auth(org.getId(), UserRole.BUYER_ADMIN);
+        assertThat(topUp(org.getId(), h, 100000, "UPI").getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(topUp(org.getId(), h, 100, "UPI").getBody().get("code")).isEqualTo("DAILY_LIMIT_REACHED");
+
+        // The buyer closed Checkout without paying; once the order is 31 minutes old it no longer holds the limit.
+        jdbc.update("update payment_order set created_at = now() - interval '31 minutes' where org_id = ?", org.getId());
+        assertThat(topUp(org.getId(), h, 100000, "UPI").getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
     @Autowired
     FakePaymentProvider fake;
 

@@ -23,6 +23,8 @@ import java.util.UUID;
 public class TopUpService {
 
     private static final Logger log = LoggerFactory.getLogger(TopUpService.class);
+    /** How long an unpaid top-up order (an open checkout) counts against the daily limit. */
+    static final Duration OPEN_CHECKOUT_HOLD = Duration.ofMinutes(30);
 
     private final PaymentProvider provider;
     private final PaymentProperties props;
@@ -145,7 +147,7 @@ public class TopUpService {
 
     private BigDecimal remainingToday(UUID orgId) {
         Instant dayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC);
-        BigDecimal used = orders.topUpTotalSince(orgId, dayStart);
+        BigDecimal used = orders.topUpTotalSince(orgId, dayStart, Instant.now().minus(OPEN_CHECKOUT_HOLD));
         return props.topupDailyLimit().subtract(used).max(BigDecimal.ZERO).setScale(2);
     }
 }
