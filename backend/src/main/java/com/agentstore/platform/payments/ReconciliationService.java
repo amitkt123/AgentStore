@@ -6,6 +6,7 @@ import com.agentstore.platform.ledger.LedgerChecks;
 import com.agentstore.platform.ledger.LedgerService;
 import com.agentstore.platform.ledger.LedgerTransactionType;
 import com.agentstore.platform.ledger.Posting;
+import com.agentstore.platform.payouts.PayoutReconciliation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -49,11 +50,12 @@ public class ReconciliationService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final TransactionTemplate tx;
+    private final PayoutReconciliation payoutReconciliation;
 
     public ReconciliationService(PaymentProvider provider, ReconciliationIssues issues, LedgerChecks ledgerChecks,
                                  LedgerService ledgerService, LedgerAccounts ledgerAccounts, JdbcTemplate jdbc,
                                  ObjectMapper mapper, PlatformTransactionManager transactionManager,
-                                 MeterRegistry meters) {
+                                 MeterRegistry meters, PayoutReconciliation payoutReconciliation) {
         this.provider = provider;
         this.issues = issues;
         this.ledgerChecks = ledgerChecks;
@@ -61,6 +63,7 @@ public class ReconciliationService {
         this.ledgerAccounts = ledgerAccounts;
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.payoutReconciliation = payoutReconciliation;
         this.tx = new TransactionTemplate(transactionManager);
         Gauge.builder("agentstore.money.reconciliation_issues", this, ReconciliationService::unresolvedCount)
                 .register(meters);
@@ -82,6 +85,7 @@ public class ReconciliationService {
         found += checkPayments(dayUtc, payments);
         found += checkPaidOrders(dayUtc, payments);
         found += checkRefunds(dayUtc, refunds, now);
+        found += payoutReconciliation.check(dayUtc, now);
         postGatewayFees(settlements);
         found += checkLedger(dayUtc);
         return found;

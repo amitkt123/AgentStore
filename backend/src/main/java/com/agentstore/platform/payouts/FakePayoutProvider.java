@@ -179,6 +179,11 @@ public class FakePayoutProvider implements PayoutProvider {
         return true;
     }
 
+    /** Lists a payout that did not come through {@link #createPayout}, as one made outside Karya would be. */
+    public synchronized void addExternalPayout(ProviderPayout payout) {
+        payoutsById.put(payout.payoutId(), payout);
+    }
+
     /**
      * Makes 777.77 succeed from now on, as if the provider came back after a timeout. 999.99 is still refused for
      * balance: that rule stands for the platform's own provider balance, which a retry does not fix.

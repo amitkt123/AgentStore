@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import com.agentstore.platform.payouts.FakePayoutProvider;
+import com.agentstore.platform.payouts.PayoutProvider;
+
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.Instant;
@@ -30,6 +33,8 @@ class ReconciliationServiceTest extends AbstractIntegrationTest {
     ReconciliationService reconciliation;
     @Autowired
     PaymentProvider provider;
+    @Autowired
+    com.agentstore.platform.payouts.PayoutProvider payoutProvider;
     @Autowired
     PaymentOrderRepository orders;
     @Autowired
@@ -83,6 +88,23 @@ class ReconciliationServiceTest extends AbstractIntegrationTest {
     List<Map<String, Object>> issues() {
         return jdbc.queryForList("select kind, provider_ref, resolved_at from reconciliation_issue "
                 + "where day = ? and kind <> 'LEDGER_CHECK_FAILED' order by kind, provider_ref", Date.valueOf(DAY));
+    }
+
+    @Test
+    void reconcileIncludesPayoutIssues() {
+        FakePayoutProvider payouts = (FakePayoutProvider) payoutProvider;
+        String ref = uniq("fake_pout_ext_");
+        payouts.addExternalPayout(new PayoutProvider.ProviderPayout(ref, UUID.randomUUID().toString(),
+                new BigDecimal("75.00"), BigDecimal.ZERO, "PROCESSED", "U1", null, AT.minusSeconds(7200)));
+        try {
+            int found = reconciliation.reconcile(DAY, AT);
+
+            assertThat(found).isGreaterThanOrEqualTo(1);
+            assertThat(issues()).anySatisfy(i -> assertThat(i).containsEntry("kind", "PAYOUT_UNMATCHED")
+                    .containsEntry("provider_ref", ref));
+        } finally {
+            payouts.reset();
+        }
     }
 
     @Test
