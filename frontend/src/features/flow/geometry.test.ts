@@ -1,4 +1,4 @@
-import { edgeMidpoint, edgePath } from "./geometry";
+import { edgeMidpoint, edgePath, isSideways } from "./geometry";
 
 const a = { x: 0, y: 0, w: 100, h: 40 };
 
@@ -12,4 +12,9 @@ it("curves down when the next box is below", () => {
 
 it("finds the midpoint", () => {
   expect(edgeMidpoint(a, { x: 160, y: 0, w: 100, h: 40 })).toEqual({ x: 130, y: 20 });
+});
+
+it("tells a sideways edge from a downward one", () => {
+  expect(isSideways(a, { x: 160, y: 0, w: 100, h: 40 })).toBe(true);
+  expect(isSideways(a, { x: 0, y: 80, w: 100, h: 40 })).toBe(false);
 });

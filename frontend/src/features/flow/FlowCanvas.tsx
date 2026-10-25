@@ -1,7 +1,7 @@
 "use client";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import styles from "./FlowCanvas.module.css";
-import { edgeMidpoint, edgePath, type Box } from "./geometry";
+import { edgeMidpoint, edgePath, isSideways, type Box } from "./geometry";
 import type { FlowGraph, FlowNode } from "./layout";
 import type { BlockState } from "@/lib/api/types";
 
@@ -90,7 +90,11 @@ export function FlowCanvas({ graph, selectedId, onSelect, showState = true, live
                   markerEnd={`url(#${marker})`}
                 />
                 {(e.kind === "approved" || e.kind === "rejected") && (
-                  <text x={mid.x} y={mid.y - 6} textAnchor="middle" className={styles.label}>{e.kind === "approved" ? "Approved" : "Rejected"}</text>
+                  e.kind === "approved"
+                    ? <text x={mid.x} y={mid.y - 8} textAnchor="middle" className={styles.label}>Approved</text>
+                    : isSideways(a, b)
+                      ? <text x={mid.x} y={mid.y - 8} textAnchor="middle" className={styles.label}>Rejected</text>
+                      : <text x={mid.x + 8} y={mid.y + 4} textAnchor="start" className={styles.label}>Rejected</text>
                 )}
                 {active && live && <circle className={styles.pulse} r={3} style={{ offsetPath: `path("${d}")` }} />}
               </g>

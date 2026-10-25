@@ -3,9 +3,12 @@ type Pt = { x: number; y: number };
 
 const r = (n: number) => Math.round(n * 10) / 10;
 
+/** True when b sits to the right of a, so the edge runs sideways rather than down. */
+export const isSideways = (a: Box, b: Box): boolean => b.x >= a.x + a.w - 1;
+
 /** Start, two control points and end of the curve from a to b: rightward when b sits to the right, else downward. */
 function curve(a: Box, b: Box): [Pt, Pt, Pt, Pt] {
-  if (b.x >= a.x + a.w - 1) {
+  if (isSideways(a, b)) {
     const s = { x: a.x + a.w, y: a.y + a.h / 2 }, e = { x: b.x, y: b.y + b.h / 2 };
     const k = Math.max(24, (e.x - s.x) / 2);
     return [s, { x: s.x + k, y: s.y }, { x: e.x - k, y: e.y }, e];
