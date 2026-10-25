@@ -11,9 +11,9 @@ import java.util.Map;
 /**
  * Masks a payout webhook body before it is stored in {@code payment_webhook_event.payload}. RazorpayX fund account
  * and validation entities embed the developer's full bank account number and UPI address; anywhere in the JSON tree,
- * an {@code account_number} inside a {@code bank_account} object and an {@code address} inside a {@code vpa} object
- * become "••••" plus their last 4 characters. Everything else is kept. The signature is verified on the raw bytes
- * before this runs.
+ * an {@code account_number} inside a {@code bank_account} object and an {@code address} or {@code username} inside a
+ * {@code vpa} object become "••••" plus their last 4 characters (the username too, because username + handle rebuilds
+ * the UPI ID). Everything else is kept. The signature is verified on the raw bytes before this runs.
  */
 final class PayoutPayloadRedactor {
 
@@ -44,6 +44,7 @@ final class PayoutPayloadRedactor {
             ObjectNode object = (ObjectNode) node;
             mask(object.get("bank_account"), "account_number");
             mask(object.get("vpa"), "address");
+            mask(object.get("vpa"), "username");
             for (Iterator<Map.Entry<String, JsonNode>> it = object.fields(); it.hasNext(); ) {
                 walk(it.next().getValue());
             }

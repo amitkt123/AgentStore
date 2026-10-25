@@ -30,6 +30,9 @@ class PayoutPayloadRedactorTest {
                 RazorpayXPayoutProviderTest.fixture("validation.completed-vpa-full.json")));
 
         assertThat(stored).doesNotContain("asha.sharma@exampleupi").contains("••••eupi");
+        // username + handle would rebuild the UPI ID, so the username is masked too
+        assertThat(stored).doesNotContain("asha.sharma").contains("\"username\":\"••••arma\"")
+                .contains("\"handle\":\"exampleupi\"");
     }
 
     @Test
