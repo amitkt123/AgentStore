@@ -141,6 +141,28 @@ class ConnectionControlsTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void theGatesViewTellsEachViewerWhetherTheyMayDecide() {
+        var s = scenario();
+        UUID listed = approver(s, "listed@example.com");
+        UUID admin = identities.member(orgById(s), "admin@example.com", UserRole.BUYER_ADMIN, "Finance lead").getUser().getId();
+        Connection connection = s.connection();
+        connection.setApproverUserIds(Set.of(listed));
+        connectionRepository.save(connection);
+        Run run = fixtures.run(s, RunStatus.RUNNING, "sbx-vcd", "tok-vcd");
+        gateService.open(run.getId(), "post_journal_entries", 5, "Post entries", "{}", "[]");
+
+        assertThat(viewerCanDecide(run, s.buyer().getId(), listed, UserRole.BUYER_MEMBER)).isTrue();
+        assertThat(viewerCanDecide(run, s.buyer().getId(), admin, UserRole.BUYER_ADMIN)).isFalse();
+        assertThat(viewerCanDecide(run, s.buyer().getId(), listed, UserRole.ADMIN)).isFalse();
+    }
+
+    boolean viewerCanDecide(Run run, UUID orgId, UUID userId, UserRole role) {
+        var body = rest.exchange(url("/api/v1/runs/" + run.getId() + "/gates"), HttpMethod.GET,
+                new HttpEntity<>(bearer(orgId, userId, role)), com.fasterxml.jackson.databind.JsonNode.class).getBody();
+        return body.get(0).get("viewerCanDecide").asBoolean();
+    }
+
+    @Test
     void createAcceptsTheLimitAndApprovers() {
         var s = scenario();
         UUID a1 = approver(s, "ap1@example.com");

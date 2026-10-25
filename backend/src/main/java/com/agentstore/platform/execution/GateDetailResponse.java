@@ -6,17 +6,20 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/** What a buyer sees at an approval gate. payload and preview are parsed JSON, so clients get objects, not strings. */
+/**
+ * What a buyer sees at an approval gate. payload and preview are parsed JSON, so clients get objects, not strings.
+ * viewerCanDecide says whether the caller would be allowed to approve or reject it, so the portal shows the buttons only then.
+ */
 public record GateDetailResponse(UUID gateId, String action, String summary, Object payload, GateStatus status,
                                  Instant expiresAt, BigDecimal estimatedUnits, BigDecimal costIfApproved,
                                  Object preview, DecidedVia decidedVia, UUID decidedByUserId, Instant decidedAt,
-                                 String note) {
+                                 String note, boolean viewerCanDecide) {
 
-    static GateDetailResponse from(GateRequest gate, BigDecimal costIfApproved, ObjectMapper mapper) {
+    static GateDetailResponse from(GateRequest gate, BigDecimal costIfApproved, boolean viewerCanDecide, ObjectMapper mapper) {
         return new GateDetailResponse(gate.getId(), gate.getAction(), gate.getSummary(), parse(gate.getPayload(), mapper),
                 gate.getStatus(), gate.getExpiresAt(), gate.getEstimatedUnits(), costIfApproved,
                 parse(gate.getPreview(), mapper), gate.getDecidedVia(), gate.getDecidedByUserId(), gate.getDecidedAt(),
-                gate.getDecisionNote());
+                gate.getDecisionNote(), viewerCanDecide);
     }
 
     private static Object parse(String json, ObjectMapper mapper) {

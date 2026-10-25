@@ -156,8 +156,19 @@ public class GateService {
      * would otherwise deadlock. A run with no gate row is restricted only when its org has such a member.
      */
     private void requireApprover(Run run, GateRequest gate, UUID userId) {
+        if (!isApprover(run, gate, userId)) {
+            throw new NotAnApproverException();
+        }
+    }
+
+    /** Whether this caller would pass the decision endpoints for this gate: a buyer role in the token, then {@link #requireApprover}. */
+    public boolean mayDecide(Run run, GateRequest gate, UUID userId, UserRole role) {
+        return OrgRoles.canDecideGates(role) && isApprover(run, gate, userId);
+    }
+
+    private boolean isApprover(Run run, GateRequest gate, UUID userId) {
         if (run.getConnection() == null) {
-            return;
+            return true;
         }
         UUID orgId = run.getConnection().getBuyerOrg().getId();
         List<UUID> eligible = gate != null ? gate.eligibleApproverIds() : null;
@@ -166,13 +177,11 @@ public class GateService {
                 : memberships.countByIdOrgIdAndRole(orgId, UserRole.BUYER_ADMIN)
                         + memberships.countByIdOrgIdAndRole(orgId, UserRole.BUYER_MEMBER) > 0;
         if (!restricted) {
-            return;
+            return true;
         }
         boolean currentApprover = memberships.findById(new OrgMembershipId(userId, orgId))
                 .map(m -> OrgRoles.canDecideGates(m.getRole())).orElse(false);
-        if (!currentApprover || (eligible != null && !eligible.contains(userId))) {
-            throw new NotAnApproverException();
-        }
+        return currentApprover && (eligible == null || eligible.contains(userId));
     }
 
     /** Waits up to {@code wait} for the gate to leave PENDING. Not transactional: each read is its own short transaction. */

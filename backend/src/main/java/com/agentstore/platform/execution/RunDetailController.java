@@ -20,13 +20,15 @@ public class RunDetailController {
     private final RunLookup runLookup;
     private final RunListService runListService;
     private final GateRequestRepository gateRequestRepository;
+    private final GateService gateService;
     private final com.agentstore.platform.manifest.ManifestParser manifestParser;
     private final com.fasterxml.jackson.databind.ObjectMapper mapper;
 
     public RunDetailController(RunRepository runRepository, RunStepRepository runStepRepository, RunFlowService flowService,
                                RunLookup runLookup, GateRequestRepository gateRequestRepository,
                                com.agentstore.platform.manifest.ManifestParser manifestParser,
-                               com.fasterxml.jackson.databind.ObjectMapper mapper, RunListService runListService) {
+                               com.fasterxml.jackson.databind.ObjectMapper mapper, RunListService runListService,
+                               GateService gateService) {
         this.runRepository = runRepository;
         this.runStepRepository = runStepRepository;
         this.flowService = flowService;
@@ -35,6 +37,7 @@ public class RunDetailController {
         this.manifestParser = manifestParser;
         this.mapper = mapper;
         this.runListService = runListService;
+        this.gateService = gateService;
     }
 
     @GetMapping
@@ -82,8 +85,11 @@ public class RunDetailController {
     public java.util.List<GateDetailResponse> gates(@PathVariable("runId") String runRef) {
         Run run = runLookup.find(runRef);
         requireViewable(run);
+        var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return gateRequestRepository.findByRunIdOrderByCreatedAtDesc(run.getId()).stream()
-                .map(g -> GateDetailResponse.from(g, GateCosts.costIfApproved(run, g, manifestParser), mapper)).toList();
+                .map(g -> GateDetailResponse.from(g, GateCosts.costIfApproved(run, g, manifestParser),
+                        g.getStatus() == GateStatus.PENDING && gateService.mayDecide(run, g, claims.userId(), claims.role()),
+                        mapper)).toList();
     }
 
     @GetMapping("/mine")

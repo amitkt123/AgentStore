@@ -7,7 +7,7 @@ const at = (s: number) => new Date(Date.UTC(2026, 9, 25, 10, 0, s)).toISOString(
 const step = (kind: RunStepKind, detail: object, start: number | null, end: number, id?: string): RunStep =>
   ({ id: id ?? `${kind}-${end}`, kind, detail: JSON.stringify(detail), startedAt: start === null ? null : at(start), createdAt: at(end) });
 const gate = (action: string, status: GateDetail["status"], decidedAt: string | null = null, gateId = `g-${action}`): GateDetail =>
-  ({ gateId, action, summary: "", payload: null, status, expiresAt: at(900), estimatedUnits: null, costIfApproved: null, preview: null, decidedVia: null, decidedByUserId: null, decidedAt, note: null });
+  ({ gateId, action, summary: "", payload: null, status, expiresAt: at(900), estimatedUnits: null, costIfApproved: null, preview: null, decidedVia: null, decidedByUserId: null, decidedAt, note: null, viewerCanDecide: true });
 
 describe("buildReplay", () => {
   it("puts each step in its lane, one beat per step when nothing overlaps", () => {
@@ -69,6 +69,11 @@ describe("buildReplay", () => {
   it("tells a viewer who cannot decide that the gate waits for an approver", () => {
     const g = buildReplay([step("GATE_REQUESTED", { action: "post", summary: "Post?" }, null, 3, "q")], [gate("post", "PENDING")], { canDecide: false });
     expect(g.blocks[0]).toMatchObject({ tone: "waiting", detail: "Waiting for an approver", gateId: "g-post" });
+  });
+
+  it("tells a buyer left off the gate's approver list that it waits for an approver", () => {
+    const g = buildReplay([step("GATE_REQUESTED", { action: "post", summary: "Post?" }, null, 3, "q")], [{ ...gate("post", "PENDING"), viewerCanDecide: false }]);
+    expect(g.blocks[0]).toMatchObject({ detail: "Waiting for an approver" });
   });
 
   it("pairs each request of a re-asked gate with its own decision", () => {

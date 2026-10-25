@@ -7,7 +7,7 @@ vi.mock("@/lib/session", () => ({ getSession: vi.fn().mockResolvedValue({ userId
 import { getRunGates } from "@/lib/api/runs";
 import Page from "./[token]/[gateId]/page";
 
-const gate = { gateId: "g1", action: "post", summary: "Post 142 entries?", payload: {}, status: "PENDING", expiresAt: "2999-01-01T00:00:00Z", estimatedUnits: null, costIfApproved: null, preview: null, decidedVia: null, decidedByUserId: null, decidedAt: null, note: null };
+const gate = { gateId: "g1", action: "post", summary: "Post 142 entries?", payload: {}, status: "PENDING", expiresAt: "2999-01-01T00:00:00Z", estimatedUnits: null, costIfApproved: null, preview: null, decidedVia: null, decidedByUserId: null, decidedAt: null, note: null, viewerCanDecide: true };
 
 it("renders the requested gate for an approver", async () => {
   vi.mocked(getRunGates).mockResolvedValue([gate] as never);
