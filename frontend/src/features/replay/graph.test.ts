@@ -41,10 +41,21 @@ describe("buildReplay", () => {
     expect(g.edges.find((e) => e.ghost)!.label).toBe("Approved");
   });
 
-  it("takes an expired gate's outcome from the gates list and counts it as rejected", () => {
+  it("takes an expired gate's outcome from the gates list and labels the path taken as no answer", () => {
     const g = buildReplay([step("GATE_REQUESTED", { action: "post", summary: "Post?" }, null, 3, "q"), step("FAILED", {}, null, 700, "f")], [gate("post", "EXPIRED", at(600))]);
     expect(g.blocks.find((b) => b.id === "q")!.detail).toMatch(/^Expired/);
-    expect(g.edges.find((e) => e.to === "f")!.label).toBe("Rejected");
+    expect(g.edges.find((e) => e.to === "f")!.label).toBe("No answer");
+    expect(g.edges.find((e) => e.ghost)!.label).toBe("Approved");
+  });
+
+  it("never shows a gate with no record or decision as waiting (legacy agent-reported GATE)", () => {
+    for (const kind of ["GATE", "GATE_REQUESTED"] as const) {
+      const g = buildReplay([step(kind, {}, null, 3, "q"), step("COMPLETE", {}, null, 300, "e")], []);
+      const ask = g.blocks.find((b) => b.id === "q")!;
+      expect(ask).toMatchObject({ lane: "You", tone: "done", detail: null });
+      expect(g.blocks.some((b) => b.tone === "ghost")).toBe(false);
+      expect(g.edges).toEqual([{ from: "q", to: "e", label: null, ghost: false }]);
+    }
   });
 
   it("shows a pending gate as waiting, with no fork yet", () => {

@@ -10,7 +10,8 @@ export interface ReplayBlock {
   label: string; title: string; detail: string | null; metric: string | null; tone: Tone;
   facts: [string, string][];
 }
-export interface ReplayEdge { from: string; to: string; label: "Approved" | "Rejected" | null; ghost: boolean }
+export type EdgeLabel = "Approved" | "Rejected" | "No answer";
+export interface ReplayEdge { from: string; to: string; label: EdgeLabel | null; ghost: boolean }
 export interface ReplayGraph { lanes: Lane[]; blocks: ReplayBlock[]; edges: ReplayEdge[]; beats: number }
 
 const LANE_OF: Record<string, [Lane, string]> = {
@@ -158,7 +159,7 @@ export function buildReplay(steps: RunStep[], gates: GateDetail[]): ReplayGraph 
     for (const from of byBeat[n - 1] ?? []) {
       const oc = gateOutcome.get(from.id);
       const decided = oc && oc !== "PENDING";
-      const word = (o: Outcome) => (o === "APPROVED" ? "Approved" : "Rejected") as "Approved" | "Rejected";
+      const word = (o: Outcome): EdgeLabel => (o === "APPROVED" ? "Approved" : o === "EXPIRED" ? "No answer" : "Rejected");
       for (const to of real) edges.push({ from: from.id, to: to.id, label: decided ? word(oc) : null, ghost: false });
       const gh = (ghosts[n] ?? []).find((g) => g.id === `ghost:${from.id}`);
       if (gh && decided) edges.push({ from: from.id, to: gh.id, label: oc === "APPROVED" ? "Rejected" : "Approved", ghost: true });
