@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import styles from "./GateCard.module.css";
 import { Button } from "@/ui/Button";
 import { decideGateAction } from "@/app/(app)/runs/actions";
@@ -13,6 +13,7 @@ export function gateIsExpired(g: GateDetail, nowMs: number): boolean {
 
 export function GateCard({ runRef, gate, canDecide, viewerUserId }: { runRef: string; gate: GateDetail; canDecide: boolean; viewerUserId?: string }) {
   const [error, setError] = useState<string | null>(null);
+  const headingId = useId();
   const [pending, start] = useTransition();
   const expired = gateIsExpired(gate, Date.now());
   const decided = gate.status === "APPROVED" || gate.status === "REJECTED";
@@ -28,8 +29,8 @@ export function GateCard({ runRef, gate, canDecide, viewerUserId }: { runRef: st
   const numericCols = new Set(cols.filter((c) => gate.preview?.rows.some((r) => cell(r[c], c).numeric)));
 
   return (
-    <section className={styles.card} aria-labelledby={`g-${gate.gateId}`}>
-      <h2 id={`g-${gate.gateId}`}>{gate.summary}</h2>
+    <section className={styles.card} aria-labelledby={headingId}>
+      <h2 id={headingId}>{gate.summary}</h2>
       {gate.costIfApproved != null && <p>Approving costs {formatMoney(gate.costIfApproved)}.</p>}
       {gate.preview && gate.preview.rows.length > 0 && (
         <div className={styles.scroll}>

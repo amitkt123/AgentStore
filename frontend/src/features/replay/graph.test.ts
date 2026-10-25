@@ -66,6 +66,11 @@ describe("buildReplay", () => {
     expect(g.edges).toEqual([]);
   });
 
+  it("tells a viewer who cannot decide that the gate waits for an approver", () => {
+    const g = buildReplay([step("GATE_REQUESTED", { action: "post", summary: "Post?" }, null, 3, "q")], [gate("post", "PENDING")], { canDecide: false });
+    expect(g.blocks[0]).toMatchObject({ tone: "waiting", detail: "Waiting for an approver", gateId: "g-post" });
+  });
+
   it("pairs each request of a re-asked gate with its own decision", () => {
     const g = buildReplay([
       step("GATE_REQUESTED", { action: "post", summary: "One?" }, null, 1, "q1"), step("GATE_DECIDED", { action: "post", decision: "REJECTED" }, null, 2, "d1"),

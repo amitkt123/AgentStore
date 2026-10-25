@@ -9,6 +9,8 @@ export interface ReplayBlock {
   id: string; lane: Lane; beat: number; time: string | null;
   label: string; title: string; detail: string | null; metric: string | null; tone: Tone;
   facts: [string, string][];
+  /** Set on an approval block that matched a gate record. */
+  gateId?: string;
 }
 export type EdgeLabel = "Approved" | "Rejected" | "No answer";
 export interface ReplayEdge { from: string; to: string; label: EdgeLabel | null; ghost: boolean }
@@ -54,7 +56,7 @@ const factsOf = (s: RunStep, d: Detail, time: string | null): [string, string][]
   return facts;
 };
 
-export function buildReplay(steps: RunStep[], gates: GateDetail[]): ReplayGraph {
+export function buildReplay(steps: RunStep[], gates: GateDetail[], { canDecide = true }: { canDecide?: boolean } = {}): ReplayGraph {
   const consumed = new Set<number>();
   const items: Item[] = [];
   let lastStaged: string | null = null;
@@ -85,8 +87,8 @@ export function buildReplay(steps: RunStep[], gates: GateDetail[]): ReplayGraph 
       // No decision step and no gate record (a legacy agent-reported GATE): an ask with no known outcome, never "waiting".
       const outcome: Outcome | undefined = dec === "APPROVED" || dec === "REJECTED" || dec === "EXPIRED" ? dec : match?.status;
       const decidedIso = decided?.step.createdAt ?? match?.decidedAt ?? (outcome === "EXPIRED" ? match?.expiresAt ?? null : null);
-      block = { ...block, title: str(d.summary) ?? stepText(s), tone: outcome === "PENDING" ? "waiting" : "done" };
-      if (outcome === "PENDING") block.detail = "Waiting for you";
+      block = { ...block, title: str(d.summary) ?? stepText(s), tone: outcome === "PENDING" ? "waiting" : "done", gateId: match?.gateId };
+      if (outcome === "PENDING") block.detail = canDecide ? "Waiting for you" : "Waiting for an approver";
       else if (outcome) {
         block.detail = `${OUTCOME_WORD[outcome]} at ${decidedIso ? formatTime(decidedIso) : "–"}`;
         const a = ms(s.createdAt), b = ms(decidedIso);
