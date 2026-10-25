@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReplayCanvas } from "./ReplayCanvas";
 import { buildReplay } from "./graph";
@@ -24,6 +25,16 @@ const long = (n: number) => buildReplay(Array.from({ length: n }, (_, i) => step
 const edges = (c: HTMLElement) => c.querySelectorAll("path[data-edge]");
 
 describe("ReplayCanvas", () => {
+  it("keeps the controls in normal flow above the scroll box, never over the canvas", () => {
+    render(<ReplayCanvas graph={gated} live={false} />);
+    const controls = screen.getByRole("group", { name: "Replay controls" });
+    const scroll = document.querySelector("[data-scroll]")!;
+    expect(controls.compareDocumentPosition(scroll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(scroll.contains(controls)).toBe(false);
+    const rule = /\.controls\s*\{([^}]*)\}/.exec(readFileSync("src/features/replay/ReplayCanvas.module.css", "utf8"))![1];
+    expect(rule).not.toMatch(/position:\s*(absolute|fixed)/);
+  });
+
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
   it("draws every step of a finished run at once", () => {

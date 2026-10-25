@@ -6,7 +6,7 @@
 }
 
 .controls {
-  position: absolute; z-index: 2; left: 14px; top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  position: relative; z-index: 2; margin: 14px 14px 10px; width: fit-content; max-width: calc(100% - 28px); display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   padding: 6px; border-radius: 999px;
 }
 .btn {
@@ -22,7 +22,7 @@
 .bar i { display: block; height: 100%; background: var(--b); transition: width var(--dur-2) var(--ease); }
 .now { font-size: 13px; color: var(--ink2); padding: 0 6px; min-width: 92px; font-variant-numeric: tabular-nums; }
 
-.scroll { overflow-x: auto; overflow-y: hidden; padding-top: 64px; }
+.scroll { overflow-x: auto; overflow-y: hidden; padding-top: 0; }
 .spacer { position: relative; }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 

@@ -31,6 +31,12 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
   const replay = buildReplay(detail.steps, gates);
   const block = replay.blocks.find((b) => b.id === sel);
   const toggle = (id: string) => { if (!id.startsWith("ghost:")) setSel((cur) => (cur === id ? undefined : id)); };
+  const close = () => {
+    const prev = sel;
+    setSel(undefined);
+    const btns = document.querySelectorAll<HTMLElement>('section[aria-label="Run replay"] [data-block-id]');
+    Array.from(btns).find((b) => b.dataset.blockId === prev)?.focus();
+  };
   const cap = flow.spend.cap;
 
   return (
@@ -57,7 +63,7 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
             <>
               <h2 className={styles.factsTitle}>{block.title}</h2>
               <dl>{block.facts.map(([k, v], i) => <div key={i}><dt>{k}</dt><dd className={styles.fact}>{v}</dd></div>)}</dl>
-              <button type="button" className={styles.all} onClick={() => setSel(undefined)}>Close</button>
+              <button type="button" className={styles.all} onClick={close}>Close</button>
             </>
           ) : (
             <dl>

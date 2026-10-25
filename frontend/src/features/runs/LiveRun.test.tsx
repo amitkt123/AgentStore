@@ -83,6 +83,16 @@ it("shows a clicked step's full detail in the facts panel, and Close returns to 
   expect(within(facts).getByText("Spend")).toBeInTheDocument();
 });
 
+it("returns focus to the selected block when the facts panel is closed", async () => {
+  const s = snap({ status: "RUNNING", steps: [{ id: "s1", kind: "AGENT_LOG", source: "AGENT", detail: '{"message":"Reading"}', createdAt: "2026-09-29T10:05:00Z" }] });
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  const blockBtn = within(screen.getByRole("region", { name: "Run replay" })).getByRole("button", { name: /Agent note/ });
+  await userEvent.click(blockBtn);
+  await userEvent.click(within(screen.getByRole("complementary", { name: "Run facts" })).getByRole("button", { name: "Close" }));
+  expect(blockBtn).toHaveFocus();
+});
+
 it("still offers the approval while a gate waits", () => {
   const s = snap({ steps: [{ id: "g", kind: "GATE_REQUESTED", detail: '{"action":"post","summary":"Post 142 entries?"}', createdAt: "2026-09-29T10:05:00Z" }] }, [gate]);
   vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
