@@ -37,7 +37,7 @@
 
 ## Deliberate deviations from the spec (record them in the PR description)
 
-1. **Migration V48, not V46.** V46 and V47 were used by WS10a and WS10b.
+1. **Migration V49, not V46.** V46 and V47 were used by WS10a and WS10b, and V48 by run replay (#50).
 2. **The webhook path is `POST /webhooks/payouts/{provider}`.** This mirrors WS10b's `/webhooks/payments/{provider}`. It is a separate path because both fake providers are named `fake`. Events are stored in the existing `payment_webhook_event` table with `provider = 'payouts:' + name`. In the RazorpayX dashboard the URL is `/webhooks/payouts/razorpayx`.
 3. **Reconciliation stays at `/api/v1/admin/payments/reconciliation`** (WS10b's path), not `/api/v1/admin/reconciliation`. Payout checks are added to the same run.
 4. **`DEVELOPER` role, not `DEVELOPER_ADMIN`** (see Global Constraints).
@@ -60,7 +60,7 @@
 ### Task 1: Schema, config and the provider seam
 
 **Files:**
-- Create: `backend/src/main/resources/db/migration/V48__payouts.sql`
+- Create: `backend/src/main/resources/db/migration/V49__payouts.sql`
 - Create in `backend/src/main/java/com/agentstore/platform/payouts/`:
   - `PayoutProperties.java`, `PayoutProvider.java`, `PayoutProviderConfig.java`, `FakePayoutProvider.java`;
   - `PayoutProviderRejectedException.java`, `PayoutProviderUnavailableException.java`, `PayoutInsufficientBalanceException.java`;
@@ -101,7 +101,7 @@ record PayoutWebhookEvent(String eventId, Kind kind, String payoutId, String val
 ```
 
 - Produces: the exceptions. `PayoutProviderRejectedException` is a definite no. `PayoutProviderUnavailableException` is a 5xx, a timeout, or a 401/403. `PayoutInsufficientBalanceException` means the RazorpayX balance is too low. All extend `RuntimeException`.
-- Produces: the `V48` schema.
+- Produces: the `V49` schema.
   - `payout_account(id, org_id → org, type, account_number_encrypted bytea, account_nonce bytea, account_last4, ifsc, vpa, holder_name, validated_name, name_match boolean, status PENDING|VERIFIED|FAILED, provider_contact_id, provider_fund_account_id, provider_validation_id unique, failure_reason, approved_by_user_id, approval_note, created_at, verified_at, replaced_at)`.
     - Partial unique index `(org_id) where replaced_at is null`: one active account per org.
     - Check constraint: BANK has number and IFSC and no VPA; VPA has a VPA and no number.
