@@ -151,17 +151,14 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
             {blocks.map((b) => {
               const p = placed.boxes.get(b.id)!;
               const entering = drawing?.beat === b.beat && !settled.has(b.id);
-              return (
-                <button
-                  key={b.id}
-                  type="button"
-                  data-block-id={b.id}
-                  aria-pressed={selectedId === b.id}
-                  aria-label={say(b)}
-                  className={`${styles.block} ${styles[b.tone]} ${b.beat === current && b.tone !== "ghost" ? styles.current : ""} ${selectedId === b.id ? styles.sel : ""} ${entering ? styles.enter : ""}`}
-                  style={{ left: p.x, top: p.y, width: p.w, minHeight: p.h, ...(entering ? { animationDuration: `${enterMs}ms` } : {}) }}
-                  onClick={() => onSelect?.(b.id)}
-                >
+              const ghost = b.tone === "ghost";
+              const look = {
+                "data-block-id": b.id,
+                className: `${styles.block} ${styles[b.tone]} ${b.beat === current && !ghost ? styles.current : ""} ${selectedId === b.id ? styles.sel : ""} ${entering ? styles.enter : ""}`,
+                style: { left: p.x, top: p.y, width: p.w, minHeight: p.h, ...(entering ? { animationDuration: `${enterMs}ms` } : {}) },
+              };
+              const body = (
+                <>
                   <span className={styles.top}>
                     {b.time && <span className={`${styles.time} mono`}>{b.time}</span>}
                     <span className={styles.kind}>{b.label}</span>
@@ -169,6 +166,13 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
                   <strong>{b.title}</strong>
                   {b.detail && <span className={`${styles.detail} ${b.tone === "waiting" ? styles.warn : ""}`}>{b.detail}</span>}
                   {b.metric && <span className={`${styles.metric} mono`}>{b.metric}</span>}
+                </>
+              );
+              // A path not taken has no detail to show; the step list narrates it with its gate.
+              if (ghost) return <div key={b.id} aria-hidden="true" {...look}>{body}</div>;
+              return (
+                <button key={b.id} type="button" aria-pressed={selectedId === b.id} aria-label={say(b)} onClick={() => onSelect?.(b.id)} {...look}>
+                  {body}
                 </button>
               );
             })}

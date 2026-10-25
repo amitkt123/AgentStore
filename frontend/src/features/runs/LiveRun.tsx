@@ -30,7 +30,7 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
   const terminal = isTerminal(detail.status);
   const replay = buildReplay(detail.steps, gates);
   const block = replay.blocks.find((b) => b.id === sel);
-  const toggle = (id: string) => { if (!id.startsWith("ghost:")) setSel((cur) => (cur === id ? undefined : id)); };
+  const toggle = (id: string) => setSel((cur) => (cur === id ? undefined : id));
   const close = () => {
     const prev = sel;
     setSel(undefined);

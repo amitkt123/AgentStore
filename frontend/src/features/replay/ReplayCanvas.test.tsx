@@ -99,6 +99,14 @@ describe("ReplayCanvas", () => {
     expect(items[1]).toHaveTextContent("then Rejected. Not taken: Would have posted, Ledger");
   });
 
+  it("draws the not-taken block as a plain shape, not a control", () => {
+    const { container } = render(<ReplayCanvas graph={gated} live={false} />);
+    const ghost = container.querySelector('[data-block-id="ghost:q"]')!;
+    expect(ghost.tagName).not.toBe("BUTTON");
+    expect(ghost).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByRole("button", { name: /Not taken/ })).toBeNull();
+  });
+
   it("tells screen readers the steps and the branch in words", () => {
     render(<ReplayCanvas graph={gated} live={false} />);
     const list = screen.getByRole("list", { name: "Steps in order" });
