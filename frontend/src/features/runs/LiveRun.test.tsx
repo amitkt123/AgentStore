@@ -13,7 +13,7 @@ const snap = (over: Partial<RunSnapshot["detail"]> = {}, gates: RunSnapshot["gat
   flow: { blocks: [{ block: "gate:post", state: "WAITING", metrics: null, gateId: "g1", flag: null }, { block: "charge", state: "IDLE", metrics: null, gateId: null, flag: null }], reachedBlock: "gate:post", spend: { charged: 96, cap: 500 }, deadlineAt: "2999-01-01T00:00:00Z", blockedAttempts: 3 },
   gates,
 });
-const gate = { gateId: "g1", action: "post", summary: "Post 142 entries?", payload: {}, status: "PENDING" as const, expiresAt: "2999-01-01T00:00:00Z", estimatedUnits: null, costIfApproved: null, preview: null, decidedVia: null, decidedByUserId: null, decidedAt: null, note: null };
+const gate = { gateId: "g1", action: "post", summary: "Post 142 entries?", payload: {}, status: "PENDING" as const, expiresAt: "2999-01-01T00:00:00Z", estimatedUnits: null, costIfApproved: null, preview: null, decidedVia: null, decidedByUserId: null, decidedAt: null, note: null, viewerCanDecide: true };
 
 it("shows status, spend, blocked attempts, timeline and the pending gate", () => {
   const s = snap({}, [gate]);

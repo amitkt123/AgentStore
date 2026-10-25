@@ -88,7 +88,7 @@ export function buildReplay(steps: RunStep[], gates: GateDetail[], { canDecide =
       const outcome: Outcome | undefined = dec === "APPROVED" || dec === "REJECTED" || dec === "EXPIRED" ? dec : match?.status;
       const decidedIso = decided?.step.createdAt ?? match?.decidedAt ?? (outcome === "EXPIRED" ? match?.expiresAt ?? null : null);
       block = { ...block, title: str(d.summary) ?? stepText(s), tone: outcome === "PENDING" ? "waiting" : "done", gateId: match?.gateId };
-      if (outcome === "PENDING") block.detail = canDecide ? "Waiting for you" : "Waiting for an approver";
+      if (outcome === "PENDING") block.detail = canDecide && match?.viewerCanDecide ? "Waiting for you" : "Waiting for an approver";
       else if (outcome) {
         block.detail = `${OUTCOME_WORD[outcome]} at ${decidedIso ? formatTime(decidedIso) : "–"}`;
         const a = ms(s.createdAt), b = ms(decidedIso);

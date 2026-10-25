@@ -86,7 +86,7 @@ class BankTransferTest extends AbstractIntegrationTest {
     @Test
     void otherRolesAndOrgsAreForbidden() {
         Org org = buyer();
-        assertThat(details(org.getId(), auth(org.getId(), UserRole.BUYER_APPROVER)).getStatusCode())
+        assertThat(details(org.getId(), auth(org.getId(), UserRole.BUYER_MEMBER)).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(details(org.getId(), auth(UUID.randomUUID(), UserRole.BUYER_ADMIN)).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);

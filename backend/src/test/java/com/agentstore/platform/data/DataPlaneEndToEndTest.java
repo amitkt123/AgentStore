@@ -63,7 +63,7 @@ class DataPlaneEndToEndTest extends AbstractStorageIntegrationTest {
     void aBuyerUploadsBindsRunsAnAgentApprovesAndDownloadsWhatWasCommitted() {
         var s = fx.scenario();
         var buyer = fx.bearer(s.buyer(), UserRole.BUYER_ADMIN);
-        var approver = fx.bearer(s.buyer(), UserRole.BUYER_APPROVER);
+        var approver = fx.bearer(s.buyer(), UserRole.BUYER_MEMBER);
 
         // 1. upload a statement CSV and a PDF through the API
         var csv = rest.exchange(url("/api/v1/datasets"), HttpMethod.POST, new HttpEntity<>(

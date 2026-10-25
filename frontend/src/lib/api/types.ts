@@ -40,7 +40,7 @@ export type RunStepKind = "READ" | "WRITE" | "GATE" | "COST" | "COMPLETE" | "FAI
 export interface RunStep { id?: string; kind: RunStepKind; source?: "PLATFORM" | "AGENT"; detail: string; block?: string | null; startedAt?: string | null; createdAt: string | null }
 export interface RunDetail { id: string; displayId: string; status: RunStatus; terminalReason: TerminalReason | null; costCap: number; totalCharged: number; steps: RunStep[] }
 export type GateStatus = "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED";
-export interface GateDetail { gateId: string; action: string; summary: string; payload: unknown; status: GateStatus; expiresAt: string; estimatedUnits: number | null; costIfApproved: number | null; preview: { columns?: string[]; rows: Record<string, unknown>[]; totalRows: number; total?: number } | null; decidedVia: "WEB" | "EMAIL_LINK" | "SLACK_LINK" | null; decidedByUserId: string | null; decidedAt: string | null; note: string | null }
+export interface GateDetail { gateId: string; action: string; summary: string; payload: unknown; status: GateStatus; expiresAt: string; estimatedUnits: number | null; costIfApproved: number | null; preview: { columns?: string[]; rows: Record<string, unknown>[]; totalRows: number; total?: number } | null; decidedVia: "WEB" | "EMAIL_LINK" | "SLACK_LINK" | null; decidedByUserId: string | null; decidedAt: string | null; note: string | null; viewerCanDecide: boolean }
 export interface RunSnapshot { detail: RunDetail; flow: FlowView; gates: GateDetail[] }
 export type DataFormat = string;
 export interface DatasetUsage { connectionId: string; resource: string; agent: string; version: string; access: string }

@@ -11,8 +11,13 @@ public final class OrgRoles {
 
     public static Set<UserRole> assignable(OrgType type) {
         return type == OrgType.BUYER
-                ? EnumSet.of(UserRole.BUYER_ADMIN, UserRole.BUYER_APPROVER)
+                ? EnumSet.of(UserRole.BUYER_ADMIN, UserRole.BUYER_MEMBER)
                 : EnumSet.of(UserRole.DEVELOPER);
+    }
+
+    /** Buyer admins and buyer members may both approve or reject a run's gates. */
+    public static boolean canDecideGates(UserRole role) {
+        return role == UserRole.BUYER_ADMIN || role == UserRole.BUYER_MEMBER;
     }
 
     public static boolean canManageMembers(UserRole role) {

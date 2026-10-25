@@ -60,7 +60,7 @@ class GateWs1bTest extends AbstractIntegrationTest {
 
     private HttpHeaders bearer(UUID orgId, UUID userId) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtService.issue(userId, orgId, UserRole.BUYER_APPROVER));
+        headers.setBearerAuth(jwtService.issue(userId, orgId, UserRole.BUYER_MEMBER));
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;
     }
@@ -73,14 +73,14 @@ class GateWs1bTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void snapshotsTheOrgsApproversAndRefusesEveryoneElse() {
+    void snapshotsTheOrgsAdminsAndMembersAndRefusesEveryoneElse() {
         var scenario = fixtures.liveTierA(new BigDecimal("500.00"), new BigDecimal("1000.00"));
-        User eligible = member(scenario.buyer(), "a1@example.com", UserRole.BUYER_APPROVER);
-        member(scenario.buyer(), "admin1@example.com", UserRole.BUYER_ADMIN);   // admins cannot approve today
+        User eligible = member(scenario.buyer(), "a1@example.com", UserRole.BUYER_MEMBER);
+        User admin = member(scenario.buyer(), "admin1@example.com", UserRole.BUYER_ADMIN);
         Run run = fixtures.run(scenario, RunStatus.RUNNING, "sbx-g1", "tok-g1");
         GateRequest gate = gateService.open(run.getId(), "post_journal_entries", 5, "Post", "{}", "[]");
 
-        assertThat(gate.eligibleApproverIds()).containsExactly(eligible.getId());
+        assertThat(gate.eligibleApproverIds()).containsExactlyInAnyOrder(eligible.getId(), admin.getId());
         assertThat(decide(run, gate, bearer(scenario.buyer().getId(), UUID.randomUUID()))).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(decide(run, gate, bearer(scenario.buyer().getId(), eligible.getId()))).isEqualTo(HttpStatus.OK);
         assertThat(gates.findById(gate.getId()).orElseThrow().getDecidedVia()).isEqualTo(DecidedVia.WEB);
@@ -98,10 +98,10 @@ class GateWs1bTest extends AbstractIntegrationTest {
     @Test
     void roleChangeAfterOpeningDoesNotAlterTheSnapshot() {
         var scenario = fixtures.liveTierA(new BigDecimal("500.00"), new BigDecimal("1000.00"));
-        User eligible = member(scenario.buyer(), "a2@example.com", UserRole.BUYER_APPROVER);
+        User eligible = member(scenario.buyer(), "a2@example.com", UserRole.BUYER_MEMBER);
         Run run = fixtures.run(scenario, RunStatus.RUNNING, "sbx-g3", "tok-g3");
         GateRequest gate = gateService.open(run.getId(), "post_journal_entries", 5, "Post", "{}", "[]");
-        User late = member(scenario.buyer(), "a3@example.com", UserRole.BUYER_APPROVER);
+        User late = member(scenario.buyer(), "a3@example.com", UserRole.BUYER_MEMBER);
         assertThat(gates.findById(gate.getId()).orElseThrow().eligibleApproverIds())
                 .containsExactly(eligible.getId()).doesNotContain(late.getId());
     }

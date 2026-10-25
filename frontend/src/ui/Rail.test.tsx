@@ -18,9 +18,9 @@ it("gives developers verification and API keys and leaves the buyer rail alone",
   expect(railItemsFor("BUYER_ADMIN", 3)).toEqual(buyerRailItems(3));
 });
 
-it("hides Billing from buyer approvers", () => {
-  expect(railItemsFor("BUYER_APPROVER", 1).map((i) => i.href)).toEqual(["/home", "/store", "/runs", "/files"]);
-  expect(railItemsFor("BUYER_APPROVER", 1)[2].badge).toBe(1);
+it("hides Billing from buyer members", () => {
+  expect(railItemsFor("BUYER_MEMBER", 1).map((i) => i.href)).toEqual(["/home", "/store", "/runs", "/files"]);
+  expect(railItemsFor("BUYER_MEMBER", 1)[2].badge).toBe(1);
 });
 
 it("keeps Agents active inside a Studio route", () => {
@@ -37,7 +37,7 @@ it("gives ADMIN Money, Payouts and Reconciliation, and nobody else", async () =>
   expect(adminRailItems().map((i) => [i.href, i.label])).toEqual([
     ["/admin/money", "Money"], ["/admin/payouts", "Payouts"], ["/admin/reconciliation", "Reconciliation"],
   ]);
-  for (const role of ["BUYER_ADMIN", "BUYER_APPROVER", "DEVELOPER"] as const) {
+  for (const role of ["BUYER_ADMIN", "BUYER_MEMBER", "DEVELOPER"] as const) {
     expect(railItemsFor(role, 0).some((i) => i.href.startsWith("/admin"))).toBe(false);
   }
   expect(railItemsFor("ADMIN", 0)).toEqual(adminRailItems());

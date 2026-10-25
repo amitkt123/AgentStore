@@ -2,6 +2,7 @@ package com.agentstore.platform.identity;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -11,4 +12,6 @@ public interface OrgMembershipRepository extends JpaRepository<OrgMembership, Or
     List<OrgMembership> findByIdOrgIdOrderByCreatedAtAsc(UUID orgId);
 
     long countByIdOrgIdAndRole(UUID orgId, UserRole role);
+
+    long countByIdOrgIdAndRoleIn(UUID orgId, Collection<UserRole> roles);
 }

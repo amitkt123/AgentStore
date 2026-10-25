@@ -114,7 +114,7 @@ async function main() {
 
   const approverOrgId = (await pg.query("select id from org where name=$1", ["E2E Buyer Approver Org (temp)"])).rows[0].id;
   await pg.query(
-    `update org_membership set org_id=$1, role='BUYER_APPROVER', title='Accounts manager'
+    `update org_membership set org_id=$1, role='BUYER_MEMBER', title='Accounts manager'
        where org_id=$2 and user_id=(select id from app_user where email=$3)`,
     [buyerOrgId, approverOrgId, "e2e-approver@example.com"],
   );

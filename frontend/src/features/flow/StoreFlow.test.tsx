@@ -59,6 +59,12 @@ it("labels unenforced declarations as declared by the developer", () => {
   expect(screen.getAllByText(/declared by the developer/i)).toHaveLength(2);
 });
 
+it("offers a member Run now on an added agent but not Set it up again", () => {
+  render(<StoreFlow agentId="a1" versionId="v1" detail={detail} canConnect={false} connectionId="c1" />);
+  expect(screen.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Set it up again" })).toBeNull();
+});
+
 it("offers Run now instead of a second add when the agent is already added", () => {
   render(<StoreFlow agentId="a1" versionId="v1" detail={detail} canConnect connectionId="c1" />);
   expect(screen.getByRole("button", { name: "Run now" })).toBeInTheDocument();

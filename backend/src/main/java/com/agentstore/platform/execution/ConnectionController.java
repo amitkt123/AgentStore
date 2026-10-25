@@ -9,7 +9,7 @@ import com.agentstore.platform.identity.Org;
 import com.agentstore.platform.identity.OrgMembershipId;
 import com.agentstore.platform.identity.OrgMembershipRepository;
 import com.agentstore.platform.identity.OrgRepository;
-import com.agentstore.platform.identity.UserRole;
+import com.agentstore.platform.identity.OrgRoles;
 import com.agentstore.platform.manifest.ManifestParser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -104,12 +104,12 @@ public class ConnectionController {
         return ConnectionResponse.from(connectionRepository.save(connection));
     }
 
-    /** Each approver must be a BUYER_APPROVER member of the org: the decision endpoints require that role. */
+    /** Each approver must be a buyer admin or buyer member of the org: the decision endpoints require one of those roles. */
     private Set<java.util.UUID> validatedApprovers(java.util.UUID orgId, List<java.util.UUID> userIds) {
         Set<java.util.UUID> approvers = new java.util.HashSet<>(userIds);
         for (java.util.UUID userId : approvers) {
             boolean approver = memberships.findById(new OrgMembershipId(userId, orgId))
-                    .map(m -> m.getRole() == UserRole.BUYER_APPROVER).orElse(false);
+                    .map(m -> OrgRoles.canDecideGates(m.getRole())).orElse(false);
             if (!approver) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Not an approver in this workspace: " + userId);
@@ -131,7 +131,7 @@ public class ConnectionController {
     }
 
     @GetMapping("/mine")
-    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public List<ConnectionSummaryResponse> mine() {
         var claims = (JwtService.Claims) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return connectionRepository.findByBuyerOrgId(claims.orgId()).stream()

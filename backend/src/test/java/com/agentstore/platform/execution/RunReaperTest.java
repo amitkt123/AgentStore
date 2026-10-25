@@ -197,7 +197,7 @@ class RunReaperTest extends AbstractIntegrationTest {
 
         // ...then, before the reaper's terminate call acquires the row lock, the buyer approves it.
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), s.buyer().getId(), UserRole.BUYER_APPROVER));
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), s.buyer().getId(), UserRole.BUYER_MEMBER));
         headers.setContentType(MediaType.APPLICATION_JSON);
         var response = rest.exchange(url("/api/v1/runs/" + run.getId() + "/approve"), HttpMethod.POST,
                 new HttpEntity<>(new ApproveRunRequest("approved"), headers), String.class);
@@ -221,7 +221,7 @@ class RunReaperTest extends AbstractIntegrationTest {
         reaper.reapAt(now);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), s.buyer().getId(), UserRole.BUYER_APPROVER));
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), s.buyer().getId(), UserRole.BUYER_MEMBER));
         headers.setContentType(MediaType.APPLICATION_JSON);
         var response = rest.exchange(url("/api/v1/runs/" + run.getId() + "/approve"), HttpMethod.POST,
                 new HttpEntity<>(new ApproveRunRequest("late"), headers), String.class);

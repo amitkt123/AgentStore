@@ -53,7 +53,7 @@ class ConnectionControlsTest extends AbstractIntegrationTest {
     }
 
     UUID approver(ExecutionFixtures.Scenario s, String email) {
-        return identities.member(orgById(s), email, UserRole.BUYER_APPROVER, "Approver").getUser().getId();
+        return identities.member(orgById(s), email, UserRole.BUYER_MEMBER, "Approver").getUser().getId();
     }
 
     Org orgById(ExecutionFixtures.Scenario s) {
@@ -68,7 +68,7 @@ class ConnectionControlsTest extends AbstractIntegrationTest {
     ResponseEntity<String> decide(Run run, GateRequest gate, UUID orgId, UUID userId) {
         return rest.exchange(url("/api/v1/runs/" + run.getId() + "/gates/" + gate.getId() + "/decision"),
                 HttpMethod.POST, new HttpEntity<>(Map.of("decision", "APPROVE"),
-                        bearer(orgId, userId, UserRole.BUYER_APPROVER)), String.class);
+                        bearer(orgId, userId, UserRole.BUYER_MEMBER)), String.class);
     }
 
     @Test
@@ -112,13 +112,13 @@ class ConnectionControlsTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void approversMustBeApproverMembersOfTheOrg() {
+    void approversMustBeBuyerMembersOfTheOrg() {
         var s = scenario();
         UUID admin = identities.member(orgById(s), "adm@example.com", UserRole.BUYER_ADMIN, "Admin").getUser().getId();
         UUID outsider = identities.buyerAdmin("out@example.com").getUser().getId();
 
         assertThat(patch(s, s.buyer().getId(), Map.of("approverUserIds", List.of(admin))).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .isEqualTo(HttpStatus.OK);
         assertThat(patch(s, s.buyer().getId(), Map.of("approverUserIds", List.of(outsider))).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -138,6 +138,28 @@ class ConnectionControlsTest extends AbstractIntegrationTest {
 
         assertThat(decide(run, gate, s.buyer().getId(), other).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(decide(run, gate, s.buyer().getId(), listed).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void theGatesViewTellsEachViewerWhetherTheyMayDecide() {
+        var s = scenario();
+        UUID listed = approver(s, "listed@example.com");
+        UUID admin = identities.member(orgById(s), "admin@example.com", UserRole.BUYER_ADMIN, "Finance lead").getUser().getId();
+        Connection connection = s.connection();
+        connection.setApproverUserIds(Set.of(listed));
+        connectionRepository.save(connection);
+        Run run = fixtures.run(s, RunStatus.RUNNING, "sbx-vcd", "tok-vcd");
+        gateService.open(run.getId(), "post_journal_entries", 5, "Post entries", "{}", "[]");
+
+        assertThat(viewerCanDecide(run, s.buyer().getId(), listed, UserRole.BUYER_MEMBER)).isTrue();
+        assertThat(viewerCanDecide(run, s.buyer().getId(), admin, UserRole.BUYER_ADMIN)).isFalse();
+        assertThat(viewerCanDecide(run, s.buyer().getId(), listed, UserRole.ADMIN)).isFalse();
+    }
+
+    boolean viewerCanDecide(Run run, UUID orgId, UUID userId, UserRole role) {
+        var body = rest.exchange(url("/api/v1/runs/" + run.getId() + "/gates"), HttpMethod.GET,
+                new HttpEntity<>(bearer(orgId, userId, role)), com.fasterxml.jackson.databind.JsonNode.class).getBody();
+        return body.get(0).get("viewerCanDecide").asBoolean();
     }
 
     @Test

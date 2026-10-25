@@ -95,18 +95,18 @@ class NotificationConsumerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void gateOpenedInAnOrgWithNoApproversNotifiesAdminsWithoutALink() {
+    void gateOpenedInAnOrgWithOnlyAnAdminNotifiesTheAdminWithALink() {
         var s = scenario();
         UUID admin = identities.member(s.buyer(), "admin-" + UUID.randomUUID() + "@example.com",
                 UserRole.BUYER_ADMIN, "Finance lead").getUser().getId();
         Run run = runningRun(s);
         GateRequest gate = gateService.open(run.getId(), "a", 5, "s", "{}", "[]");
-        assertThat(gate.eligibleApproverIds()).isNull();
+        assertThat(gate.eligibleApproverIds()).containsExactly(admin);
 
         consumer.handle(eventOf(gate.getId(), "GATE_OPENED"));
 
         assertThat(rows(admin)).singleElement().satisfies(row -> {
-            assertThat(row.get("email_no_link")).isEqualTo(true);
+            assertThat(row.get("email_no_link")).isEqualTo(false);
             assertThat(due(row)).isNotNull();
         });
     }

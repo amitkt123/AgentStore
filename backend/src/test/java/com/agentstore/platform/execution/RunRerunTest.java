@@ -52,7 +52,7 @@ class RunRerunTest extends AbstractIntegrationTest {
         Run original = finishedRun(s);
 
         var response = rest.exchange(url("/api/v1/runs/" + original.getId() + "/rerun"), HttpMethod.POST,
-                as(s.buyer().getId(), UserRole.BUYER_APPROVER), RunResponse.class);
+                as(s.buyer().getId(), UserRole.BUYER_MEMBER), RunResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().id()).isNotEqualTo(original.getId());
@@ -119,7 +119,7 @@ class RunRerunTest extends AbstractIntegrationTest {
         Run original = finishedRun(s);
         UUID starter = UUID.randomUUID();
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtService.issue(starter, s.buyer().getId(), UserRole.BUYER_APPROVER));
+        headers.setBearerAuth(jwtService.issue(starter, s.buyer().getId(), UserRole.BUYER_MEMBER));
 
         var response = rest.exchange(url("/api/v1/runs/" + original.getId() + "/rerun"), HttpMethod.POST,
                 new HttpEntity<>(headers), RunResponse.class);

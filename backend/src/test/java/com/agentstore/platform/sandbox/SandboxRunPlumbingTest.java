@@ -140,7 +140,7 @@ class SandboxRunPlumbingTest extends AbstractStorageIntegrationTest {
         assertThat(call(HttpMethod.GET, "/api/v1/runs/" + run.getId() + "/outputs", null, buyer, UserRole.BUYER_ADMIN).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(call(HttpMethod.POST, "/api/v1/runs/" + run.getId() + "/approve", Map.of("notes", "x"), buyer,
-                UserRole.BUYER_APPROVER).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+                UserRole.BUYER_MEMBER).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         var mine = rest.exchange("http://localhost:" + port + "/api/v1/runs/mine", HttpMethod.GET,
                 new HttpEntity<>(null, fx.bearer(buyer, UserRole.BUYER_ADMIN)), List.class);
         assertThat(mine.getBody()).isEmpty();

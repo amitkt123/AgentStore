@@ -4,7 +4,7 @@ it.each(["/home", "/store", "/store/a1/v1", "/runs", "/runs/R-1", "/files", "/co
   expect(gateTarget("DEVELOPER", path)).toBe("/developer/verification");
 });
 
-it.each(["BUYER_ADMIN", "BUYER_APPROVER", "ADMIN"] as const)("sends %s away from developer routes", (role) => {
+it.each(["BUYER_ADMIN", "BUYER_MEMBER", "ADMIN"] as const)("sends %s away from developer routes", (role) => {
   expect(gateTarget(role, "/developer/verification")).toBe("/home");
   expect(gateTarget(role, "/developer/api-keys")).toBe("/home");
 });
@@ -27,10 +27,10 @@ it("lets a developer, and only a developer, into the agents screens", () => {
   expect(gateTarget("DEVELOPER", "/developer/agents")).toBeNull();
   expect(gateTarget("DEVELOPER", "/developer/agents/a1/versions/v1")).toBeNull();
   expect(gateTarget("BUYER_ADMIN", "/developer/agents/a1/versions/v1")).toBe("/home");
-  expect(gateTarget("BUYER_APPROVER", "/developer/agents")).toBe("/home");
+  expect(gateTarget("BUYER_MEMBER", "/developer/agents")).toBe("/home");
 });
 
-it.each(["BUYER_ADMIN", "BUYER_APPROVER"] as const)("keeps %s out of /admin", (role) => {
+it.each(["BUYER_ADMIN", "BUYER_MEMBER"] as const)("keeps %s out of /admin", (role) => {
   expect(gateTarget(role, "/admin/money")).toBe("/home");
 });
 
@@ -51,7 +51,7 @@ it.each(["/admin/payouts", "/admin/reconciliation"])("keeps non-admins out of %s
 
 it("sends a signed-in user past login and signup to their own home", () => {
   expect(gateTarget("BUYER_ADMIN", "/login")).toBe("/home");
-  expect(gateTarget("BUYER_APPROVER", "/signup")).toBe("/home");
+  expect(gateTarget("BUYER_MEMBER", "/signup")).toBe("/home");
   expect(gateTarget("DEVELOPER", "/signup")).toBe("/developer/agents");
   expect(gateTarget("ADMIN", "/login")).toBe("/admin/money");
   expect(gateTarget(undefined, "/login")).toBeNull();

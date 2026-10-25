@@ -32,7 +32,7 @@ class RunGatesViewTest extends AbstractIntegrationTest {
 
     private HttpEntity<Void> buyer(UUID orgId) {
         HttpHeaders h = new HttpHeaders();
-        h.setBearerAuth(jwtService.issue(UUID.randomUUID(), orgId, UserRole.BUYER_APPROVER));
+        h.setBearerAuth(jwtService.issue(UUID.randomUUID(), orgId, UserRole.BUYER_MEMBER));
         return new HttpEntity<>(h);
     }
 
