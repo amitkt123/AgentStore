@@ -174,8 +174,7 @@ public class GateService {
         List<UUID> eligible = gate != null ? gate.eligibleApproverIds() : null;
         boolean restricted = gate != null
                 ? eligible != null
-                : memberships.countByIdOrgIdAndRole(orgId, UserRole.BUYER_ADMIN)
-                        + memberships.countByIdOrgIdAndRole(orgId, UserRole.BUYER_MEMBER) > 0;
+                : memberships.countByIdOrgIdAndRoleIn(orgId, List.of(UserRole.BUYER_ADMIN, UserRole.BUYER_MEMBER)) > 0;
         if (!restricted) {
             return true;
         }
