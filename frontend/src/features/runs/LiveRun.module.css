@@ -16,3 +16,4 @@
 .all { align-self: flex-start; margin: 12px 0 0; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--glass-line); background: var(--glass-2); font: inherit; font-size: 13px; color: var(--b); cursor: pointer; }
 .meter { margin-top: 6px; height: 6px; border-radius: 999px; background: var(--l2); overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--b); border-radius: 999px; transition: width var(--dur-2) var(--ease); }
+.gate { margin-top: 12px; }

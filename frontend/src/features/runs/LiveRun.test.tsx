@@ -109,3 +109,20 @@ it("shows spend as a meter", () => {
   expect(meter).toHaveAttribute("aria-valuenow", "96");
   expect(meter).toHaveAttribute("aria-valuemax", "500");
 });
+
+it("puts the approve buttons next to a clicked pending approval in the flow", async () => {
+  const s = snap({ steps: [{ id: "q", kind: "GATE_REQUESTED", detail: '{"gateId":"g1","action":"post","summary":"Post 142 entries?"}', createdAt: "2026-09-29T10:05:00Z" }] }, [gate]);
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  await userEvent.click(within(screen.getByRole("region", { name: "Run replay" })).getByRole("button", { name: /Post 142 entries/ }));
+  const facts = screen.getByRole("complementary", { name: "Run facts" });
+  expect(within(facts).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+});
+
+it("says the run waits for an approver, not for you, when the viewer cannot decide", () => {
+  const s = snap({ steps: [{ id: "q", kind: "GATE_REQUESTED", detail: '{"gateId":"g1","action":"post","summary":"Post 142 entries?"}', createdAt: "2026-09-29T10:05:00Z" }] }, [gate]);
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide={false} />);
+  expect(screen.queryByText("Waiting for you")).toBeNull();
+  expect(screen.getAllByText("Waiting for an approver").length).toBeGreaterThan(0);
+});
