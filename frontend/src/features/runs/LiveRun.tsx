@@ -1,27 +1,16 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import styles from "./LiveRun.module.css";
 import { useRunPolling } from "./useRunPolling";
 import { isTerminal, statusPill, terminalText } from "./status";
-import { stepNote, stepText } from "./stepText";
-import { FlowCanvas } from "@/features/flow/FlowCanvas";
-import { toBlockViews } from "@/features/flow/blocks";
-import { layoutFlow, type GateOutcome } from "@/features/flow/layout";
-import { stepsForNode } from "./stepFilter";
 import { Glass } from "@/ui/Glass";
 import { GateCard } from "@/features/gates/GateCard";
 import { Pill } from "@/ui/Pill";
 import { ErrorState } from "@/ui/ErrorState";
-import { formatMoney, formatTime, formatWhen } from "@/lib/format";
-import type { GateDetail, GateStatus, Manifest, RunSnapshot } from "@/lib/api/types";
-
-/** Each gate's outcome keyed by its block id; a re-asked gate keeps its latest answer. */
-function outcomesOf(gates: GateDetail[]): Record<string, GateOutcome> {
-  const out: Record<string, GateOutcome> = {};
-  const latest = [...gates].sort((x, y) => ((x.decidedAt ?? "\uffff") < (y.decidedAt ?? "\uffff") ? -1 : 1));
-  for (const g of latest) out[`gate:${g.action}`] = g.status;
-  return out;
-}
+import { ReplayCanvas, type ReplayCanvasHandle } from "@/features/replay/ReplayCanvas";
+import { buildReplay } from "@/features/replay/graph";
+import { formatMoney, formatTime } from "@/lib/format";
+import type { GateStatus, Manifest, RunSnapshot } from "@/lib/api/types";
 
 const GATE_OUTCOME: Record<GateStatus, string> = { PENDING: "Waiting", APPROVED: "Approved", REJECTED: "Rejected", EXPIRED: "Expired" };
 
@@ -32,18 +21,22 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
     isDone: (s) => isTerminal(s.detail.status),
   });
   const [sel, setSel] = useState<string | undefined>(undefined);
+  const canvas = useRef<ReplayCanvasHandle>(null);
+  const replay = useMemo(() => buildReplay(data.detail.steps, data.gates), [data.detail.steps, data.gates]);
   if (forbidden) return <ErrorState message="You don't have access to this run." />;
 
   const { detail, flow, gates } = data;
   const pill = statusPill(detail.status);
   const why = terminalText(detail.terminalReason);
   const pending = gates.filter((g) => g.status === "PENDING");
-  const views = toBlockViews(flow.blocks.map((b) => ({ id: b.block, state: b.state, metrics: b.metrics, flag: b.flag })), manifest);
   const terminal = isTerminal(detail.status);
-  const graph = layoutFlow(views, { gateOutcomes: outcomesOf(gates), reachedBlock: flow.reachedBlock, terminal, succeeded: detail.status === "COMPLETED" });
-  const selNode = [...graph.columns.flatMap((c) => c.nodes), ...graph.offPath].find((n) => n.id === sel);
-  const steps = selNode ? stepsForNode(detail.steps, selNode) : detail.steps;
-  const endReached = graph.ends.some((e) => e.reached);
+  const block = replay.blocks.find((b) => b.id === sel);
+  const toggle = (id: string) => setSel((cur) => (cur === id ? undefined : id));
+  const close = () => {
+    const prev = sel;
+    setSel(undefined);
+    if (prev) canvas.current?.focusBlock(prev);
+  };
   const cap = flow.spend.cap;
 
   return (
@@ -53,10 +46,10 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
         <Pill tone={pill.tone}>{pill.text}</Pill>
       </header>
       {error && <p role="status" className={styles.note}>{error}</p>}
-      {why && terminal && !endReached && <p className={styles.why}>{why}</p>}
+      {why && terminal && <p className={styles.why}>{why}</p>}
       {pending.map((g) => <GateCard key={g.gateId} runRef={runRef} gate={g} canDecide={canDecide} viewerUserId={viewerUserId} />)}
-      <Glass as="section" aria-label="Flow" className={styles.canvas}>
-        <FlowCanvas graph={graph} live={!terminal} selectedId={sel} onSelect={(id) => setSel((cur) => (cur === id ? undefined : id))} endText={why} />
+      <Glass as="section" className={styles.canvas}>
+        <ReplayCanvas ref={canvas} graph={replay} live={!terminal} selectedId={sel} onSelect={toggle} />
       </Glass>
       {gates.filter((g) => g.status !== "PENDING").map((g) => (
         <details key={g.gateId} className={styles.decided} open={!isTerminal(detail.status)}>
@@ -65,31 +58,25 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
         </details>
       ))}
       <div className={styles.cols}>
-        <section aria-labelledby="tl">
-          <h2 id="tl">Timeline</h2>
-          <p className={styles.sub}>Recorded by Karya as it happens, not reported by the agent.</p>
-          {selNode && <button type="button" className={styles.all} onClick={() => setSel(undefined)}>Show all steps</button>}
-          {selNode && steps.length === 0 && <p className={styles.sub}>No steps for this part yet.</p>}
-          <ol className={styles.steps}>
-            {steps.map((s, i) => (
-              <li key={i}>
-                <span className="mono">{formatWhen(s.createdAt)}</span>
-                <span>{stepText(s)}{stepNote(s) && <span className={styles.stepNote} title={stepNote(s, Infinity) ?? undefined}>{stepNote(s)}</span>}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
         <Glass as="aside" aria-label="Run facts" className={styles.facts}>
-          <dl>
-            <div>
-              <dt>Spend</dt><dd>{formatMoney(flow.spend.charged)} of {formatMoney(cap)}</dd>
-              <div role="meter" aria-label="Spend" aria-valuemin={0} aria-valuemax={cap} aria-valuenow={flow.spend.charged} className={styles.meter}>
-                <i style={{ width: `${cap > 0 ? Math.min(100, (flow.spend.charged / cap) * 100) : 0}%` }} />
+          {block ? (
+            <>
+              <h2 className={styles.factsTitle}>{block.title}</h2>
+              <dl>{block.facts.map(([k, v], i) => <div key={i}><dt>{k}</dt><dd className={styles.fact}>{v}</dd></div>)}</dl>
+              <button type="button" className={styles.all} onClick={close}>Close</button>
+            </>
+          ) : (
+            <dl>
+              <div>
+                <dt>Spend</dt><dd>{formatMoney(flow.spend.charged)} of {formatMoney(cap)}</dd>
+                <div role="meter" aria-label="Spend" aria-valuemin={0} aria-valuemax={cap} aria-valuenow={flow.spend.charged} className={styles.meter}>
+                  <i style={{ width: `${cap > 0 ? Math.min(100, (flow.spend.charged / cap) * 100) : 0}%` }} />
+                </div>
               </div>
-            </div>
-            <div><dt>Blocked attempts</dt><dd>{flow.blockedAttempts}</dd></div>
-            {flow.deadlineAt && !isTerminal(detail.status) && <div><dt>Sandbox closes</dt><dd className="mono">{formatTime(flow.deadlineAt)}</dd></div>}
-          </dl>
+              <div><dt>Blocked attempts</dt><dd>{flow.blockedAttempts}</dd></div>
+              {flow.deadlineAt && !terminal && <div><dt>Sandbox closes</dt><dd className="mono">{formatTime(flow.deadlineAt)}</dd></div>}
+            </dl>
+          )}
         </Glass>
       </div>
     </div>

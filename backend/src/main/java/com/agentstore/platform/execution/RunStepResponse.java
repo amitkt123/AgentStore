@@ -1,9 +1,12 @@
 package com.agentstore.platform.execution;
 
 import java.time.Instant;
+import java.util.UUID;
 
-public record RunStepResponse(RunStepKind kind, RunStepSource source, String detail, Instant createdAt) {
+public record RunStepResponse(UUID id, RunStepKind kind, RunStepSource source, String detail, String block,
+                              Instant startedAt, Instant createdAt) {
     public static RunStepResponse from(RunStep step) {
-        return new RunStepResponse(step.getKind(), step.getSource(), step.getDetail(), step.getCreatedAt());
+        return new RunStepResponse(step.getId(), step.getKind(), step.getSource(), step.getDetail(), step.getBlock(),
+                step.getStartedAt(), step.getCreatedAt());
     }
 }

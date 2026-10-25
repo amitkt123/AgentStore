@@ -43,15 +43,19 @@ test("buyer admin sees a waiting run but cannot decide it", async ({ page }) => 
   await page.goto("/runs");
   await expect(page.getByRole("link", { name: "R-E2E1", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "R-E2E1", exact: true }).click();
-  await expect(page.getByText("Post 142 journal entries for August?", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Post 142 journal entries for August?" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
 });
 
 test("approver approves the gate from the run page and the run moves on", async ({ page }) => {
   await signIn(page, "e2e-approver@example.com");
   await page.goto("/runs/R-E2E1");
+  const replay = page.getByRole("region", { name: "Run replay" });
+  await expect(replay).toContainText("Read your data");
+  await expect(replay).toContainText("Waiting for you");
   await page.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByText(/You approved this/)).toBeVisible();
+  await expect(replay.getByRole("list")).toContainText("then Approved");
   await page.goto("/runs");
   await expect(page.getByRole("link", { name: "R-E2E1", exact: true })).toBeVisible();
 });

@@ -21,6 +21,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -193,9 +194,16 @@ public class RunLifecycleService {
     /** Records a platform-observed step (DATA_READ, LLM_CALL, …) for a run that is still open. */
     @Transactional
     public void recordStep(UUID runId, RunStepKind kind, RunStepSource source, Map<String, Object> detail) {
+        recordStep(runId, kind, source, detail, null);
+    }
+
+    /** As above, stamping when the runtime call that caused the step began (null when unknown). */
+    @Transactional
+    public void recordStep(UUID runId, RunStepKind kind, RunStepSource source, Map<String, Object> detail,
+                           Instant startedAt) {
         Run run = lockOpen(runId);
         run.setLastHeartbeatAt(Instant.now());
-        step(run, kind, source, detail == null ? Map.of() : detail);
+        step(run, kind, source, detail == null ? Map.of() : detail, startedAt);
         runRepository.save(run);
     }
 
@@ -298,7 +306,9 @@ public class RunLifecycleService {
         BigDecimal remaining = run.getCostCap().subtract(spent).max(BigDecimal.ZERO);
         BigDecimal charged = requested.min(remaining);
 
-        step(run, stepKind, source, detail);
+        Map<String, Object> stepDetail = new LinkedHashMap<>(detail);
+        stepDetail.put("amount", charged);
+        step(run, stepKind, source, stepDetail);
         if (sandbox) {
             run.setSimulatedCharged(run.getSimulatedCharged().add(charged));
             run.setRequestedCharge(run.getRequestedCharge().add(requested));
@@ -404,8 +414,13 @@ public class RunLifecycleService {
     }
 
     private void step(Run run, RunStepKind kind, RunStepSource source, Map<String, Object> detail) {
+        step(run, kind, source, detail, null);
+    }
+
+    private void step(Run run, RunStepKind kind, RunStepSource source, Map<String, Object> detail, Instant startedAt) {
         try {
             RunStep step = new RunStep(null, run, kind, objectMapper.writeValueAsString(detail), source);
+            step.setStartedAt(startedAt);
             step.setBlock(RunStepBlocks.of(kind, detail));
             runStepRepository.save(step);
             if (step.getBlock() != null) {

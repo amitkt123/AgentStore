@@ -26,6 +26,7 @@ Mockup elements omitted because the backend has no data or route for them. Updat
 | G20 | Billing bills list and "Pay" in postpaid mode | Resolved in WS10b |
 | G21 | Earnings "Withdraw", "Payout account", withdrawal history | No payout backend; arrives with WS10c |
 | G22 | Tax invoices on Billing | GST tax invoices are a WS10 non-goal (legal question, spec §8 Q6); the postpaid bill in WS10b is a statement, not a tax invoice |
+| G23 | Parallel columns in the run replay for runs before V48 | Parallel columns need `startedAt`, which only steps recorded after V48 carry; older runs draw one step per beat |
 
 ## Known visual differences
 - Live run block descriptions are missing (G11). The flow canvas still shows each node's title; only its body is empty.

@@ -30,6 +30,8 @@ import java.util.regex.Pattern;
  */
 public class RuntimeAuthFilter extends OncePerRequestFilter {
 
+    /** Request attribute (an Instant): when this runtime call reached the platform. */
+    public static final String CALL_STARTED_AT = "agentstore.runtime.callStartedAt";
     static final String SUPPORTED_API_VERSION = "1";
     private static final Pattern API_VERSION = Pattern.compile("runtime-api/(\\S+)");
 
@@ -51,6 +53,7 @@ public class RuntimeAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
+        request.setAttribute(CALL_STARTED_AT, Instant.now());
         String unsupported = unsupportedApiVersion(request.getHeader("User-Agent"));
         if (unsupported != null) {
             ProblemResponses.write(response, HttpStatus.BAD_REQUEST, "UNSUPPORTED_API_VERSION",
