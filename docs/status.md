@@ -2,7 +2,7 @@
 
 The single place to see what is done and what is next. Update it in the same PR as any change that finishes, starts or reshapes a workstream. Gaps and risks stay in `docs/frontend-gaps.md` and `docs/known-issues.md`; this file links to them, it does not copy them.
 
-Last updated: 2026-10-25 (WS10c money out done incl. final-review fixes and UPI username masking, manual Razorpay and RazorpayX test-mode checks pending; buyer admins can approve gates, BUYER_APPROVER renamed BUYER_MEMBER, members get Run now, gate buttons only for viewers on the approver list; run page: approve from the clicked approval block, "Waiting for an approver" for non-approvers, full-width run page; run replay flow on the run page; UX-G2 flow canvas done)
+Last updated: 2026-10-25 (execution bug-hunt fixes; WS10c money out done incl. final-review fixes and UPI username masking, manual Razorpay and RazorpayX test-mode checks pending; buyer admins can approve gates, BUYER_APPROVER renamed BUYER_MEMBER, members get Run now, gate buttons only for viewers on the approver list; run page: approve from the clicked approval block, "Waiting for an approver" for non-approvers, full-width run page; run replay flow on the run page; UX-G2 flow canvas done)
 
 Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-and-sandbox-design.md` (workstreams in §5, milestones in §7). Specs and plans named below live in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
 
@@ -68,6 +68,16 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 - Return the reviewer's `decisionNote` on developer verification (G14).
 - Return 404, not 403, for another org's run on buyer run paths (`known-issues.md`).
 - `EmailDeliveryTest` and `ApprovalLinkTest` fail from Colima clock skew (`known-issues.md`).
+- `GET /api/v1/runs/mine` has no paging and nothing on master calls it: add paging or retire it.
+
+## Execution bug-hunt fixes
+
+From a static bug hunt of `platform/execution` on 2026-10-25, fixed in this PR (plan `2026-10-25-execution-bug-hunt-fixes.md`):
+
+- The monthly limit now counts what in-flight runs have already charged.
+- The legacy COST callback quantity is bounded like `/runtime/v1/usage`.
+- `run.reached_block` is TEXT (migration V51), so long block names no longer fail the run or drop the violation count.
+- Gate decisions are refused (409) after the gate's expiry.
 
 ## Demo
 
