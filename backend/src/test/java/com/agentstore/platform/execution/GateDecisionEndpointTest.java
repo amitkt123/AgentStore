@@ -43,7 +43,7 @@ class GateDecisionEndpointTest extends AbstractIntegrationTest {
 
     private HttpHeaders approver(UUID orgId, UUID userId) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtService.issue(userId, orgId, UserRole.BUYER_APPROVER));
+        headers.setBearerAuth(jwtService.issue(userId, orgId, UserRole.BUYER_MEMBER));
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;
     }
@@ -76,6 +76,19 @@ class GateDecisionEndpointTest extends AbstractIntegrationTest {
         assertThat(gate.getStatus()).isEqualTo(GateStatus.APPROVED);
         assertThat(gate.getDecidedByUserId()).isEqualTo(userId);
         assertThat(gate.getDecisionNote()).isEqualTo("ok");
+    }
+
+    @Test
+    void aBuyerAdminCanApproveThroughTheGateEndpoint() {
+        Fx fx = awaiting("tok-gd-admin");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), fx.scenario().buyer().getId(), UserRole.BUYER_ADMIN));
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        var response = decide(fx, headers, Map.of("decision", "APPROVE"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(gateRepository.findById(fx.gate().getId()).orElseThrow().getStatus()).isEqualTo(GateStatus.APPROVED);
     }
 
     @Test

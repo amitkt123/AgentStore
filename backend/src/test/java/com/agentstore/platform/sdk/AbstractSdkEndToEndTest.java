@@ -104,7 +104,7 @@ abstract class AbstractSdkEndToEndTest extends AbstractIntegrationTest {
 
     private void decide(RuntimeFixtures.RunningAgent agent, UUID gateId, GateDecision decision) {
         HttpHeaders buyer = new HttpHeaders();
-        buyer.setBearerAuth(jwtService.issue(UUID.randomUUID(), agent.scenario().buyer().getId(), UserRole.BUYER_APPROVER));
+        buyer.setBearerAuth(jwtService.issue(UUID.randomUUID(), agent.scenario().buyer().getId(), UserRole.BUYER_MEMBER));
         buyer.setContentType(MediaType.APPLICATION_JSON);
         var response = rest.exchange("http://localhost:" + port + "/api/v1/runs/" + agent.run().getId() + "/gates/" + gateId + "/decision",
                 HttpMethod.POST, new HttpEntity<>(Map.of("decision", decision.name(), "note", "e2e"), buyer), RunResponse.class);

@@ -53,7 +53,7 @@ class ConnectionControlsTest extends AbstractIntegrationTest {
     }
 
     UUID approver(ExecutionFixtures.Scenario s, String email) {
-        return identities.member(orgById(s), email, UserRole.BUYER_APPROVER, "Approver").getUser().getId();
+        return identities.member(orgById(s), email, UserRole.BUYER_MEMBER, "Approver").getUser().getId();
     }
 
     Org orgById(ExecutionFixtures.Scenario s) {
@@ -68,7 +68,7 @@ class ConnectionControlsTest extends AbstractIntegrationTest {
     ResponseEntity<String> decide(Run run, GateRequest gate, UUID orgId, UUID userId) {
         return rest.exchange(url("/api/v1/runs/" + run.getId() + "/gates/" + gate.getId() + "/decision"),
                 HttpMethod.POST, new HttpEntity<>(Map.of("decision", "APPROVE"),
-                        bearer(orgId, userId, UserRole.BUYER_APPROVER)), String.class);
+                        bearer(orgId, userId, UserRole.BUYER_MEMBER)), String.class);
     }
 
     @Test
@@ -112,13 +112,13 @@ class ConnectionControlsTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void approversMustBeApproverMembersOfTheOrg() {
+    void approversMustBeBuyerMembersOfTheOrg() {
         var s = scenario();
         UUID admin = identities.member(orgById(s), "adm@example.com", UserRole.BUYER_ADMIN, "Admin").getUser().getId();
         UUID outsider = identities.buyerAdmin("out@example.com").getUser().getId();
 
         assertThat(patch(s, s.buyer().getId(), Map.of("approverUserIds", List.of(admin))).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .isEqualTo(HttpStatus.OK);
         assertThat(patch(s, s.buyer().getId(), Map.of("approverUserIds", List.of(outsider))).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }

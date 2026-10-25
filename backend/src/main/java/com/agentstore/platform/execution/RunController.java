@@ -72,7 +72,7 @@ public class RunController {
     public static final Duration PENDING_BUILD_TIMEOUT = Duration.ofMinutes(25);
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public RunResponse trigger(@Valid @RequestBody TriggerRunRequest request) {
         Connection connection = connectionRepository.findById(request.connectionId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Connection not found"));
@@ -85,7 +85,7 @@ public class RunController {
 
     /** Starts a new run on the run's own connection, at the connection's current pinned version and bindings. */
     @PostMapping("/{runId}/rerun")
-    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public RunResponse rerun(@PathVariable("runId") String runRef) {
         UUID runId = runLookup.idOf(runRef);
         requireOwnedByCaller(runId);
@@ -150,7 +150,7 @@ public class RunController {
     }
 
     @PostMapping("/{runId}/approve")
-    @PreAuthorize("hasRole('BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public RunResponse approve(@PathVariable("runId") String runRef, @RequestBody ApproveRunRequest request) {
         UUID runId = runLookup.idOf(runRef);
         requireOwnedByCaller(runId);
@@ -159,7 +159,7 @@ public class RunController {
     }
 
     @PostMapping("/{runId}/reject")
-    @PreAuthorize("hasRole('BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public RunResponse reject(@PathVariable("runId") String runRef, @RequestBody ApproveRunRequest request) {
         UUID runId = runLookup.idOf(runRef);
         requireOwnedByCaller(runId);
@@ -168,7 +168,7 @@ public class RunController {
     }
 
     @PostMapping("/{runId}/gates/{gateId}/decision")
-    @PreAuthorize("hasRole('BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public RunResponse decide(@PathVariable("runId") String runRef, @PathVariable UUID gateId,
                               @Valid @RequestBody GateDecisionRequest request) {
         UUID runId = runLookup.idOf(runRef);

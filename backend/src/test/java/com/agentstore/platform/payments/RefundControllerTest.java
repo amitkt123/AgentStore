@@ -170,7 +170,7 @@ class RefundControllerTest extends AbstractIntegrationTest {
         Org org = buyer();
         paidTopUp(org, "500.00", 1);
         UUID id = org.getId();
-        HttpHeaders approver = auth(id, UserRole.BUYER_APPROVER);
+        HttpHeaders approver = auth(id, UserRole.BUYER_MEMBER);
         HttpHeaders otherAdmin = auth(UUID.randomUUID(), UserRole.BUYER_ADMIN);
         HttpHeaders platformAdmin = auth(UUID.randomUUID(), UserRole.ADMIN);
 

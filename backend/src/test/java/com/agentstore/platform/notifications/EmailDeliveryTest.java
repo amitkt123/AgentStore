@@ -98,7 +98,7 @@ class EmailDeliveryTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void aNoApproverNotificationSendsAnEmailWithoutALink() {
+    void anOrgWithOnlyAnAdminEmailsTheAdminAnApprovalLink() {
         var s = scenario();
         User admin = identities.member(s.buyer(), "admin-" + UUID.randomUUID() + "@example.com",
                 UserRole.BUYER_ADMIN, "Finance lead").getUser();
@@ -107,8 +107,8 @@ class EmailDeliveryTest extends AbstractIntegrationTest {
         delivery.deliverDue();
 
         EmailMessage message = emails.lastTo(admin.getEmail()).orElseThrow();
-        assertThat(message.text()).doesNotContain("/approve/").contains("approver");
-        assertThat(jdbc.queryForObject("select count(*) from approval_link", Integer.class)).isZero();
+        assertThat(message.text()).contains("/approve/");
+        assertThat(jdbc.queryForObject("select count(*) from approval_link where user_id = ?", Integer.class, admin.getId())).isEqualTo(1);
     }
 
     @Test

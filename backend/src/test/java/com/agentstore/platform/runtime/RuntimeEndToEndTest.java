@@ -78,7 +78,7 @@ class RuntimeEndToEndTest extends AbstractIntegrationTest {
         assertThat(agentCall(HttpMethod.GET, "/runtime/v1/gates/" + gateId, token, null).getBody().get("status")).isEqualTo("PENDING");
 
         HttpHeaders buyer = new HttpHeaders();
-        buyer.setBearerAuth(jwtService.issue(UUID.randomUUID(), agent.scenario().buyer().getId(), UserRole.BUYER_APPROVER));
+        buyer.setBearerAuth(jwtService.issue(UUID.randomUUID(), agent.scenario().buyer().getId(), UserRole.BUYER_MEMBER));
         buyer.setContentType(MediaType.APPLICATION_JSON);
         var decision = rest.exchange(url("/api/v1/runs/" + agent.run().getId() + "/gates/" + gateId + "/decision"),
                 HttpMethod.POST, new HttpEntity<>(Map.of("decision", "APPROVE", "note", "ok"), buyer), RunResponse.class);

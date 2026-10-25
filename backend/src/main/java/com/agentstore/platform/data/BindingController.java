@@ -38,7 +38,7 @@ public class BindingController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public List<BindingService.BindingResponse> list(@PathVariable UUID connectionId) {
         return bindingService.list(Caller.current().orgId(), connectionId);
     }

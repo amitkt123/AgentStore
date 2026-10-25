@@ -209,7 +209,7 @@ class TopUpControllerTest extends AbstractIntegrationTest {
         Org other = buyer();
         assertThat(topUp(org.getId(), auth(other.getId(), UserRole.BUYER_ADMIN), 500, "UPI").getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(topUp(org.getId(), auth(org.getId(), UserRole.BUYER_APPROVER), 500, "UPI").getStatusCode())
+        assertThat(topUp(org.getId(), auth(org.getId(), UserRole.BUYER_MEMBER), 500, "UPI").getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(topUp(org.getId(), auth(UUID.randomUUID(), UserRole.ADMIN), 500, "UPI").getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);

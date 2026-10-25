@@ -38,7 +38,7 @@ public class RunDetailController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public RunListResponse list(@RequestParam(required = false) String group,
                                 @RequestParam(required = false) UUID agentId,
                                 @RequestParam(required = false) String q,
@@ -87,7 +87,7 @@ public class RunDetailController {
     }
 
     @GetMapping("/mine")
-    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public java.util.List<RunSummaryResponse> mine(@RequestParam(required = false) RunStatus status) {
         var claims = (JwtService.Claims)
                 SecurityContextHolder.getContext().getAuthentication().getPrincipal();

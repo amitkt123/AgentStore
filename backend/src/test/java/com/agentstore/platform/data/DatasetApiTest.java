@@ -122,7 +122,7 @@ class DatasetApiTest extends AbstractStorageIntegrationTest {
     void onlyABuyerAdminMayUploadAndABlankNameIsRejected() {
         Org org = buyer();
 
-        assertThat(upload(org, UserRole.BUYER_APPROVER, "a.csv", DataFixtures.CSV.getBytes(StandardCharsets.UTF_8))
+        assertThat(upload(org, UserRole.BUYER_MEMBER, "a.csv", DataFixtures.CSV.getBytes(StandardCharsets.UTF_8))
                 .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         var body = DataFixtures.file("a.csv", DataFixtures.CSV.getBytes(StandardCharsets.UTF_8), "  ");
         var blank = rest.exchange(url("/api/v1/datasets"), HttpMethod.POST,
@@ -139,7 +139,7 @@ class DatasetApiTest extends AbstractStorageIntegrationTest {
         upload(theirs, UserRole.BUYER_ADMIN, "theirs.csv", DataFixtures.CSV.getBytes(StandardCharsets.UTF_8));
 
         var response = rest.exchange(url("/api/v1/datasets?include=usage"), HttpMethod.GET,
-                new HttpEntity<>(null, fx.bearer(mine, UserRole.BUYER_APPROVER)), List.class);
+                new HttpEntity<>(null, fx.bearer(mine, UserRole.BUYER_MEMBER)), List.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).hasSize(1);
@@ -196,7 +196,7 @@ class DatasetApiTest extends AbstractStorageIntegrationTest {
         Org org = buyer();
         Dataset dataset = fx.upload(org, "a.csv", DataFixtures.CSV);
 
-        var response = exchange(HttpMethod.GET, "/api/v1/orgs/" + org.getId() + "/storage", org, UserRole.BUYER_APPROVER);
+        var response = exchange(HttpMethod.GET, "/api/v1/orgs/" + org.getId() + "/storage", org, UserRole.BUYER_MEMBER);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(((Number) response.getBody().get("usedBytes")).longValue())

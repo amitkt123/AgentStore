@@ -139,13 +139,13 @@ class AuthControllerTest extends AbstractIntegrationTest {
         String email = "admin-invited-test@platform.example";
         OrgMembership inviter = identity.buyerAdmin("inviter-" + UUID.randomUUID() + "@acme.example");
         var invite = rest.exchange(url("/api/v1/orgs/" + inviter.getOrg().getId() + "/invitations"), HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", email, "role", "BUYER_APPROVER"), bearer(identity.tokenFor(inviter))),
+                new HttpEntity<>(Map.of("email", email, "role", "BUYER_MEMBER"), bearer(identity.tokenFor(inviter))),
                 String.class);
         assertThat(invite.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String inviteToken = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "invite");
         var accepted = rest.postForEntity(url("/api/v1/invitations/" + inviteToken + "/accept"),
                 Map.of("fullName", "Invited Admin", "password", "s3cret-pw"), AuthResponse.class);
-        assertThat(claimsOf(accepted.getBody()).role()).isEqualTo(UserRole.BUYER_APPROVER);
+        assertThat(claimsOf(accepted.getBody()).role()).isEqualTo(UserRole.BUYER_MEMBER);
 
         rest.postForEntity(url("/api/v1/auth/password/forgot"), Map.of("email", email), Void.class);
         String resetToken = RecordingEmailSender.tokenFromLink(emails.lastTo(email).orElseThrow(), "reset-password");
@@ -154,7 +154,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
         var login = rest.postForEntity(url("/api/v1/auth/login"),
                 new LoginRequest(email, "new-s3cret-pw", false), AuthResponse.class);
-        assertThat(claimsOf(login.getBody()).role()).isEqualTo(UserRole.BUYER_APPROVER);
+        assertThat(claimsOf(login.getBody()).role()).isEqualTo(UserRole.BUYER_MEMBER);
     }
 
     @Test

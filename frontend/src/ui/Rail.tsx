@@ -33,7 +33,7 @@ export function railItemsFor(role: UserRole, needsYou: number): RailItem[] {
   switch (railFor(role)) {
     case "developer": return developerRailItems();
     // Billing is for buyer admins; approvers cannot open it.
-    case "buyer": return role === "BUYER_APPROVER"
+    case "buyer": return role === "BUYER_MEMBER"
       ? buyerRailItems(needsYou).filter((item) => item.href !== "/billing")
       : buyerRailItems(needsYou);
     case "admin": return adminRailItems();

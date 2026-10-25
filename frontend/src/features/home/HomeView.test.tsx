@@ -8,7 +8,7 @@ import type { ConnectionSummary } from "@/lib/api/types";
 const waiting = [{ id: "r1", displayId: "R-2291", agent: "Bank Reconciliation", version: "1.3.0", status: "AWAITING_APPROVAL" as const, terminalReason: null, reachedBlock: "gate:post", startedAt: "2026-09-29T04:35:00Z", completedAt: null, charged: 0, held: 500, decidedBy: null }];
 
 it("greets by first name and lists runs that need approval", () => {
-  render(<HomeView fullName="Priya Shah" role="BUYER_APPROVER" needsYou={waiting} connections={[]} />);
+  render(<HomeView fullName="Priya Shah" role="BUYER_MEMBER" needsYou={waiting} connections={[]} />);
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Priya");
   expect(screen.getByRole("link", { name: /R-2291/ })).toHaveAttribute("href", "/runs/R-2291");
 });
@@ -40,6 +40,6 @@ it("confirms an agent was just added", () => {
 });
 
 it("does not offer Run now to an approver", () => {
-  render(<HomeView fullName="Priya Shah" role="BUYER_APPROVER" needsYou={[]} connections={[conn()]} />);
+  render(<HomeView fullName="Priya Shah" role="BUYER_MEMBER" needsYou={[]} connections={[conn()]} />);
   expect(screen.queryByRole("button", { name: "Run now" })).toBeNull();
 });

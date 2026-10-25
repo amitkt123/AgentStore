@@ -51,7 +51,7 @@ class RunFlowControllerTest extends AbstractIntegrationTest {
         var agent = runtimeFixtures.runningAgent(new BigDecimal("500.00"));
 
         var response = rest.exchange(url("/api/v1/runs/" + agent.run().getId() + "/flow"), HttpMethod.GET,
-                new HttpEntity<>(bearer(agent.scenario().buyer().getId(), UserRole.BUYER_APPROVER)), Map.class);
+                new HttpEntity<>(bearer(agent.scenario().buyer().getId(), UserRole.BUYER_MEMBER)), Map.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }

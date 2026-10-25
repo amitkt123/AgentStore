@@ -76,7 +76,7 @@ class Ws1bEndToEndTest extends AbstractStorageIntegrationTest {
         membership.setId(new OrgMembershipId(eligible.getId(), orgId));
         membership.setUser(eligible);
         membership.setOrg(agent.scenario().buyer());
-        membership.setRole(UserRole.BUYER_APPROVER);
+        membership.setRole(UserRole.BUYER_MEMBER);
         membership.setCreatedAt(Instant.now());
         memberships.save(membership);
         HttpHeaders agentHeaders = RuntimeFixtures.bearer(agent.token());
@@ -92,7 +92,7 @@ class Ws1bEndToEndTest extends AbstractStorageIntegrationTest {
         String gateId = (String) gate.getBody().get("gateId");
 
         // the buyer sees cost and a platform-built preview, by display id
-        HttpHeaders approver = buyer(orgId, UUID.randomUUID(), UserRole.BUYER_APPROVER);
+        HttpHeaders approver = buyer(orgId, UUID.randomUUID(), UserRole.BUYER_MEMBER);
         JsonNode gates = call(HttpMethod.GET, "/api/v1/runs/" + displayId + "/gates", approver, null, JsonNode.class).getBody();
         assertThat(gates.get(0).get("costIfApproved").decimalValue()).isPositive();
         assertThat(gates.get(0).get("preview").get("totalRows").asInt()).isEqualTo(2);
@@ -107,7 +107,7 @@ class Ws1bEndToEndTest extends AbstractStorageIntegrationTest {
         String decisionPath = "/api/v1/runs/" + displayId + "/gates/" + gateId + "/decision";
         assertThat(call(HttpMethod.POST, decisionPath, approver, Map.of("decision", "APPROVE"), String.class).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(call(HttpMethod.POST, decisionPath, buyer(orgId, eligible.getId(), UserRole.BUYER_APPROVER),
+        assertThat(call(HttpMethod.POST, decisionPath, buyer(orgId, eligible.getId(), UserRole.BUYER_MEMBER),
                 Map.of("decision", "APPROVE"), String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
 
         // the agent finishes; the run ends FINISHED and moves to the finished group

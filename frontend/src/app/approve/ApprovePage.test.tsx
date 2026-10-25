@@ -3,7 +3,7 @@ import { vi } from "vitest";
 
 vi.mock("@/app/(app)/runs/actions", () => ({ decideGateAction: vi.fn() }));
 vi.mock("@/lib/api/runs", () => ({ getRunGates: vi.fn() }));
-vi.mock("@/lib/session", () => ({ getSession: vi.fn().mockResolvedValue({ userId: "u", orgId: "o", role: "BUYER_APPROVER", exp: 9e9 }) }));
+vi.mock("@/lib/session", () => ({ getSession: vi.fn().mockResolvedValue({ userId: "u", orgId: "o", role: "BUYER_MEMBER", exp: 9e9 }) }));
 import { getRunGates } from "@/lib/api/runs";
 import Page from "./[token]/[gateId]/page";
 

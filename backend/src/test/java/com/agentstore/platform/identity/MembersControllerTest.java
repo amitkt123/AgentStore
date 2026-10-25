@@ -45,7 +45,7 @@ class MembersControllerTest extends AbstractIntegrationTest {
     @Test
     void anyMemberCanListTheTeamWithNamesAndTitles() {
         OrgMembership admin = identity.buyerAdmin(email());
-        OrgMembership approver = identity.member(admin.getOrg(), email(), UserRole.BUYER_APPROVER, "Accounts manager");
+        OrgMembership approver = identity.member(admin.getOrg(), email(), UserRole.BUYER_MEMBER, "Accounts manager");
 
         var list = rest.exchange(members(admin), HttpMethod.GET, new HttpEntity<>(bearer(identity.tokenFor(approver))),
                 Map[].class).getBody();
@@ -68,7 +68,7 @@ class MembersControllerTest extends AbstractIntegrationTest {
     @Test
     void adminCanChangeARoleAndTitle() {
         OrgMembership admin = identity.buyerAdmin(email());
-        OrgMembership approver = identity.member(admin.getOrg(), email(), UserRole.BUYER_APPROVER, null);
+        OrgMembership approver = identity.member(admin.getOrg(), email(), UserRole.BUYER_MEMBER, null);
 
         rest.exchange(members(admin) + "/" + approver.getUser().getId(), HttpMethod.PATCH,
                 new HttpEntity<>(Map.of("role", "BUYER_ADMIN", "title", "Controller"), bearer(identity.tokenFor(admin))),
@@ -85,7 +85,7 @@ class MembersControllerTest extends AbstractIntegrationTest {
         String self = members(admin) + "/" + admin.getUser().getId();
 
         var demote = rest.exchange(self, HttpMethod.PATCH,
-                new HttpEntity<>(Map.of("role", "BUYER_APPROVER"), bearer(identity.tokenFor(admin))), String.class);
+                new HttpEntity<>(Map.of("role", "BUYER_MEMBER"), bearer(identity.tokenFor(admin))), String.class);
         var remove = rest.exchange(self, HttpMethod.DELETE, new HttpEntity<>(bearer(identity.tokenFor(admin))),
                 String.class);
 
@@ -101,7 +101,7 @@ class MembersControllerTest extends AbstractIntegrationTest {
 
         // A second admin demotes the first. `staleAdminToken` still carries role=BUYER_ADMIN.
         rest.exchange(members(admin) + "/" + admin.getUser().getId(), HttpMethod.PATCH,
-                new HttpEntity<>(Map.of("role", "BUYER_APPROVER"), bearer(identity.tokenFor(secondAdmin))),
+                new HttpEntity<>(Map.of("role", "BUYER_MEMBER"), bearer(identity.tokenFor(secondAdmin))),
                 Void.class);
 
         var response = rest.exchange(members(admin) + "/" + secondAdmin.getUser().getId(), HttpMethod.PATCH,
@@ -113,7 +113,7 @@ class MembersControllerTest extends AbstractIntegrationTest {
     @Test
     void removingAMemberDeletesTheMembershipOnly() {
         OrgMembership admin = identity.buyerAdmin(email());
-        OrgMembership approver = identity.member(admin.getOrg(), email(), UserRole.BUYER_APPROVER, null);
+        OrgMembership approver = identity.member(admin.getOrg(), email(), UserRole.BUYER_MEMBER, null);
 
         var response = rest.exchange(members(admin) + "/" + approver.getUser().getId(), HttpMethod.DELETE,
                 new HttpEntity<>(bearer(identity.tokenFor(admin))), Void.class);

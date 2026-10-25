@@ -69,7 +69,7 @@ class OutputsApiTest extends AbstractStorageIntegrationTest {
         write(agent, "journal_entries", true, List.of(Map.of("bank_line", "l1", "amount", 1)));
 
         var list = rest.exchange("http://localhost:" + port + "/api/v1/runs/" + agent.run().getId() + "/outputs?preview=50",
-                HttpMethod.GET, new HttpEntity<>(null, fx.bearer(agent.scenario().buyer(), UserRole.BUYER_APPROVER)), List.class);
+                HttpMethod.GET, new HttpEntity<>(null, fx.bearer(agent.scenario().buyer(), UserRole.BUYER_MEMBER)), List.class);
 
         assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(list.getBody()).hasSize(2);
@@ -104,7 +104,7 @@ class OutputsApiTest extends AbstractStorageIntegrationTest {
 
         var response = rest.exchange("http://localhost:" + port + "/api/v1/runs/" + agent.run().getId() + "/outputs/"
                         + output.getId() + "/download?format=csv", HttpMethod.GET,
-                new HttpEntity<>(null, fx.bearer(agent.scenario().buyer(), UserRole.BUYER_APPROVER)), String.class);
+                new HttpEntity<>(null, fx.bearer(agent.scenario().buyer(), UserRole.BUYER_MEMBER)), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getHeaders().getContentType().toString()).startsWith("text/csv");
