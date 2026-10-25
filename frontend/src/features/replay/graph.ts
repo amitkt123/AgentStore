@@ -74,7 +74,8 @@ export function buildReplay(steps: RunStep[], gates: GateDetail[]): ReplayGraph 
         if (t.kind === "GATE_REQUESTED" && gateKey(t, td) === key) break;
         if (t.kind === "GATE_DECIDED" && gateKey(t, td) === key) { decided = { step: t, d: td }; consumed.add(j); break; }
       }
-      const match = key ? gates.filter((g) => g.action === key).sort((a, b) => (ms(b.decidedAt) ?? 0) - (ms(a.decidedAt) ?? 0))[0] : undefined;
+      const gateId = str(d.gateId);
+      const match = gateId ? gates.find((g) => g.gateId === gateId) : key ? gates.filter((g) => g.action === key).sort((a, b) => (ms(b.decidedAt) ?? 0) - (ms(a.decidedAt) ?? 0))[0] : undefined;
       const dec = str(decided?.d.decision);
       const outcome: Outcome = dec === "APPROVED" || dec === "REJECTED" || dec === "EXPIRED" ? dec : (match?.status ?? "PENDING");
       const decidedIso = decided?.step.createdAt ?? match?.decidedAt ?? (outcome === "EXPIRED" ? match?.expiresAt ?? null : null);

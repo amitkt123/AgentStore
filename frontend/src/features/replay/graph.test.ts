@@ -6,8 +6,8 @@ import type { GateDetail, RunStep, RunStepKind } from "@/lib/api/types";
 const at = (s: number) => new Date(Date.UTC(2026, 9, 25, 10, 0, s)).toISOString();
 const step = (kind: RunStepKind, detail: object, start: number | null, end: number, id?: string): RunStep =>
   ({ id: id ?? `${kind}-${end}`, kind, detail: JSON.stringify(detail), startedAt: start === null ? null : at(start), createdAt: at(end) });
-const gate = (action: string, status: GateDetail["status"], decidedAt: string | null = null): GateDetail =>
-  ({ gateId: `g-${action}`, action, summary: "", payload: null, status, expiresAt: at(900), estimatedUnits: null, costIfApproved: null, preview: null, decidedVia: null, decidedByUserId: null, decidedAt, note: null });
+const gate = (action: string, status: GateDetail["status"], decidedAt: string | null = null, gateId = `g-${action}`): GateDetail =>
+  ({ gateId, action, summary: "", payload: null, status, expiresAt: at(900), estimatedUnits: null, costIfApproved: null, preview: null, decidedVia: null, decidedByUserId: null, decidedAt, note: null });
 
 describe("buildReplay", () => {
   it("puts each step in its lane, one beat per step when nothing overlaps", () => {
@@ -64,6 +64,16 @@ describe("buildReplay", () => {
     expect(asks).toHaveLength(2);
     expect(asks[0].detail).toMatch(/^Rejected/);
     expect(asks[1].detail).toMatch(/^Approved/);
+  });
+
+  it("matches a re-asked gate to its own record by gateId, so a pending second ask still waits", () => {
+    const g = buildReplay([
+      step("GATE_REQUESTED", { gateId: "g1", action: "post", summary: "One?" }, null, 1, "q1"), step("GATE_DECIDED", { gateId: "g1", action: "post", decision: "REJECTED" }, null, 2, "d1"),
+      step("GATE_REQUESTED", { gateId: "g2", action: "post", summary: "Two?" }, null, 3, "q2"),
+    ], [gate("post", "REJECTED", at(2), "g1"), gate("post", "PENDING", null, "g2")]);
+    const asks = g.blocks.filter((b) => b.label === "Asks you");
+    expect(asks[1]).toMatchObject({ tone: "waiting", detail: "Waiting for you" });
+    expect(g.blocks.filter((b) => b.tone === "ghost")).toHaveLength(1);
   });
 
   it("orders steps with no times by list order, one per beat, time blank", () => {
