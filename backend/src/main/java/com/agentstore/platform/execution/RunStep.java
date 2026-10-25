@@ -39,6 +39,9 @@ public class RunStep {
      * 'gate:<action>' | 'llm' | 'charge' | null. See {@link RunStepBlocks}. */
     private String block;
 
+    /** When the runtime call that produced this step began; null for steps not caused by a runtime call. */
+    private Instant startedAt;
+
     private Instant createdAt;
 
     public RunStep(UUID id, Run run, RunStepKind kind, String detail) {
