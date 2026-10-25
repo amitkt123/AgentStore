@@ -11,3 +11,4 @@
 @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
 .note { display: block; font-size: 11px; color: var(--ink3); margin-top: 2px; }
 .again { font-size: 13px; }
+.canvas { padding: 20px; }

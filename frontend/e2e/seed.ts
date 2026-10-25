@@ -26,6 +26,17 @@ async function signup(fullName: string, orgName: string, side: "BUYER" | "DEVELO
   return (await res.json()) as { token: string };
 }
 
+// Only the two seeded steps, so decisions recorded by earlier e2e runs do not pile up in the replay.
+async function seedSteps(pg: Client, runId: string) {
+  await pg.query("delete from run_step where run_id=$1", [runId]);
+  await pg.query(
+    `insert into run_step (id, run_id, kind, detail, block, source, created_at) values
+       (gen_random_uuid(), $1, 'READ', '{"count":412}', 'read:bank_statement', 'PLATFORM', now() - interval '4 minutes'),
+       (gen_random_uuid(), $1, 'GATE_REQUESTED', '{"action":"post_entries","summary":"Post 142 journal entries for August?"}', 'gate:post_entries', 'PLATFORM', now() - interval '3 minutes')`,
+    [runId],
+  );
+}
+
 // The approval spec consumes the seeded gate, so a re-run puts the run back to waiting instead of seeding twice.
 async function resetIfSeeded(): Promise<boolean> {
   const pg = new Client({ connectionString: DATABASE_URL });
@@ -42,6 +53,7 @@ async function resetIfSeeded(): Promise<boolean> {
       "update gate_request set status='PENDING', decided_by_user_id=null, decision_note=null, decided_at=null, decided_via=null, expires_at=now() + interval '1 day' where run_id=$1",
       [id],
     );
+    await seedSteps(pg, id);
     return true;
   } finally {
     await pg.end();
@@ -131,12 +143,7 @@ async function main() {
      returning id`,
     [runId, JSON.stringify({ columns: ["party", "amount"], rows: [{ party: "NEFT ACME 0814", amount: 48200 }], totalRows: 142 })],
   )).rows[0].id;
-  await pg.query(
-    `insert into run_step (id, run_id, kind, detail, block, source) values
-       (gen_random_uuid(), $1, 'READ', '{"count":412}', 'read:bank_statement', 'PLATFORM'),
-       (gen_random_uuid(), $1, 'GATE_REQUESTED', '{}', 'gate:post_entries', 'PLATFORM')`,
-    [runId],
-  );
+  await seedSteps(pg, runId);
   await pg.end();
 
   console.log("Buyer admin login:    e2e-buyer@example.com / e2e-password");
