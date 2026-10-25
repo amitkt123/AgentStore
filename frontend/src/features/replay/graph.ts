@@ -39,11 +39,15 @@ const gateKey = (s: RunStep, d: Detail): string | null => str(d.action) ?? (s.bl
 type Outcome = "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED";
 interface Item { block: ReplayBlock; start: number | null; end: number | null; outcome?: Outcome; stagedResource?: string | null }
 
+/** Internal keys never shown as facts: raw ids and plumbing. */
+const INTERNAL = new Set(["block", "source"]);
+const internal = (k: string) => INTERNAL.has(k) || k === "id" || /Id$/.test(k);
+
 const factsOf = (s: RunStep, d: Detail, time: string | null): [string, string][] => {
   const facts: [string, string][] = [["Step", stepText(s)]];
   if (time) facts.push(["Time", time]);
   for (const [k, v] of Object.entries(d)) {
-    if (v === null || v === undefined || typeof v === "object") continue;
+    if (v === null || v === undefined || typeof v === "object" || internal(k)) continue;
     facts.push([humanize(k), String(v)]);
   }
   return facts;

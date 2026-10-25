@@ -100,4 +100,11 @@ describe("buildReplay", () => {
     const g = buildReplay([step("USAGE", { amount: 12 }, null, 1)], []);
     expect(g.blocks[0].metric).toBe(formatMoney(12));
   });
+
+  it("keeps internal ids out of a step's facts", () => {
+    const g = buildReplay([step("DATA_READ", { gateId: "g-123", runId: "r-456", stepId: "s-1", id: "x-1", block: "gate:post", source: "sdk", resource: "ledger" }, null, 1, "r")], []);
+    const facts = g.blocks[0].facts;
+    for (const v of ["g-123", "r-456", "s-1", "x-1", "gate:post", "sdk"]) expect(facts.some(([, f]) => f === v)).toBe(false);
+    expect(facts).toContainEqual(["Resource", "ledger"]);
+  });
 });
