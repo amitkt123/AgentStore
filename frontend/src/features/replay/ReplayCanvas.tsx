@@ -64,7 +64,10 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
 
   const sr = graph.blocks.filter((b) => b.beat < visible && b.tone !== "ghost").map((b) => {
     const ghost = graph.blocks.find((g) => g.id === `ghost:${b.id}` && g.beat < visible);
-    const taken = graph.edges.find((e) => e.from === b.id && !e.ghost && e.label)?.label;
+    // The taken word: from the taken edge, else the opposite of the not-taken edge (a gate that ended the run).
+    const ghostLabel = graph.edges.find((e) => e.from === b.id && e.ghost)?.label;
+    const taken = graph.edges.find((e) => e.from === b.id && !e.ghost && e.label)?.label
+      ?? (ghostLabel ? (ghostLabel === "Approved" ? "Rejected" : "Approved") : undefined);
     return { id: b.id, text: ghost && taken ? `${say(b)}, then ${taken}. Not taken: ${ghost.title}${ghost.detail ? `, ${ghost.detail}` : ""}` : say(b) };
   });
 
@@ -72,6 +75,7 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
     const beat = beatOf.get(e.to) ?? 0;
     const a = placed.boxes.get(e.from), b = placed.boxes.get(e.to);
     if (beat >= visible || !a || !b) return null; // an arrow never exists before its step
+    if (e.ghost && lineOf(beat)) return null; // the not-taken arrow arrives with its block
     const { d, labelAt } = elbowPath(a, b);
     const growing = !e.ghost && lineOf(beat);
     const fading = e.ghost && drawing?.beat === beat;
@@ -119,10 +123,10 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
 
       <div ref={box} className={styles.scroll} data-scroll="">
         <div className={styles.spacer} style={{ width: placed.width * k, height: placed.height * k }}>
-          <div data-world="" aria-hidden="true" className={styles.world}
+          <div data-world="" className={styles.world}
             style={{ width: placed.width, height: placed.height, transform: `scale(${k})` }}>
             {placed.lanes.map((l, i) => (
-              <div key={l.lane} className={`${styles.lane} ${i % 2 ? styles.alt : ""}`} style={{ top: l.top, height: l.height }}>
+              <div key={l.lane} aria-hidden="true" className={`${styles.lane} ${i % 2 ? styles.alt : ""}`} style={{ top: l.top, height: l.height }}>
                 <span>{l.lane}</span>
               </div>
             ))}
@@ -146,6 +150,7 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
                   type="button"
                   data-block-id={b.id}
                   aria-pressed={selectedId === b.id}
+                  aria-label={say(b)}
                   className={`${styles.block} ${styles[b.tone]} ${b.beat === current && b.tone !== "ghost" ? styles.current : ""} ${selectedId === b.id ? styles.sel : ""} ${entering ? styles.enter : ""}`}
                   style={{ left: p.x, top: p.y, width: p.w, minHeight: p.h, ...(entering ? { animationDuration: `${enterMs}ms` } : {}) }}
                   onClick={() => onSelect?.(b.id)}

@@ -53,18 +53,39 @@ describe("ReplayCanvas", () => {
     expect(container.querySelector(`[data-block-id="${growing.getAttribute("data-to")}"]`)).not.toBeNull();
   });
 
-  it("fades the not-taken branch in without growing it", () => {
+  it("fades the not-taken branch in with its block, without growing it", () => {
     vi.useFakeTimers();
     const { container } = render(<ReplayCanvas graph={gated} live={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Replay" }));
     act(() => { vi.advanceTimersByTime(3200); }); // beat 2: the fork, line phase
+    expect(container.querySelector('path[data-growing][data-to="w"]')).not.toBeNull();
+    expect(container.querySelector('path[data-edge="ghost"]')).toBeNull();
+    expect(container.querySelector('[data-block-id="ghost:q"]')).toBeNull();
+    act(() => { vi.advanceTimersByTime(700); }); // block phase
     const ghost = container.querySelector('path[data-edge="ghost"]')!;
     expect(ghost).not.toBeNull();
     expect(ghost).not.toHaveAttribute("data-growing");
     expect(ghost).toHaveAttribute("data-fading");
-    expect(container.querySelector('path[data-growing][data-to="w"]')).not.toBeNull();
-    act(() => { vi.advanceTimersByTime(1600); });
-    expect(container.querySelector('path[data-edge="ghost"]')).not.toHaveAttribute("data-growing");
+    expect(ghost).toHaveAttribute("marker-end");
+    expect(container.querySelector('[data-block-id="ghost:q"]')).not.toBeNull();
+  });
+
+  it("keeps the block buttons out of hidden decoration, named in words", () => {
+    render(<ReplayCanvas graph={gated} live={false} />);
+    for (const h of document.querySelectorAll('[aria-hidden="true"]')) expect(h.querySelector("button")).toBeNull();
+    const d = gated.blocks.find((b) => b.id === "d")!;
+    expect(d.detail).toBe("Ledger");
+    expect(screen.getByRole("button", { name: `Draft: ${d.title}, Ledger` })).toHaveAttribute("data-block-id", "d");
+  });
+
+  it("narrates the branch when a rejected gate ends the run", () => {
+    const g = buildReplay([
+      step("WRITE_STAGED", { resource: "ledger", count: 2 }, 1, 2, "d"), step("GATE_REQUESTED", { action: "post", summary: "Post?" }, null, 3, "q"),
+      step("GATE_DECIDED", { action: "post", decision: "REJECTED" }, null, 60, "r"),
+    ], []);
+    render(<ReplayCanvas graph={g} live={false} />);
+    const items = within(screen.getByRole("list", { name: "Steps in order" })).getAllByRole("listitem");
+    expect(items[1]).toHaveTextContent("then Rejected. Not taken: Would have posted, Ledger");
   });
 
   it("tells screen readers the steps and the branch in words", () => {
