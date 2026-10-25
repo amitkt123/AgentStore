@@ -1,5 +1,5 @@
 "use client";
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Glass } from "@/ui/Glass";
 import styles from "./ReplayCanvas.module.css";
 import type { ReplayBlock, ReplayEdge, ReplayGraph } from "./graph";
@@ -7,6 +7,7 @@ import { elbowPath, placeReplay } from "./place";
 import { CATCH_UP_MS, usePrefersReducedMotion, useReplay } from "./useReplay";
 
 type Props = { graph: ReplayGraph; live: boolean; selectedId?: string; onSelect?: (id: string) => void };
+export interface ReplayCanvasHandle { focusBlock(id: string): void }
 
 const MIN_SCALE = 0.8, DOT = 22, ENTER_MS = 600;
 const atEnd = (el: HTMLElement) => el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
@@ -20,7 +21,11 @@ const measure = (p: SVGPathElement | null) => {
 
 const say = (b: ReplayBlock) => `${b.label}: ${b.title}${b.detail ? `, ${b.detail}` : ""}`;
 
-export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
+export const ReplayCanvas = forwardRef<ReplayCanvasHandle, Props>(function ReplayCanvas({ graph, live, selectedId, onSelect }, ref) {
+  const root = useRef<HTMLElement>(null);
+  useImperativeHandle(ref, () => ({
+    focusBlock: (id) => Array.from(root.current?.querySelectorAll<HTMLElement>("[data-block-id]") ?? []).find((b) => b.dataset.blockId === id)?.focus(),
+  }), []);
   const reducedMotion = usePrefersReducedMotion();
   const perBeat = useMemo(() => {
     const out: string[][] = Array.from({ length: graph.beats }, () => []);
@@ -111,7 +116,7 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
   const n = visible, total = graph.beats;
   const busy = live;
   return (
-    <section aria-label="Run replay" className={styles.panel} style={{ backgroundSize: `${DOT * k}px ${DOT * k}px` }}>
+    <section ref={root} aria-label="Run replay" className={styles.panel} style={{ backgroundSize: `${DOT * k}px ${DOT * k}px` }}>
       <Glass level={2} className={styles.controls} role="group" aria-label="Replay controls">
         <button type="button" className={styles.btn} disabled={busy || total === 0} onClick={r.replay}>Replay</button>
         <button type="button" className={styles.btn} disabled={busy || (!r.playing && !drawing && visible >= total)} onClick={r.playing ? r.pause : r.resume}>
@@ -185,4 +190,4 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
       </ol>
     </section>
   );
-}
+});

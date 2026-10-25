@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import styles from "./LiveRun.module.css";
 import { useRunPolling } from "./useRunPolling";
 import { isTerminal, statusPill, terminalText } from "./status";
@@ -7,7 +7,7 @@ import { Glass } from "@/ui/Glass";
 import { GateCard } from "@/features/gates/GateCard";
 import { Pill } from "@/ui/Pill";
 import { ErrorState } from "@/ui/ErrorState";
-import { ReplayCanvas } from "@/features/replay/ReplayCanvas";
+import { ReplayCanvas, type ReplayCanvasHandle } from "@/features/replay/ReplayCanvas";
 import { buildReplay } from "@/features/replay/graph";
 import { formatMoney, formatTime } from "@/lib/format";
 import type { GateStatus, Manifest, RunSnapshot } from "@/lib/api/types";
@@ -21,6 +21,8 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
     isDone: (s) => isTerminal(s.detail.status),
   });
   const [sel, setSel] = useState<string | undefined>(undefined);
+  const canvas = useRef<ReplayCanvasHandle>(null);
+  const replay = useMemo(() => buildReplay(data.detail.steps, data.gates), [data.detail.steps, data.gates]);
   if (forbidden) return <ErrorState message="You don't have access to this run." />;
 
   const { detail, flow, gates } = data;
@@ -28,14 +30,12 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
   const why = terminalText(detail.terminalReason);
   const pending = gates.filter((g) => g.status === "PENDING");
   const terminal = isTerminal(detail.status);
-  const replay = buildReplay(detail.steps, gates);
   const block = replay.blocks.find((b) => b.id === sel);
   const toggle = (id: string) => setSel((cur) => (cur === id ? undefined : id));
   const close = () => {
     const prev = sel;
     setSel(undefined);
-    const btns = document.querySelectorAll<HTMLElement>('section[aria-label="Run replay"] [data-block-id]');
-    Array.from(btns).find((b) => b.dataset.blockId === prev)?.focus();
+    if (prev) canvas.current?.focusBlock(prev);
   };
   const cap = flow.spend.cap;
 
@@ -49,7 +49,7 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
       {why && terminal && <p className={styles.why}>{why}</p>}
       {pending.map((g) => <GateCard key={g.gateId} runRef={runRef} gate={g} canDecide={canDecide} viewerUserId={viewerUserId} />)}
       <Glass as="section" className={styles.canvas}>
-        <ReplayCanvas graph={replay} live={!terminal} selectedId={sel} onSelect={toggle} />
+        <ReplayCanvas ref={canvas} graph={replay} live={!terminal} selectedId={sel} onSelect={toggle} />
       </Glass>
       {gates.filter((g) => g.status !== "PENDING").map((g) => (
         <details key={g.gateId} className={styles.decided} open={!isTerminal(detail.status)}>
