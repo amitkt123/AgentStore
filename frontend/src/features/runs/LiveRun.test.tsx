@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
 vi.mock("./useRunPolling", () => ({ useRunPolling: vi.fn() }));
@@ -6,6 +7,7 @@ vi.mock("@/app/(app)/runs/actions", () => ({ decideGateAction: vi.fn() }));
 import { useRunPolling } from "./useRunPolling";
 import { LiveRun } from "./LiveRun";
 import type { RunSnapshot } from "@/lib/api/types";
+import { bankManifest } from "@/features/flow/fixtures";
 
 const snap = (over: Partial<RunSnapshot["detail"]> = {}, gates: RunSnapshot["gates"] = []): RunSnapshot => ({
   detail: { id: "i", displayId: "R-2291", status: "AWAITING_APPROVAL", terminalReason: null, costCap: 500, totalCharged: 96, steps: [{ kind: "GATE_REQUESTED", detail: "{}", createdAt: "2026-09-29T10:05:00Z" }], ...over },
@@ -57,4 +59,52 @@ it("keeps a just-decided approval open while the run is still going", () => {
   const { container } = render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide viewerUserId="u1" />);
   expect(container.querySelector("details")).toHaveAttribute("open");
   expect(screen.getByText(/you approved this/i)).toBeVisible();
+});
+
+it("filters the timeline to a clicked node and shows all again", async () => {
+  const s = snap({ steps: [{ kind: "GATE_REQUESTED", detail: "{}", createdAt: "2026-09-29T10:05:00Z" }, { kind: "LLM_CALL", detail: "{}", createdAt: "2026-09-29T10:04:00Z" }] });
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  await userEvent.click(screen.getByRole("button", { name: /Your approval/ }));
+  expect(screen.getByText("Asked for your approval")).toBeInTheDocument();
+  expect(screen.queryByText("Asked the AI model")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Show all steps" }));
+  expect(screen.getByText("Asked the AI model")).toBeInTheDocument();
+});
+
+it("keeps the selection and moves the active edge when a poll changes state", async () => {
+  const s = snap();
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  const { container, rerender } = render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  await userEvent.click(screen.getByRole("button", { name: /Your approval/ }));
+  const next = snap({ status: "RUNNING" });
+  next.flow = { ...next.flow, blocks: [{ ...next.flow.blocks[0], state: "DONE" }, next.flow.blocks[1]], reachedBlock: "charge" };
+  vi.mocked(useRunPolling).mockReturnValue({ data: next, error: null, forbidden: false });
+  rerender(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  expect(screen.getByRole("button", { name: /Your approval/ })).toHaveAttribute("aria-pressed", "true");
+  expect(container.querySelector('path[data-active="true"]')).toHaveAttribute("data-to", "charge");
+});
+
+it("stops the pulse and marks the reject end on a rejected run", () => {
+  const s = snap({ status: "FAILED", terminalReason: "GATE_REJECTED" }, [{ ...gate, status: "REJECTED", decidedAt: "2026-09-29T10:06:00Z" }]);
+  s.flow = { ...s.flow, blocks: [
+    { block: "read:bank_statement", state: "DONE", metrics: null, gateId: null, flag: null },
+    { block: "draft:ledger", state: "DONE", metrics: null, gateId: null, flag: null },
+    { block: "gate:post_entries", state: "DONE", metrics: null, gateId: "g1", flag: null },
+    { block: "charge", state: "SKIPPED", metrics: null, gateId: null, flag: null },
+  ] };
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  const { container } = render(<LiveRun runRef="R-2291" initial={s} manifest={bankManifest} canDecide />);
+  expect(container.querySelectorAll("circle")).toHaveLength(0);
+  expect(container.querySelector("[data-end]")).toHaveTextContent(/you rejected the approval/i);
+  expect(container.querySelector('[data-node-id="post:ledger"]')).toHaveTextContent("Skipped");
+});
+
+it("shows spend as a meter", () => {
+  const s = snap();
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  const meter = screen.getByRole("meter", { name: "Spend" });
+  expect(meter).toHaveAttribute("aria-valuenow", "96");
+  expect(meter).toHaveAttribute("aria-valuemax", "500");
 });
