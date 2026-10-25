@@ -26,6 +26,9 @@ test("buyer admin uploads a file, sees the store flow and the plug-in screen", a
   await page.goto("/store");
   await page.getByRole("link", { name: /E2E Bank Reconciliation/ }).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("E2E Bank Reconciliation");
+  await expect(page.getByText("Approved", { exact: true })).toBeVisible();
+  await expect(page.getByText("Rejected", { exact: true })).toBeVisible();
+  await expect(page.getByText("Stops here, nothing is posted")).toBeVisible();
   // The seed's run already connects this buyer to the agent, so the store offers Run now; the plug-in screen is still reachable.
   await page.goto(page.url().replace("/store/", "/connect/"));
   await expect(page.getByText("Can write: Ledger, only after your approval")).toBeVisible();
@@ -41,13 +44,13 @@ test("buyer admin sees a waiting run but cannot decide it", async ({ page }) => 
   await expect(page.getByRole("link", { name: "R-E2E1", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "R-E2E1", exact: true }).click();
   await expect(page.getByText("Post 142 journal entries for August?", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
 });
 
 test("approver approves the gate from the run page and the run moves on", async ({ page }) => {
   await signIn(page, "e2e-approver@example.com");
   await page.goto("/runs/R-E2E1");
-  await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByText(/You approved this/)).toBeVisible();
   await page.goto("/runs");
   await expect(page.getByRole("link", { name: "R-E2E1", exact: true })).toBeVisible();

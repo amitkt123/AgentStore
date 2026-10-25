@@ -11,12 +11,14 @@ for (const w of widths) {
     await page.getByLabel("Password").fill("e2e-password");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL(/\/home$/);
-    for (const p of pages) {
+    await page.goto("/store");
+    const detail = await page.getByRole("link", { name: /E2E Bank Reconciliation/ }).first().getAttribute("href");
+    for (const p of [...pages, detail!, "/runs/R-E2E1"]) {
       await page.goto(p);
       await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow, `${p} overflows at ${w}px`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: `test-results/${w}${p.replace("/", "-")}.png`, fullPage: true });
+      await page.screenshot({ path: `test-results/${w}${p.replace(/\//g, "-")}.png`, fullPage: true });
     }
   });
 }
