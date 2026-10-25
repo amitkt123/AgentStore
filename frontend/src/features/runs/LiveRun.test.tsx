@@ -86,7 +86,7 @@ it("keeps the selection and moves the active edge when a poll changes state", as
 });
 
 it("stops the pulse and marks the reject end on a rejected run", () => {
-  const s = snap({ status: "FAILED", terminalReason: "GATE_REJECTED" }, [{ ...gate, status: "REJECTED", decidedAt: "2026-09-29T10:06:00Z" }]);
+  const s = snap({ status: "FAILED", terminalReason: "GATE_REJECTED" }, [{ ...gate, action: "post_entries", status: "REJECTED", decidedAt: "2026-09-29T10:06:00Z" }]);
   s.flow = { ...s.flow, blocks: [
     { block: "read:bank_statement", state: "DONE", metrics: null, gateId: null, flag: null },
     { block: "draft:ledger", state: "DONE", metrics: null, gateId: null, flag: null },

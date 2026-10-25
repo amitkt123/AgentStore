@@ -15,13 +15,12 @@ import { ErrorState } from "@/ui/ErrorState";
 import { formatMoney, formatTime, formatWhen } from "@/lib/format";
 import type { GateDetail, GateStatus, Manifest, RunSnapshot } from "@/lib/api/types";
 
-/** The latest decided gate's outcome, else PENDING while one waits, else null. */
-function outcomeOf(gates: GateDetail[]): GateOutcome {
-  const decided = gates.filter((g) => g.status !== "PENDING" && g.decidedAt).sort((a, b) => (a.decidedAt! < b.decidedAt! ? 1 : -1));
-  if (decided.length) return decided[0].status;
-  const any = gates.find((g) => g.status !== "PENDING");
-  if (any) return any.status;
-  return gates.length ? "PENDING" : null;
+/** Each gate's outcome keyed by its block id; a re-asked gate keeps its latest answer. */
+function outcomesOf(gates: GateDetail[]): Record<string, GateOutcome> {
+  const out: Record<string, GateOutcome> = {};
+  const latest = [...gates].sort((x, y) => ((x.decidedAt ?? "\uffff") < (y.decidedAt ?? "\uffff") ? -1 : 1));
+  for (const g of latest) out[`gate:${g.action}`] = g.status;
+  return out;
 }
 
 const GATE_OUTCOME: Record<GateStatus, string> = { PENDING: "Waiting", APPROVED: "Approved", REJECTED: "Rejected", EXPIRED: "Expired" };
@@ -41,7 +40,7 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
   const pending = gates.filter((g) => g.status === "PENDING");
   const views = toBlockViews(flow.blocks.map((b) => ({ id: b.block, state: b.state, metrics: b.metrics, flag: b.flag })), manifest);
   const terminal = isTerminal(detail.status);
-  const graph = layoutFlow(views, { gateOutcome: outcomeOf(gates), reachedBlock: flow.reachedBlock, terminal });
+  const graph = layoutFlow(views, { gateOutcomes: outcomesOf(gates), reachedBlock: flow.reachedBlock, terminal, succeeded: detail.status === "COMPLETED" });
   const selNode = [...graph.columns.flatMap((c) => c.nodes), ...graph.offPath].find((n) => n.id === sel);
   const steps = selNode ? stepsForNode(detail.steps, selNode) : detail.steps;
   const endReached = graph.ends.some((e) => e.reached);

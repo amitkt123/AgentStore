@@ -8,7 +8,6 @@ import type { BlockState } from "@/lib/api/types";
 const STATE_TEXT: Record<BlockState, string> = {
   DONE: "Done", WAITING: "Waiting for you", FAILED: "Failed", SKIPPED: "Skipped", IDLE: "Not started",
 };
-const ZERO: Box = { x: 0, y: 0, w: 0, h: 0 };
 
 type Props = { graph: FlowGraph; selectedId?: string; onSelect?: (id: string) => void; showState?: boolean; live?: boolean; caption?: boolean; endText?: string | null };
 
@@ -62,6 +61,7 @@ export function FlowCanvas({ graph, selectedId, onSelect, showState = true, live
   const boxes = useBoxes(root, graph);
   const marker = `arrow-${useId().replace(/:/g, "")}`;
   const stateOf = new Map<string, BlockState>([...graph.columns.flatMap((c) => c.nodes), ...graph.offPath].map((n) => [n.id, n.state]));
+  const endsReached = new Set(graph.ends.filter((e) => e.reached).map((e) => e.id));
   const node = (n: FlowNode) => <Node key={n.id} n={n} selected={selectedId === n.id} onSelect={onSelect} showState={showState} />;
 
   return (
@@ -74,9 +74,11 @@ export function FlowCanvas({ graph, selectedId, onSelect, showState = true, live
             </marker>
           </defs>
           {graph.edges.map((e) => {
-            const a = boxes.get(e.from) ?? ZERO, b = boxes.get(e.to) ?? ZERO;
+            const a = boxes.get(e.from), b = boxes.get(e.to);
+            if (!a || !b) return null; // not measured yet: no arrow rather than one from the corner
             const d = edgePath(a, b);
             const active = e.to === graph.activeTo;
+            const halted = e.kind === "rejected" && endsReached.has(e.to);
             const mid = edgeMidpoint(a, b);
             return (
               <g key={`${e.from}>${e.to}`}>
@@ -86,7 +88,8 @@ export function FlowCanvas({ graph, selectedId, onSelect, showState = true, live
                   data-from={e.from}
                   data-to={e.to}
                   data-active={active || undefined}
-                  className={`${styles.edge} ${styles[e.kind]} ${styles[`from${stateOf.get(e.from) ?? "IDLE"}`]} ${active ? styles.active : ""}`}
+                  data-stopped={halted || undefined}
+                  className={`${styles.edge} ${styles[e.kind]} ${styles[`from${stateOf.get(e.from) ?? "IDLE"}`]} ${active ? styles.active : ""} ${halted ? styles.halted : ""}`}
                   markerEnd={`url(#${marker})`}
                 />
                 {(e.kind === "approved" || e.kind === "rejected") && (

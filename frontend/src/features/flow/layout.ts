@@ -17,12 +17,17 @@ export interface FlowGraph {
   activeTo: string | null;
 }
 
-type Opts = { gateOutcome?: GateOutcome; reachedBlock?: string | null; terminal?: boolean };
+/** gateOutcomes is keyed by gate node id (`gate:<action>`); succeeded means the run ended well. */
+type Opts = { gateOutcomes?: Record<string, GateOutcome>; reachedBlock?: string | null; terminal?: boolean; succeeded?: boolean };
 
-function postState({ gateOutcome = null, terminal = false }: Opts): BlockState {
-  if (gateOutcome === "APPROVED") return "DONE";
-  if (gateOutcome === "REJECTED" || gateOutcome === "EXPIRED" || terminal) return "SKIPPED";
-  return "IDLE";
+const stopped = (o: GateOutcome | undefined) => o === "REJECTED" || o === "EXPIRED";
+
+/** A post is done only once every gate is approved and the run got past the write; any stopped gate skips it. */
+function postState(gateIds: string[], { gateOutcomes = {}, reachedBlock = null, terminal = false, succeeded = false }: Opts): BlockState {
+  const outcomes = gateIds.map((id) => gateOutcomes[id]);
+  if (outcomes.some(stopped)) return "SKIPPED";
+  if (outcomes.every((o) => o === "APPROVED") && (reachedBlock === "charge" || (terminal && succeeded))) return "DONE";
+  return terminal ? "SKIPPED" : "IDLE";
 }
 
 /**
@@ -42,7 +47,7 @@ export function layoutFlow(blocks: BlockView[], opts: Opts = {}): FlowGraph {
       const r = d.id.slice(d.id.indexOf(":") + 1);
       byStage.get("Writes")!.push({
         id: `post:${r}`, kind: "Writes", stage: "Writes", title: `Posts ${humanize(r).toLowerCase()}`, body: "Only after your approval.",
-        state: postState(opts), metric: null, undeclared: false, derived: true,
+        state: postState(gates.map((g) => g.id), opts), metric: null, undeclared: false, derived: true,
       });
     }
   }
@@ -54,8 +59,7 @@ export function layoutFlow(blocks: BlockView[], opts: Opts = {}): FlowGraph {
     if (!next) return;
     for (const a of col.nodes) for (const b of next.nodes) edges.push({ from: a.id, to: b.id, kind: col.stage === "Asks you" ? "approved" : "main" });
   });
-  const reached = opts.gateOutcome === "REJECTED" || opts.gateOutcome === "EXPIRED";
-  const ends: EndNode[] = gates.map((g) => ({ id: `end:${g.id}`, gateId: g.id, label: "Stops here, nothing is posted", reached }));
+  const ends: EndNode[] = gates.map((g) => ({ id: `end:${g.id}`, gateId: g.id, label: "Stops here, nothing is posted", reached: stopped(opts.gateOutcomes?.[g.id]) }));
   ends.forEach((e) => edges.push({ from: e.gateId, to: e.id, kind: "rejected" }));
   for (const n of offPath) {
     const before = columns.filter((c) => STAGES.indexOf(c.stage) < STAGES.indexOf(n.stage)).pop();

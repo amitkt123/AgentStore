@@ -1,4 +1,4 @@
-import { layoutFlow } from "./layout";
+import { layoutFlow, type GateOutcome } from "./layout";
 import { bankManifest, fixtureViews, manifestViews } from "./fixtures";
 import type { BlockView } from "./blocks";
 
@@ -31,11 +31,31 @@ it("fans in from several reads", () => {
 
 it("derives the post state from the gate outcome", () => {
   const post = (o: Parameters<typeof layoutFlow>[1]) => layoutFlow(bank(), o).columns[4].nodes[0].state;
-  expect(post({ gateOutcome: "APPROVED" })).toBe("DONE");
-  expect(post({ gateOutcome: "REJECTED" })).toBe("SKIPPED");
-  expect(layoutFlow(bank(), { gateOutcome: "REJECTED" }).ends[0].reached).toBe(true);
-  expect(post({ gateOutcome: "EXPIRED" })).toBe("SKIPPED");
-  expect(post({ gateOutcome: null, terminal: true })).toBe("SKIPPED");
+  const g = (o: GateOutcome) => ({ "gate:post_entries": o });
+  expect(post({ gateOutcomes: g("APPROVED") })).toBe("IDLE");
+  expect(post({ gateOutcomes: g("APPROVED"), reachedBlock: "charge" })).toBe("DONE");
+  expect(post({ gateOutcomes: g("APPROVED"), terminal: true, succeeded: true })).toBe("DONE");
+  expect(post({ gateOutcomes: g("REJECTED") })).toBe("SKIPPED");
+  expect(layoutFlow(bank(), { gateOutcomes: g("REJECTED") }).ends[0].reached).toBe(true);
+  expect(post({ gateOutcomes: g("EXPIRED") })).toBe("SKIPPED");
+  expect(post({ terminal: true })).toBe("SKIPPED");
+});
+
+it("does not call a write done when the run failed after approval", () => {
+  const post = layoutFlow(bank(), { gateOutcomes: { "gate:post_entries": "APPROVED" }, reachedBlock: "draft:ledger", terminal: true, succeeded: false }).columns[4].nodes[0];
+  expect(post.state).toBe("SKIPPED");
+});
+
+it("judges each gate on its own outcome", () => {
+  const m = { ...bankManifest, approvalGates: [
+    { trigger: "a", description: "", timeoutMinutes: 30, preview: null },
+    { trigger: "b", description: "", timeoutMinutes: 30, preview: null },
+  ] };
+  const waiting = layoutFlow(manifestViews(m), { gateOutcomes: { "gate:a": "APPROVED", "gate:b": "PENDING" }, reachedBlock: "charge" });
+  expect(waiting.columns.find((c) => c.stage === "Writes")!.nodes[0].state).toBe("IDLE");
+  const rejected = layoutFlow(manifestViews(m), { gateOutcomes: { "gate:a": "APPROVED", "gate:b": "REJECTED" }, terminal: true });
+  expect(rejected.ends.map((e) => e.reached)).toEqual([false, true]);
+  expect(rejected.columns.find((c) => c.stage === "Writes")!.nodes[0].state).toBe("SKIPPED");
 });
 
 it("lays out the run fixture with the undeclared block off the path", () => {

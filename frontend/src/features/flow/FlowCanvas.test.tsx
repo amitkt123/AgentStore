@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
 import { FlowCanvas, FlowMini, miniLabel } from "./FlowCanvas";
 import { layoutFlow } from "./layout";
@@ -77,4 +78,14 @@ it("labels the mini flow in words", () => {
   expect(miniLabel(bankGraph())).toBe("Reads 1, thinks, drafts 1, asks you once, writes 1, then charges");
   render(<FlowMini graph={bankGraph()} />);
   expect(screen.getByRole("img")).toHaveAccessibleName("Reads 1, thinks, drafts 1, asks you once, writes 1, then charges");
+});
+
+it("draws no arrows before the nodes are measured", () => {
+  expect(renderToString(<FlowCanvas graph={bankGraph()} />)).not.toContain("data-edge");
+});
+
+it("colours the arrow into a reached reject end as the place the run stopped", () => {
+  const g = layoutFlow(manifestViews(bankManifest), { gateOutcomes: { "gate:post_entries": "REJECTED" }, terminal: true });
+  const { container } = render(<FlowCanvas graph={g} />);
+  expect(container.querySelector('path[data-edge="rejected"]')).toHaveAttribute("data-stopped", "true");
 });

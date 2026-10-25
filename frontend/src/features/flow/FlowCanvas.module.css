@@ -42,6 +42,7 @@
 .rejected { stroke: var(--ink3); stroke-dasharray: 3 4; }
 .undeclared { stroke: var(--bad); stroke-dasharray: 3 4; opacity: 1; }
 .active { stroke: var(--b); stroke-width: 2; stroke-dasharray: none; opacity: 1; }
+.halted { stroke: var(--bad); stroke-width: 2; stroke-dasharray: none; opacity: 1; }
 .label { font-size: 11px; font-weight: 600; fill: var(--ink2); paint-order: stroke; stroke: var(--g); stroke-width: 4px; }
 .pulse { fill: var(--b); offset-distance: 0%; offset-rotate: 0deg; animation: travel var(--dur-flow) linear infinite; }
 @keyframes travel { to { offset-distance: 100%; } }
