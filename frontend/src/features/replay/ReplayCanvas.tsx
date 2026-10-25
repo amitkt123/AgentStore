@@ -51,16 +51,19 @@ export const ReplayCanvas = forwardRef<ReplayCanvasHandle, Props>(function Repla
     return () => ro.disconnect();
   }, [placed.width]);
 
-  // Live: read whether the user sits at the right end before the new content lands, then keep them there.
+  // Live: whether the user sits at the right end, kept from scroll events so it is known before new content lands.
   const seenBeats = useRef(graph.beats);
   const stick = useRef(false);
-  if (graph.beats !== seenBeats.current && box.current) stick.current = live && atEnd(box.current);
+  const onScroll = () => { if (box.current) stick.current = atEnd(box.current); };
   useLayoutEffect(() => {
-    if (graph.beats === seenBeats.current) return;
-    seenBeats.current = graph.beats;
-    if (stick.current && box.current) box.current.scrollLeft = box.current.scrollWidth;
-    stick.current = false;
-  }, [graph.beats]);
+    const el = box.current;
+    if (!el) return;
+    if (graph.beats !== seenBeats.current) {
+      seenBeats.current = graph.beats;
+      if (live && stick.current) el.scrollLeft = el.scrollWidth;
+    }
+    stick.current = atEnd(el);
+  }, [graph.beats, live]);
 
   const { visible, drawing, speed, settled } = r;
   const lineOf = (beat: number) => drawing?.beat === beat && drawing.phase === "line";
@@ -133,7 +136,7 @@ export const ReplayCanvas = forwardRef<ReplayCanvasHandle, Props>(function Repla
         <span className={styles.now} aria-hidden="true">Step {n} of {total}</span>
       </Glass>
 
-      <div ref={box} className={styles.scroll} data-scroll="">
+      <div ref={box} className={styles.scroll} data-scroll="" onScroll={onScroll}>
         <div className={styles.spacer} style={{ width: placed.width * k, height: placed.height * k }}>
           <div data-world="" className={styles.world}
             style={{ width: placed.width, height: placed.height, transform: `scale(${k})` }}>

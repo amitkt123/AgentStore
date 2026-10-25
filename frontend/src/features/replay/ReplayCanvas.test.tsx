@@ -156,9 +156,11 @@ describe("ReplayCanvas", () => {
     const box = (c: HTMLElement) => c.querySelector("[data-scroll]") as HTMLElement;
     const { container, rerender } = render(<ReplayCanvas graph={long(3)} live />);
     Object.defineProperty(box(container), "scrollLeft", { value: 600, writable: true, configurable: true });
+    fireEvent.scroll(box(container));
     rerender(<ReplayCanvas graph={long(4)} live />);
     expect(box(container).scrollLeft).toBe(1000);
     box(container).scrollLeft = 0;
+    fireEvent.scroll(box(container));
     rerender(<ReplayCanvas graph={long(5)} live />);
     expect(box(container).scrollLeft).toBe(0);
     sw.mockRestore(); cw.mockRestore();
