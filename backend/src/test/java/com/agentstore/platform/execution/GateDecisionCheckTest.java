@@ -77,16 +77,31 @@ class GateDecisionCheckTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void aMemberDowngradedFromApproverAfterTheGateOpenedIsRefused() {
+    void aBuyerAdminOnTheSnapshotCanDecide() {
         var s = scenario();
-        var membership = identities.member(s.buyer(), "downgraded-" + UUID.randomUUID() + "@example.com",
-                UserRole.BUYER_APPROVER, "Approver");
+        fixtures.approver(s);
+        var admin = identities.member(s.buyer(), "admin-" + UUID.randomUUID() + "@example.com",
+                UserRole.BUYER_ADMIN, "Finance lead");
         GateRequest gate = open(s, "tok-gd-4");
+        assertThat(gate.eligibleApproverIds()).contains(admin.getUser().getId());
+
+        gateService.decide(gate.getRun().getId(), gate.getId(), true, admin.getUser().getId(), null, DecisionChannel.WEB);
+
+        assertThat(gates.findById(gate.getId()).orElseThrow().getStatus()).isEqualTo(GateStatus.APPROVED);
+    }
+
+    @Test
+    void aMemberPromotedToAdminAfterTheGateOpenedCanStillDecide() {
+        var s = scenario();
+        var membership = identities.member(s.buyer(), "promoted-" + UUID.randomUUID() + "@example.com",
+                UserRole.BUYER_MEMBER, "Approver");
+        GateRequest gate = open(s, "tok-gd-8");
         membership.setRole(UserRole.BUYER_ADMIN);
         memberships.save(membership);
 
-        assertNotAnApprover(() -> gateService.decide(gate.getRun().getId(), gate.getId(), true,
-                membership.getUser().getId(), null, DecisionChannel.WEB));
+        gateService.decide(gate.getRun().getId(), gate.getId(), true, membership.getUser().getId(), null, DecisionChannel.WEB);
+
+        assertThat(gates.findById(gate.getId()).orElseThrow().getStatus()).isEqualTo(GateStatus.APPROVED);
     }
 
     @Test

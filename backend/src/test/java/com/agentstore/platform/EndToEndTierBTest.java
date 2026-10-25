@@ -129,7 +129,7 @@ class EndToEndTierBTest extends AbstractIntegrationTest {
 
         // A second person joins the same workspace as an approver through a real invitation.
         rest.exchange(url("/api/v1/orgs/" + buyerOrgId + "/invitations"), HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", "approver@acme.example", "role", "BUYER_APPROVER"),
+                new HttpEntity<>(Map.of("email", "approver@acme.example", "role", "BUYER_MEMBER"),
                         bearer(buyerLogin.token())), Void.class);
         String inviteToken = com.agentstore.platform.common.RecordingEmailSender.tokenFromLink(
                 emails.lastTo("approver@acme.example").orElseThrow(), "invite");

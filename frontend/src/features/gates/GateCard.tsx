@@ -17,6 +17,8 @@ export function GateCard({ runRef, gate, canDecide, viewerUserId }: { runRef: st
   const [pending, start] = useTransition();
   const expired = gateIsExpired(gate, Date.now());
   const decided = gate.status === "APPROVED" || gate.status === "REJECTED";
+  // The role says whether this viewer approves at all; the gate says whether its approver list includes them.
+  const mayDecide = canDecide && gate.viewerCanDecide;
 
   const decide = (d: "APPROVE" | "REJECT") =>
     start(async () => {
@@ -50,8 +52,8 @@ export function GateCard({ runRef, gate, canDecide, viewerUserId }: { runRef: st
       )}
       {decided && <p role="status">{decisionText(gate, viewerUserId)}</p>}
       {!decided && expired && <p role="status">This request has expired.</p>}
-      {!decided && !canDecide && <p role="status">An approver has to decide this. You can see what it will do but not answer it.</p>}
-      {!decided && canDecide && (
+      {!decided && !mayDecide && <p role="status">An approver has to decide this. You can see what it will do but not answer it.</p>}
+      {!decided && mayDecide && (
         <div className={styles.actions}>
           <Button variant="danger" disabled={expired} loading={pending} onClick={() => decide("REJECT")}>Reject</Button>
           <Button disabled={expired} loading={pending} onClick={() => decide("APPROVE")}>Approve</Button>

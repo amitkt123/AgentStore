@@ -183,13 +183,13 @@ class BillControllerTest extends AbstractIntegrationTest {
         UUID orgId = org.getId();
 
         assertThat(listStatus(orgId, auth(UUID.randomUUID(), UserRole.ADMIN))).isEqualTo(HttpStatus.OK);
-        assertThat(listStatus(orgId, auth(orgId, UserRole.BUYER_APPROVER))).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(listStatus(orgId, auth(orgId, UserRole.BUYER_MEMBER))).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(listStatus(orgId, auth(UUID.randomUUID(), UserRole.BUYER_ADMIN)))
                 .isEqualTo(HttpStatus.FORBIDDEN);
 
         assertThat(pay(orgId, b.getId(), auth(UUID.randomUUID(), UserRole.ADMIN), "UPI").getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(pay(orgId, b.getId(), auth(orgId, UserRole.BUYER_APPROVER), "UPI").getStatusCode())
+        assertThat(pay(orgId, b.getId(), auth(orgId, UserRole.BUYER_MEMBER), "UPI").getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(pay(orgId, b.getId(), auth(UUID.randomUUID(), UserRole.BUYER_ADMIN), "UPI").getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);

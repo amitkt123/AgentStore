@@ -19,14 +19,14 @@ class UserRepositoryTest extends AbstractIntegrationTest {
     void membershipLinksAUserToAnOrgWithARoleAndTitle() {
         Org org = orgRepository.save(new Org(null, "Acme SMB", OrgType.BUYER));
         User user = userRepository.save(new User(null, "finance-repo@acme.example", "hashed-pw", "Arjun Mehta"));
-        membershipRepository.save(new OrgMembership(user, org, UserRole.BUYER_APPROVER, "Accounts manager"));
+        membershipRepository.save(new OrgMembership(user, org, UserRole.BUYER_MEMBER, "Accounts manager"));
 
         var found = userRepository.findByEmailIgnoreCase("Finance-Repo@Acme.example");
         assertThat(found).isPresent();
         assertThat(membershipRepository.findByIdUserIdOrderByCreatedAtAsc(found.get().getId()))
                 .singleElement().satisfies(m -> {
                     assertThat(m.getOrg().getName()).isEqualTo("Acme SMB");
-                    assertThat(m.getRole()).isEqualTo(UserRole.BUYER_APPROVER);
+                    assertThat(m.getRole()).isEqualTo(UserRole.BUYER_MEMBER);
                     assertThat(m.getTitle()).isEqualTo("Accounts manager");
                 });
     }

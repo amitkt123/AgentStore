@@ -38,7 +38,7 @@ class DatasetCheckEndpointTest extends AbstractStorageIntegrationTest {
                                                        UUID datasetId, UUID versionId, String resource) {
         return rest.exchange("http://localhost:" + port + "/api/v1/datasets/" + datasetId + "/check", HttpMethod.POST,
                 new HttpEntity<>(Map.of("agentVersionId", versionId, "resource", resource),
-                        fx.bearer(caller, UserRole.BUYER_APPROVER)), Map.class);
+                        fx.bearer(caller, UserRole.BUYER_MEMBER)), Map.class);
     }
 
     @Test

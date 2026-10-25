@@ -3,6 +3,7 @@ package com.agentstore.platform.execution;
 import com.agentstore.platform.events.DomainEventPublisher;
 import com.agentstore.platform.identity.OrgMembershipId;
 import com.agentstore.platform.identity.OrgMembershipRepository;
+import com.agentstore.platform.identity.OrgRoles;
 import com.agentstore.platform.identity.UserRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.ApplicationEventPublisher;
@@ -149,28 +150,37 @@ public class GateService {
     }
 
     /**
-     * The decider must be a current BUYER_APPROVER of the run's buyer org (checked against the database, not the
+     * The decider must be a current BUYER_ADMIN or BUYER_MEMBER of the run's buyer org (checked against the database, not the
      * token, which can outlive a membership) and, when the gate carries an approver snapshot, be on it. A sandbox run
      * has no buyer org and is unrestricted; so is a gate with no snapshot (an org with no approver members), which
-     * would otherwise deadlock. A run with no gate row is restricted only when its org has an approver member.
+     * would otherwise deadlock. A run with no gate row is restricted only when its org has such a member.
      */
     private void requireApprover(Run run, GateRequest gate, UUID userId) {
+        if (!isApprover(run, gate, userId)) {
+            throw new NotAnApproverException();
+        }
+    }
+
+    /** Whether this caller would pass the decision endpoints for this gate: a buyer role in the token, then {@link #requireApprover}. */
+    public boolean mayDecide(Run run, GateRequest gate, UUID userId, UserRole role) {
+        return OrgRoles.canDecideGates(role) && isApprover(run, gate, userId);
+    }
+
+    private boolean isApprover(Run run, GateRequest gate, UUID userId) {
         if (run.getConnection() == null) {
-            return;
+            return true;
         }
         UUID orgId = run.getConnection().getBuyerOrg().getId();
         List<UUID> eligible = gate != null ? gate.eligibleApproverIds() : null;
         boolean restricted = gate != null
                 ? eligible != null
-                : memberships.countByIdOrgIdAndRole(orgId, UserRole.BUYER_APPROVER) > 0;
+                : memberships.countByIdOrgIdAndRoleIn(orgId, List.of(UserRole.BUYER_ADMIN, UserRole.BUYER_MEMBER)) > 0;
         if (!restricted) {
-            return;
+            return true;
         }
         boolean currentApprover = memberships.findById(new OrgMembershipId(userId, orgId))
-                .map(m -> m.getRole() == UserRole.BUYER_APPROVER).orElse(false);
-        if (!currentApprover || (eligible != null && !eligible.contains(userId))) {
-            throw new NotAnApproverException();
-        }
+                .map(m -> OrgRoles.canDecideGates(m.getRole())).orElse(false);
+        return currentApprover && (eligible == null || eligible.contains(userId));
     }
 
     /** Waits up to {@code wait} for the gate to leave PENDING. Not transactional: each read is its own short transaction. */

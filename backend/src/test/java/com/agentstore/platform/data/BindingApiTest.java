@@ -54,7 +54,7 @@ class BindingApiTest extends AbstractStorageIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("resource")).isEqualTo("bank_statement");
         var list = rest.exchange("http://localhost:" + port + "/api/v1/connections/" + s.connection().getId() + "/bindings",
-                HttpMethod.GET, new HttpEntity<>(null, fx.bearer(s.buyer(), UserRole.BUYER_APPROVER)), List.class);
+                HttpMethod.GET, new HttpEntity<>(null, fx.bearer(s.buyer(), UserRole.BUYER_MEMBER)), List.class);
         assertThat(list.getBody()).hasSize(1);
         assertThat(((Map<?, ?>) list.getBody().get(0)).get("datasetId")).isEqualTo(d.getId().toString());
     }
@@ -119,7 +119,7 @@ class BindingApiTest extends AbstractStorageIntegrationTest {
         var s = fx.scenario();
         Dataset d = fx.upload(s.buyer(), "jan.csv", DataFixtures.CSV);
 
-        assertThat(put(s.buyer(), UserRole.BUYER_APPROVER, s.connection().getId(), "bank_statement", d.getId())
+        assertThat(put(s.buyer(), UserRole.BUYER_MEMBER, s.connection().getId(), "bank_statement", d.getId())
                 .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 

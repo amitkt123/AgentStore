@@ -71,7 +71,7 @@ class ApprovalGateTest extends AbstractIntegrationTest {
 
     HttpHeaders approverHeaders(UUID orgId) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), orgId, UserRole.BUYER_APPROVER));
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), orgId, UserRole.BUYER_MEMBER));
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;
     }

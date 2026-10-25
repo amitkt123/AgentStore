@@ -12,7 +12,7 @@ const gate: GateDetail = {
   gateId: "g1", action: "post_entries", summary: "Post 142 journal entries for August?", payload: {},
   status: "PENDING", expiresAt: "2999-01-01T00:00:00Z", estimatedUnits: 142, costIfApproved: 284,
   preview: { columns: ["party", "amount"], rows: [{ party: "NEFT ACME 0814", amount: 48200 }], totalRows: 142, total: 3841260 },
-  decidedVia: null, decidedByUserId: null, decidedAt: null, note: null,
+  decidedVia: null, decidedByUserId: null, decidedAt: null, note: null, viewerCanDecide: true,
 };
 
 beforeEach(() => decide.mockClear());
@@ -35,6 +35,12 @@ it("does not show Approve or Reject to someone who cannot decide", () => {
   render(<GateCard runRef="R-1" gate={gate} canDecide={false} />);
   expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Reject" })).toBeNull();
+  expect(screen.getByText(/an approver has to decide/i)).toBeInTheDocument();
+});
+
+it("does not show Approve or Reject to a buyer the gate's approver list leaves out", () => {
+  render(<GateCard runRef="R-1" gate={{ ...gate, viewerCanDecide: false }} canDecide />);
+  expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
   expect(screen.getByText(/an approver has to decide/i)).toBeInTheDocument();
 });
 

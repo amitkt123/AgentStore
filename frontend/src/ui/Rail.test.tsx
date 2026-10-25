@@ -18,9 +18,9 @@ it("gives developers verification and API keys and leaves the buyer rail alone",
   expect(railItemsFor("BUYER_ADMIN", 3)).toEqual(buyerRailItems(3));
 });
 
-it("hides Billing from buyer approvers", () => {
-  expect(railItemsFor("BUYER_APPROVER", 1).map((i) => i.href)).toEqual(["/home", "/store", "/runs", "/files"]);
-  expect(railItemsFor("BUYER_APPROVER", 1)[2].badge).toBe(1);
+it("hides Billing from buyer members", () => {
+  expect(railItemsFor("BUYER_MEMBER", 1).map((i) => i.href)).toEqual(["/home", "/store", "/runs", "/files"]);
+  expect(railItemsFor("BUYER_MEMBER", 1)[2].badge).toBe(1);
 });
 
 it("keeps Agents active inside a Studio route", () => {

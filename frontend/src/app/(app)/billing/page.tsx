@@ -17,7 +17,7 @@ async function optional<T>(call: () => Promise<T>, failed: string[], name: strin
 
 export default async function Page({ searchParams }: { searchParams: { month?: string } }) {
   const session = (await getSession())!;
-  if (session.role === "BUYER_APPROVER") {
+  if (session.role === "BUYER_MEMBER") {
     return (
       <>
         <h1>Billing</h1>

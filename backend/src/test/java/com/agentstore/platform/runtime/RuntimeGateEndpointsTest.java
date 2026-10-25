@@ -51,7 +51,7 @@ class RuntimeGateEndpointsTest extends AbstractIntegrationTest {
 
     private void buyerDecides(RuntimeFixtures.RunningAgent agent, String gateId, String decision) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), agent.scenario().buyer().getId(), UserRole.BUYER_APPROVER));
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), agent.scenario().buyer().getId(), UserRole.BUYER_MEMBER));
         headers.setContentType(MediaType.APPLICATION_JSON);
         rest.exchange(url("/api/v1/runs/" + agent.run().getId() + "/gates/" + gateId + "/decision"), HttpMethod.POST,
                 new HttpEntity<>(Map.of("decision", decision), headers), RunResponse.class);

@@ -22,7 +22,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/runs/{runId}/outputs")
-@PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER','DEVELOPER')")
+@PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER','DEVELOPER')")
 public class OutputsController {
 
     static final int MAX_PREVIEW = 50;

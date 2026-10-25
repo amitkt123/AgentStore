@@ -4,7 +4,7 @@ import { EmptyState } from "@/ui/EmptyState";
 import { Pill } from "@/ui/Pill";
 import { formatMoney } from "@/lib/format";
 import { RunNow } from "@/features/runs/RunNow";
-import { canCreateConnections, isBuyer, type UserRole } from "@/lib/roles";
+import { isBuyer, type UserRole } from "@/lib/roles";
 import type { ConnectionSummary, RunListItem } from "@/lib/api/types";
 
 type Props = { fullName: string; role: UserRole; needsYou: RunListItem[]; connections: ConnectionSummary[]; added?: string };
@@ -26,7 +26,6 @@ export function HomeView({ fullName, role, needsYou, connections, added }: Props
   }
   const active = connections.filter((c) => c.status === "ACTIVE");
   const justAdded = added ? active.find((c) => c.agentId === added) : undefined;
-  const canRun = canCreateConnections(role);
   return (
     <div className={styles.wrap}>
       <h1>Good day, {first}</h1>
@@ -59,7 +58,7 @@ export function HomeView({ fullName, role, needsYou, connections, added }: Props
               <li key={c.id}>
                 <Link href={`/store#agent-${c.agentId}`}>{c.agentName}</Link>
                 <span className={styles.cap}>Up to {formatMoney(c.spendCap)} a run</span>
-                {canRun && <RunNow connectionId={c.id} />}
+                <RunNow connectionId={c.id} />
               </li>
             ))}
           </ul>

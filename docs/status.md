@@ -2,7 +2,7 @@
 
 The single place to see what is done and what is next. Update it in the same PR as any change that finishes, starts or reshapes a workstream. Gaps and risks stay in `docs/frontend-gaps.md` and `docs/known-issues.md`; this file links to them, it does not copy them.
 
-Last updated: 2026-10-25 (run page: approve from the clicked approval block, "Waiting for an approver" for non-approvers, full-width run page; run replay flow on the run page; UX-G2 flow canvas done; WS10b done, manual Razorpay test-mode check pending)
+Last updated: 2026-10-25 (buyer admins can approve gates, BUYER_APPROVER renamed BUYER_MEMBER, members get Run now, gate buttons only for viewers on the approver list; run page: approve from the clicked approval block, "Waiting for an approver" for non-approvers, full-width run page; run replay flow on the run page; UX-G2 flow canvas done; WS10b done, manual Razorpay test-mode check pending)
 
 Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-and-sandbox-design.md` (workstreams in §5, milestones in §7). Specs and plans named below live in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
 

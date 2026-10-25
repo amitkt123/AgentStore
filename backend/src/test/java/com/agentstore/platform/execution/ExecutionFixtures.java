@@ -56,10 +56,10 @@ public class ExecutionFixtures {
         this.membershipRepository = membershipRepository;
     }
 
-    /** A new user who is a BUYER_APPROVER member of the scenario's buyer org. */
+    /** A new user who is a BUYER_MEMBER member of the scenario's buyer org. */
     public User approver(Scenario scenario) {
         User user = userRepository.save(new User(null, "approver-" + UUID.randomUUID() + "@example.com", null, "Approver"));
-        membershipRepository.save(new OrgMembership(user, scenario.buyer(), UserRole.BUYER_APPROVER, "Approver"));
+        membershipRepository.save(new OrgMembership(user, scenario.buyer(), UserRole.BUYER_MEMBER, "Approver"));
         return user;
     }
 

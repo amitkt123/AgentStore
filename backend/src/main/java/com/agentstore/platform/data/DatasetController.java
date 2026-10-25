@@ -38,7 +38,7 @@ public class DatasetController {
     }
 
     @GetMapping("/datasets")
-    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public List<DatasetResponse> list(@RequestParam(value = "include", required = false) String include) {
         return datasetService.list(Caller.current().orgId(), "usage".equals(include));
     }
@@ -55,13 +55,13 @@ public class DatasetController {
     }
 
     @PostMapping("/datasets/{id}/check")
-    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public SchemaChecker.CheckResult check(@PathVariable UUID id, @jakarta.validation.Valid @RequestBody CheckRequest request) {
         return checkService.check(Caller.current().orgId(), id, request.agentVersionId(), request.resource());
     }
 
     @GetMapping("/orgs/{orgId}/storage")
-    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_APPROVER')")
+    @PreAuthorize("hasAnyRole('BUYER_ADMIN','BUYER_MEMBER')")
     public DatasetService.StorageResponse storage(@PathVariable UUID orgId) {
         if (!Caller.current().orgId().equals(orgId)) {
             throw new DataApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Not your workspace");

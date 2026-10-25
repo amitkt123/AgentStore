@@ -54,7 +54,7 @@ public class Connection {
     /** Most this agent may cost in a UTC calendar month, counting charges and reservations; null means no limit. */
     private BigDecimal monthlyLimit;
 
-    /** Who may decide this agent's gates. Empty means every BUYER_APPROVER in the org. */
+    /** Who may decide this agent's gates. Empty means every BUYER_ADMIN and BUYER_MEMBER in the org. */
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "connection_approver", joinColumns = @JoinColumn(name = "connection_id"))
     @Column(name = "user_id")

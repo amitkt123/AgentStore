@@ -20,7 +20,7 @@ describe("decisionText", () => {
   const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 14, 17).toISOString();
   const g = (over: Partial<GateDetail>): GateDetail => ({
     gateId: "g", action: "a", summary: "s", payload: {}, status: "APPROVED", expiresAt: at, estimatedUnits: null, costIfApproved: null,
-    preview: null, decidedVia: "WEB", decidedByUserId: "u1", decidedAt: at, note: null, ...over,
+    preview: null, decidedVia: "WEB", decidedByUserId: "u1", decidedAt: at, note: null, viewerCanDecide: false, ...over,
   });
   it("speaks to the viewer who decided", () => {
     expect(decisionText(g({}), "u1")).toBe("You approved this at 14:17.");
