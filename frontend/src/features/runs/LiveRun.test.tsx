@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
@@ -7,7 +7,6 @@ vi.mock("@/app/(app)/runs/actions", () => ({ decideGateAction: vi.fn() }));
 import { useRunPolling } from "./useRunPolling";
 import { LiveRun } from "./LiveRun";
 import type { RunSnapshot } from "@/lib/api/types";
-import { bankManifest } from "@/features/flow/fixtures";
 
 const snap = (over: Partial<RunSnapshot["detail"]> = {}, gates: RunSnapshot["gates"] = []): RunSnapshot => ({
   detail: { id: "i", displayId: "R-2291", status: "AWAITING_APPROVAL", terminalReason: null, costCap: 500, totalCharged: 96, steps: [{ kind: "GATE_REQUESTED", detail: "{}", createdAt: "2026-09-29T10:05:00Z" }], ...over },
@@ -61,43 +60,35 @@ it("keeps a just-decided approval open while the run is still going", () => {
   expect(screen.getByText(/you approved this/i)).toBeVisible();
 });
 
-it("filters the timeline to a clicked node and shows all again", async () => {
-  const s = snap({ steps: [{ kind: "GATE_REQUESTED", detail: "{}", createdAt: "2026-09-29T10:05:00Z" }, { kind: "LLM_CALL", detail: "{}", createdAt: "2026-09-29T10:04:00Z" }] });
-  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
-  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
-  await userEvent.click(screen.getByRole("button", { name: /Your approval/ }));
-  expect(screen.getByText("Asked for your approval")).toBeInTheDocument();
-  expect(screen.queryByText("Asked the AI model")).toBeNull();
-  await userEvent.click(screen.getByRole("button", { name: "Show all steps" }));
-  expect(screen.getByText("Asked the AI model")).toBeInTheDocument();
-});
-
-it("keeps the selection and moves the active edge when a poll changes state", async () => {
+it("shows the run as a replay diagram instead of step cards", () => {
   const s = snap();
   vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
-  const { container, rerender } = render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
-  await userEvent.click(screen.getByRole("button", { name: /Your approval/ }));
-  const next = snap({ status: "RUNNING" });
-  next.flow = { ...next.flow, blocks: [{ ...next.flow.blocks[0], state: "DONE" }, next.flow.blocks[1]], reachedBlock: "charge" };
-  vi.mocked(useRunPolling).mockReturnValue({ data: next, error: null, forbidden: false });
-  rerender(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
-  expect(screen.getByRole("button", { name: /Your approval/ })).toHaveAttribute("aria-pressed", "true");
-  expect(container.querySelector('path[data-active="true"]')).toHaveAttribute("data-to", "charge");
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  expect(screen.getByRole("region", { name: "Run replay" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Timeline" })).toBeNull();
+  expect(screen.queryByRole("list", { name: "Flow" })).toBeNull();
 });
 
-it("stops the pulse and marks the reject end on a rejected run", () => {
-  const s = snap({ status: "FAILED", terminalReason: "GATE_REJECTED" }, [{ ...gate, action: "post_entries", status: "REJECTED", decidedAt: "2026-09-29T10:06:00Z" }]);
-  s.flow = { ...s.flow, blocks: [
-    { block: "read:bank_statement", state: "DONE", metrics: null, gateId: null, flag: null },
-    { block: "draft:ledger", state: "DONE", metrics: null, gateId: null, flag: null },
-    { block: "gate:post_entries", state: "DONE", metrics: null, gateId: "g1", flag: null },
-    { block: "charge", state: "SKIPPED", metrics: null, gateId: null, flag: null },
-  ] };
+it("shows a clicked step's full detail in the facts panel, and Close returns to spend", async () => {
+  const note = "Reading the bank statement for August and matching every line against the ledger accounts one by one";
+  const s = snap({ status: "RUNNING", steps: [{ id: "s1", kind: "AGENT_LOG", source: "AGENT", detail: JSON.stringify({ message: note }), createdAt: "2026-09-29T10:05:00Z" }] });
   vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
-  const { container } = render(<LiveRun runRef="R-2291" initial={s} manifest={bankManifest} canDecide />);
-  expect(container.querySelectorAll("circle")).toHaveLength(0);
-  expect(container.querySelector("[data-end]")).toHaveTextContent(/you rejected the approval/i);
-  expect(container.querySelector('[data-node-id="post:ledger"]')).toHaveTextContent("Skipped");
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  const facts = screen.getByRole("complementary", { name: "Run facts" });
+  expect(within(facts).getByText("Spend")).toBeInTheDocument();
+  await userEvent.click(within(screen.getByRole("region", { name: "Run replay" })).getByRole("button", { name: /Agent note/ }));
+  expect(within(facts).getByText(note)).toBeInTheDocument();
+  expect(within(facts).queryByText("Spend")).toBeNull();
+  await userEvent.click(within(facts).getByRole("button", { name: "Close" }));
+  expect(within(facts).getByText("Spend")).toBeInTheDocument();
+});
+
+it("still offers the approval while a gate waits", () => {
+  const s = snap({ steps: [{ id: "g", kind: "GATE_REQUESTED", detail: '{"action":"post","summary":"Post 142 entries?"}', createdAt: "2026-09-29T10:05:00Z" }] }, [gate]);
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+  expect(within(screen.getByRole("region", { name: "Run replay" })).getAllByText(/Waiting for you/).length).toBeGreaterThan(0);
 });
 
 it("shows spend as a meter", () => {
