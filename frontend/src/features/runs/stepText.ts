@@ -11,3 +11,18 @@ const TEXT: Record<string, string> = {
 };
 
 export const stepText = (s: RunStep): string => TEXT[s.kind] ?? s.kind.toLowerCase().replace(/_/g, " ");
+
+const NOTE_MAX = 200;
+
+/** What the agent logged on an AGENT_LOG step: the JSON entry's message, or the raw text. Null when there is nothing to show. */
+export function stepNote(s: RunStep, max = NOTE_MAX): string | null {
+  if (s.kind !== "AGENT_LOG" || !s.detail) return null;
+  let text = s.detail;
+  try {
+    const parsed: unknown = JSON.parse(s.detail);
+    if (parsed && typeof parsed === "object") text = typeof (parsed as { message?: unknown }).message === "string" ? (parsed as { message: string }).message : "";
+  } catch { /* plain text */ }
+  text = text.trim();
+  if (!text) return null;
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}

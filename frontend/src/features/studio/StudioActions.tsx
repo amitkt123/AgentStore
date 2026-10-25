@@ -154,7 +154,7 @@ export function SubmitBar({ agentId, versionId, status, ready }: { agentId: stri
 
   return (
     <div className={styles.submit}>
-      <Button onClick={submit} loading={busy} disabled={!draft || !ready}>Submit for review</Button>
+      {draft && <Button onClick={submit} loading={busy} disabled={!ready}>Submit for review</Button>}
       {draft && !ready && <p className={styles.hint}>Fix the items above before you submit.</p>}
       {NOTES[status] && <p className={styles.hint}>{NOTES[status]}</p>}
     </div>

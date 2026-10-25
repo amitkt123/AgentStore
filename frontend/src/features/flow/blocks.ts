@@ -16,6 +16,16 @@ export function blockKind(id: string): BlockKind {
   return "Charges";
 }
 
+const REACHED: Record<BlockKind, string> = { Reads: "Read", Drafts: "Drafted", Writes: "Wrote", "Asks you": "Asked you", Thinks: "Used AI", Charges: "Charged" };
+
+/** The furthest block a run got to, as a short past-tense phrase for the runs list. */
+export function reachedText(id: string | null): string {
+  if (!id) return "–";
+  const kind = blockKind(id);
+  const name = id.includes(":") ? humanize(id.slice(id.indexOf(":") + 1)) : "";
+  return kind === "Reads" || kind === "Drafts" || kind === "Writes" ? `${REACHED[kind]} ${name}` : REACHED[kind];
+}
+
 export function blocksFromManifest(m: Manifest): { id: string; state: "IDLE" }[] {
   const ids: string[] = [];
   for (const s of m.scopes) {

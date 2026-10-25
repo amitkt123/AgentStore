@@ -14,5 +14,12 @@ export function socketsOf(m: Manifest): Socket[] {
     }));
 }
 
+export interface Write { resource: string; label: string; description: string; requiresApproval: boolean }
+
+export const writesOf = (m: Manifest): Write[] =>
+  m.scopes
+    .filter((s) => s.type === "WRITE")
+    .map((s) => ({ resource: s.resource, label: humanize(s.resource), description: s.description, requiresApproval: s.requiresApproval }));
+
 export const grantedScopesOf = (m: Manifest): string[] => m.scopes.map((s) => s.resource);
 export const defaultCap = (m: Manifest): number => m.costEnvelope.maxPerRun;

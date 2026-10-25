@@ -14,7 +14,7 @@ it("renders the headline figures formatted", () => {
   expect(screen.getAllByText("AI usage").length).toBeGreaterThan(0);
   expect(screen.getByText("You earned")).toBeInTheDocument();
   expect(screen.getAllByText("₹10,000.00").length).toBeGreaterThan(0);
-  expect(screen.getByText("Available to withdraw")).toBeInTheDocument();
+  expect(screen.getByText("Your balance with Karya")).toBeInTheDocument();
   expect(screen.getByText("₹6,000.50")).toBeInTheDocument();
 });
 
@@ -43,4 +43,11 @@ it("links the CSV download and month navigation, with no withdraw button", () =>
   expect(screen.getByRole("link", { name: "Previous month" })).toHaveAttribute("href", "/developer/earnings?month=2026-09");
   expect(screen.getByRole("link", { name: "Next month" })).toHaveAttribute("href", "/developer/earnings?month=2026-11");
   expect(screen.queryByRole("button", { name: /withdraw/i })).not.toBeInTheDocument();
+});
+
+it("does not promise withdrawals before payouts exist", () => {
+  render(<EarningsView earnings={earnings} />);
+  expect(screen.getByRole("heading", { name: "Your balance with Karya" })).toBeInTheDocument();
+  expect(screen.getByText("Withdrawals open once payouts are live.")).toBeInTheDocument();
+  expect(screen.queryByText(/available to withdraw/i)).toBeNull();
 });

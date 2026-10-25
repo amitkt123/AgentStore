@@ -28,3 +28,4 @@
 .recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .recent li { display: flex; gap: 16px; align-items: center; }
 @media (max-width: 767px) { .copyRow { grid-template-columns: 1fr auto; } .copyRow dt { grid-column: 1 / -1; } }
+.failed { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: var(--waS); color: var(--wa); }

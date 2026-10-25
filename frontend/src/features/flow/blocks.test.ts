@@ -1,4 +1,4 @@
-import { blockKind, blocksFromManifest, toBlockViews } from "./blocks";
+import { reachedText, blockKind, blocksFromManifest, toBlockViews } from "./blocks";
 import type { Manifest } from "@/lib/api/types";
 
 const manifest: Manifest = {
@@ -38,3 +38,15 @@ it("flags a block the manifest did not declare", () => {
   expect(v.undeclared).toBe(true);
   expect(v.body).toBe("This agent did not say it would do this.");
 });
+
+
+it.each([
+  ["charge", "Charged"],
+  ["draft:ledger", "Drafted Ledger"],
+  ["read:bank_statement", "Read Bank statement"],
+  ["write:ledger", "Wrote Ledger"],
+  ["gate:post_entries", "Asked you"],
+  ["llm", "Used AI"],
+])("describes %s as %s", (id, text) => expect(reachedText(id)).toBe(text));
+
+it("shows a dash when no block was reached", () => expect(reachedText(null)).toBe("–"));

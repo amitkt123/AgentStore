@@ -13,7 +13,7 @@ Mockup elements omitted because the backend has no data or route for them. Updat
 | G7 | Test cases passed, attack probes, runs and dispute rate, typical cost | Waits on WS8 |
 | G8 | Try on sample data | No backend |
 | G9 | Version pinning and "1 new" update badge | Waits on WS9 |
-| G10 | Sign-in with Google | Backend supports it (POST /auth/google) but it needs a Google client id, which is not configured |
+| G10 | Sign-in with Google | Backend supports it (POST /auth/google) but it needs a Google client id, which is not configured; the button is hidden until then (UX-1) |
 | G11 | Block descriptions on the live run | Run detail has no agentId/versionId to fetch the manifest |
 | G12 | "Code we sent by SMS" on the Phone step | WS7a captures the number and a person at Karya confirms it; no SMS vendor (no paid third parties) |
 | G13 | "Payout account" step | Bank fields are deferred to WS10c, so the flow is four steps, not five |
@@ -28,8 +28,6 @@ Mockup elements omitted because the backend has no data or route for them. Updat
 | G22 | Tax invoices on Billing | GST tax invoices are a WS10 non-goal (legal question, spec §8 Q6); the postpaid bill in WS10b is a statement, not a tax invoice |
 
 ## Known visual differences
-- Files "Added" shows a time only; a date is needed for files older than today.
-- Runs history "Started" shows a time only for the same reason.
 - Live run block descriptions are missing (G11).
 - Get verified has two panels (steps and form); the mockup's third "What changes when you're verified" panel is omitted (G15).
 - The Studio has no flow canvas and no observed-behaviour half (G16).

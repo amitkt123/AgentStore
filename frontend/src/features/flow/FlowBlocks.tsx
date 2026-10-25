@@ -6,7 +6,7 @@ const STATE_TEXT: Record<BlockState, string> = {
   DONE: "Done", WAITING: "Waiting for you", FAILED: "Failed", SKIPPED: "Skipped", IDLE: "Not started",
 };
 
-export function FlowBlocks({ blocks, selectedId, onSelect }: { blocks: BlockView[]; selectedId?: string; onSelect?: (id: string) => void }) {
+export function FlowBlocks({ blocks, selectedId, onSelect, showState = true }: { blocks: BlockView[]; selectedId?: string; onSelect?: (id: string) => void; showState?: boolean }) {
   return (
     <ol className={styles.flow}>
       {blocks.map((b) => (
@@ -22,7 +22,7 @@ export function FlowBlocks({ blocks, selectedId, onSelect }: { blocks: BlockView
             <span className={styles.body}>{b.body}</span>
             {b.metric && <span className={`${styles.metric} mono`}>{b.metric}</span>}
             {b.undeclared && <span className={styles.flag}>Not declared by the agent</span>}
-            <span className={styles.state}>{STATE_TEXT[b.state]}</span>
+            {showState && <span className={styles.state}>{STATE_TEXT[b.state]}</span>}
           </button>
         </li>
       ))}

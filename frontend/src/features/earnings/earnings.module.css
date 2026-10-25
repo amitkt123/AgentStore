@@ -11,3 +11,4 @@
 .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .download { color: var(--b); text-decoration: none; }
 .download:hover { text-decoration: underline; }
+.soon { margin: 4px 0 0; color: var(--ink3); font-size: 13px; }

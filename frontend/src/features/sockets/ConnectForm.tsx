@@ -2,12 +2,12 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import styles from "./sockets.module.css";
-import { defaultCap, grantedScopesOf, socketsOf } from "./sockets";
+import { defaultCap, grantedScopesOf, socketsOf, writesOf } from "./sockets";
 import { Button } from "@/ui/Button";
 import { Dropzone } from "@/ui/Dropzone";
 import { Pill } from "@/ui/Pill";
 import {
-  bindSocketAction, checkSocketAction, createConnectionAction, startRunAction, uploadForSocketAction,
+  bindSocketAction, checkSocketAction, createConnectionAction, uploadForSocketAction,
 } from "@/app/(app)/connect/actions";
 import { formatMoney } from "@/lib/format";
 import type { CheckResult, Dataset, Manifest } from "@/lib/api/types";
@@ -18,6 +18,7 @@ type Picked = { datasetId: string; check: CheckResult | null };
 export function ConnectForm({ agentId, versionId, agentName, manifest, datasets: initial, canConnect }: Props) {
   const router = useRouter();
   const sockets = socketsOf(manifest);
+  const writes = writesOf(manifest);
   const [datasets, setDatasets] = useState(initial);
   const [picked, setPicked] = useState<Record<string, Picked | undefined>>({});
   const [cap, setCap] = useState(defaultCap(manifest));
@@ -71,13 +72,24 @@ export function ConnectForm({ agentId, versionId, agentName, manifest, datasets:
         const bound = await bindSocketAction(cid, s.resource, picked[s.resource]!.datasetId);
         if ("error" in bound) { setError(bound.error); return; }
       }
-      const ran = await startRunAction(cid);
-      if ("error" in ran) { setError(ran.error); return; }
-      router.push(`/runs/${ran.displayId}`);
+      router.push(`/home?added=${agentId}`);
     });
 
   return (
     <div className={styles.wrap}>
+      {writes.length > 0 && (
+        <section className={styles.limits} aria-label="What it can do">
+          <h2>What it can do</h2>
+          <ul className={styles.writes}>
+            {writes.map((w) => (
+              <li key={w.resource}>
+                <strong>{`Can write: ${w.label}${w.requiresApproval ? ", only after your approval" : ", without asking first"}`}</strong>
+                {w.description && <span className={styles.sub}>{w.description}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {sockets.map((s) => {
         const p = picked[s.resource];
         return (
@@ -109,13 +121,14 @@ export function ConnectForm({ agentId, versionId, agentName, manifest, datasets:
         <h2>Limits</h2>
         <label>
           Most one run can cost
+          <span className={styles.money}>₹</span>
           <input type="number" min={1} max={max} value={cap} onChange={(e) => setCap(Number(e.target.value))} />
         </label>
         <p className={styles.sub}>{formatMoney(max, manifest.costEnvelope.currency)} is the most this agent ever charges. A run stops when it reaches your limit.</p>
       </section>
       {error && <p role="alert" className={styles.err}>{error}</p>}
       {!ready && sockets.length > 0 && <p className={styles.sub}>Plug in a file for each block above to continue.</p>}
-      <Button onClick={submit} loading={pending} disabled={!ready}>Add and run now</Button>
+      <Button onClick={submit} loading={pending} disabled={!ready}>Add to workspace</Button>
     </div>
   );
 }

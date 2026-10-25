@@ -6,8 +6,6 @@ body {
   font-family: var(--font-sans);
   color: var(--ink);
   background-color: var(--g);
-  background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.3px);
-  background-size: 18px 18px;
   -webkit-font-smoothing: antialiased;
   font-size: 14px;
   line-height: 1.45;

@@ -4,11 +4,12 @@
 .logo i:nth-child(2) { background: var(--b2); }
 .logo i:nth-child(3) { background: var(--b3); }
 .logo i:nth-child(4) { background: var(--sky2); }
-.nav { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--ink3); text-decoration: none; position: relative; }
+.nav { width: 60px; min-height: 52px; padding: 6px 2px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--ink3); text-decoration: none; position: relative; }
 .nav:hover, .on { background: var(--sky); color: var(--b); }
+.label { font-size: 10px; line-height: 1.15; text-align: center; font-weight: 500; }
 .badge { position: absolute; top: 5px; right: 5px; min-width: 16px; height: 16px; border-radius: 999px; background: var(--b); color: #fff; font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 4px; }
 @media (max-width: 767px) {
   .rail { top: auto; right: 0; width: auto; height: 60px; flex-direction: row; justify-content: space-around; padding: 0 8px; border-right: 0; border-top: 1px solid var(--l); }
   .logo { display: none; }
-  .nav { width: 56px; height: 48px; }
+  .nav { width: 64px; min-height: 52px; }
 }

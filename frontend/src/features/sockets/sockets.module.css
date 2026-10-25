@@ -6,3 +6,6 @@
 .limits { background: var(--s); border: 1px solid var(--l); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 .limits input { min-height: 44px; width: 160px; border: 1px solid var(--l); border-radius: 10px; padding: 0 10px; font: inherit; }
 .err { color: var(--bad); margin: 0; }
+.writes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.writes li { display: flex; flex-direction: column; gap: 2px; }
+.money { color: var(--ink3); margin-left: 8px; }
