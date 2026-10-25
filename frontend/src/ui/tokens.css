@@ -9,3 +9,16 @@
   --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
+:root {
+  --glass-1: rgba(255, 255, 255, 0.72); --glass-2: rgba(255, 255, 255, 0.82); --glass-3: rgba(255, 255, 255, 0.9);
+  --glass-blur: 16px;
+  --glass-edge: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --glass-line: rgba(13, 26, 48, 0.06);
+  --shadow-1: 0 1px 2px rgba(13, 26, 48, 0.04), 0 4px 14px rgba(13, 26, 48, 0.05);
+  --shadow-2: 0 2px 4px rgba(13, 26, 48, 0.05), 0 10px 28px rgba(13, 26, 48, 0.08);
+  --shadow-3: 0 4px 8px rgba(13, 26, 48, 0.06), 0 18px 48px rgba(13, 26, 48, 0.12);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-1: 120ms; --dur-2: 240ms; --dur-flow: 1.6s;
+}
+@media (max-width: 767px) { :root { --glass-blur: 10px; } }
+@media (prefers-reduced-motion: reduce) { :root { --dur-1: 0s; --dur-2: 0s; --dur-flow: 0s; } }
