@@ -36,7 +36,7 @@ it("renders the headline figures formatted", () => {
   expect(screen.getAllByText("AI usage").length).toBeGreaterThan(0);
   expect(screen.getByText("You earned")).toBeInTheDocument();
   expect(screen.getAllByText("₹10,000.00").length).toBeGreaterThan(0);
-  expect(screen.getByText("Your balance with Karya")).toBeInTheDocument();
+  expect(screen.getByText("Available to withdraw")).toBeInTheDocument();
   expect(screen.getByText("₹6,000.50")).toBeInTheDocument();
 });
 
@@ -109,11 +109,4 @@ it("keeps the Withdrawal requested notice when the balance drops to zero and the
   rerender(view({ ...earnings, available: 0 }, { available: 0, canWithdraw: false, blockedReason: "INSUFFICIENT_EARNINGS" }));
   expect(screen.queryByRole("button", { name: "Withdraw" })).not.toBeInTheDocument();
   expect(screen.getByText("Withdrawal requested.")).toBeInTheDocument();
-});
-
-it("does not promise withdrawals before payouts exist", () => {
-  render(<EarningsView earnings={earnings} />);
-  expect(screen.getByRole("heading", { name: "Your balance with Karya" })).toBeInTheDocument();
-  expect(screen.getByText("Withdrawals open once payouts are live.")).toBeInTheDocument();
-  expect(screen.queryByText(/available to withdraw/i)).toBeNull();
 });
