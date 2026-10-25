@@ -146,6 +146,26 @@ class AgentCallbackControllerTest extends AbstractIntegrationTest {
         assertThat(usageEventRepository.findByRunId(run.getId())).isEmpty();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"\"1E+9999999\"", "1E+9999999", "\"10000000000\"", "\"0.00001\""})
+    void rejectsAnOutOfRangeCostQuantity(String quantityJson) throws Exception {
+        Run run = newRunningRun(new BigDecimal("10.00"), "fake-sandbox-range-" + quantityJson.hashCode());
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("tok-123");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String body = "{\"kind\":\"COST\",\"detail\":{\"quantity\":" + quantityJson + "}}";
+
+        long t0 = System.nanoTime();
+        var response = rest.postForEntity(url("/internal/agent-callback/runs/" + run.getId() + "/events"),
+                new HttpEntity<>(body, headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(java.time.Duration.ofNanos(System.nanoTime() - t0)).isLessThan(java.time.Duration.ofSeconds(2));
+        assertThat(runRepository.findById(run.getId()).orElseThrow().getTotalCharged())
+                .isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(usageEventRepository.findByRunId(run.getId())).isEmpty();
+    }
+
     @Test
     void wrongCallbackTokenIsRejected() throws Exception {
         Run run = newRunningRun(new BigDecimal("10.00"), "fake-sandbox-wrong-token");

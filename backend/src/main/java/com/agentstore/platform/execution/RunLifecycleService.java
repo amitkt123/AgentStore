@@ -37,6 +37,8 @@ public class RunLifecycleService {
 
     /** A PRODUCTION run that keeps calling outside its granted scopes is stopped at this many violations. */
     static final int MAX_PRODUCTION_VIOLATIONS = 3;
+    static final BigDecimal MAX_QUANTITY = new BigDecimal("9999999999");
+    static final int MAX_QUANTITY_FRACTION = 4;
     private static final Set<RunStepKind> CLOSING_KINDS = EnumSet.of(RunStepKind.COMPLETE, RunStepKind.FAILED,
             RunStepKind.TIMEOUT, RunStepKind.COST_CAP_REACHED, RunStepKind.CANCELLED);
     private static final Set<RunStepKind> AGENT_REPORTABLE = EnumSet.of(
@@ -341,6 +343,11 @@ public class RunLifecycleService {
             BigDecimal quantity = new BigDecimal(String.valueOf(raw));
             if (quantity.signum() <= 0) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "quantity must be positive");
+            }
+            // scale() and compareTo are O(1) even for a huge exponent, so bound before any arithmetic
+            if (quantity.scale() > MAX_QUANTITY_FRACTION || quantity.compareTo(MAX_QUANTITY) > 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "quantity must be at most 9999999999 with up to 4 decimal places");
             }
             return quantity;
         } catch (NumberFormatException e) {
