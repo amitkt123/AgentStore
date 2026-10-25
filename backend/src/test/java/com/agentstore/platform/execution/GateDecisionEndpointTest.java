@@ -1,7 +1,9 @@
 package com.agentstore.platform.execution;
 
 import com.agentstore.platform.AbstractIntegrationTest;
+import com.agentstore.platform.identity.IdentityFixtures;
 import com.agentstore.platform.identity.JwtService;
+import com.agentstore.platform.identity.OrgRepository;
 import com.agentstore.platform.identity.UserRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,10 @@ class GateDecisionEndpointTest extends AbstractIntegrationTest {
     GateRequestRepository gateRepository;
     @Autowired
     RunRepository runRepository;
+    @Autowired
+    IdentityFixtures identities;
+    @Autowired
+    OrgRepository orgRepository;
 
     record Fx(ExecutionFixtures.Scenario scenario, Run run, GateRequest gate) {}
 
@@ -80,9 +86,15 @@ class GateDecisionEndpointTest extends AbstractIntegrationTest {
 
     @Test
     void aBuyerAdminCanApproveThroughTheGateEndpoint() {
-        Fx fx = awaiting("tok-gd-admin");
+        var scenario = fixtures.liveTierA(new BigDecimal("500.00"), new BigDecimal("1000.00"));
+        UUID admin = identities.member(orgRepository.findById(scenario.buyer().getId()).orElseThrow(),
+                "admin-" + UUID.randomUUID() + "@example.com", UserRole.BUYER_ADMIN, "Finance lead").getUser().getId();
+        Run run = fixtures.run(scenario, RunStatus.RUNNING, "sbx-tok-gd-admin", "tok-gd-admin");
+        GateRequest gate = gateService.open(run.getId(), "post_journal_entries", 5, "Post entries", "{}", "[]");
+        assertThat(gate.eligibleApproverIds()).containsExactly(admin);
+        Fx fx = new Fx(scenario, run, gate);
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), fx.scenario().buyer().getId(), UserRole.BUYER_ADMIN));
+        headers.setBearerAuth(jwtService.issue(admin, scenario.buyer().getId(), UserRole.BUYER_ADMIN));
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         var response = decide(fx, headers, Map.of("decision", "APPROVE"));
