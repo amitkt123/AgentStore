@@ -1,0 +1,85 @@
+/* Static dot grid: sized with the fit, never moves (it sits on the panel, not the scrolled content). */
+.panel {
+  position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--glass-line);
+  background-color: var(--g); background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.2px);
+  box-shadow: var(--glass-edge), var(--shadow-1);
+}
+
+.controls {
+  position: absolute; z-index: 2; left: 14px; top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 6px; border-radius: 999px;
+}
+.btn {
+  font: inherit; font-size: 13px; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--l);
+  background: var(--s); color: var(--ink); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.btn:hover:not(:disabled) { border-color: var(--b3); }
+.btn:disabled { color: var(--ink3); cursor: default; opacity: 0.6; }
+.btn[aria-pressed="true"] { background: var(--b); border-color: var(--b); color: #fff; }
+.btn:focus-visible { outline: 2px solid var(--b); outline-offset: 2px; }
+.bar { width: 140px; height: 4px; background: var(--l); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--b); transition: width var(--dur-2) var(--ease); }
+.now { font-size: 13px; color: var(--ink2); padding: 0 6px; min-width: 92px; font-variant-numeric: tabular-nums; }
+
+.scroll { overflow-x: auto; overflow-y: hidden; padding-top: 64px; }
+.spacer { position: relative; }
+.world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+
+.lane { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--l); }
+.lane.alt { background: rgba(43, 92, 230, 0.03); }
+.lane span {
+  position: absolute; left: 14px; top: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink3);
+}
+
+.edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.edge { fill: none; stroke: var(--ok); stroke-width: 1.8; }
+.head { fill: var(--ok); }
+.ghostEdge { stroke: var(--ink3); stroke-dasharray: 4 5; opacity: 0.7; }
+.ghostHead { fill: var(--ink3); }
+.growing {
+  stroke: var(--b); stroke-width: 2.2; stroke-dasharray: var(--len, 10000); stroke-dashoffset: 0;
+  animation-name: grow; animation-timing-function: ease-in-out; animation-fill-mode: both;
+}
+@keyframes grow { from { stroke-dashoffset: var(--len, 10000); } to { stroke-dashoffset: 0; } }
+.fade { animation-name: fade; animation-timing-function: ease; animation-fill-mode: both; }
+.ghostEdge.fade { animation-name: fadeGhost; }
+@keyframes fade { from { opacity: 0; } }
+@keyframes fadeGhost { from { opacity: 0; } to { opacity: 0.7; } }
+.label { font-size: 11px; font-weight: 700; fill: var(--ink2); paint-order: stroke; stroke: var(--g); stroke-width: 4px; }
+
+.block {
+  position: absolute; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; text-align: left;
+  border-radius: var(--radius); background: var(--glass-3); border: 1px solid var(--l);
+  box-shadow: var(--glass-edge), var(--shadow-1); font: inherit; font-size: 13px; color: inherit; cursor: pointer;
+  overflow-wrap: anywhere;
+  transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.block:hover { box-shadow: var(--glass-edge), var(--shadow-2); }
+.block strong { margin-top: 1px; font-size: 14px; }
+.top { display: flex; align-items: baseline; gap: 6px; }
+.time { font-size: 11px; color: var(--ink3); }
+.kind { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink3); }
+.detail { color: var(--ink2); }
+.warn { color: var(--wa); font-weight: 600; }
+.metric { font-size: 12px; margin-top: 2px; }
+
+.done { border-color: var(--okS); }
+.waiting { border-color: var(--wa); box-shadow: var(--glass-edge), var(--shadow-1), 0 0 0 4px var(--waS); }
+.bad { border-color: var(--bad); background: var(--badS); }
+.ghost { opacity: 0.55; border-style: dashed; border-color: var(--ink3); background: var(--glass-1); box-shadow: none; cursor: default; }
+.current { border-color: var(--b); box-shadow: 0 0 0 4px var(--sky2), 0 8px 22px rgba(43, 92, 230, 0.15); }
+.sel { background: var(--sky); border-color: var(--b); }
+.block:focus-visible { outline: 2px solid var(--b); outline-offset: 2px; }
+
+.enter { animation-name: rise; animation-timing-function: ease; animation-fill-mode: both; }
+.ghost.enter { animation-name: riseGhost; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px) scale(0.96); } }
+@keyframes riseGhost { from { opacity: 0; transform: translateY(8px) scale(0.96); } to { opacity: 0.55; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .growing, .fade, .enter { animation: none; }
+  .growing { stroke-dasharray: none; }
+  .btn, .bar i, .block { transition: none; }
+}

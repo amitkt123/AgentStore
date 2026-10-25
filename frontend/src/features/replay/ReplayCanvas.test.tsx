@@ -1,0 +1,126 @@
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ReplayCanvas } from "./ReplayCanvas";
+import { buildReplay } from "./graph";
+import type { RunStep, RunStepKind } from "@/lib/api/types";
+
+const at = (s: number) => new Date(Date.UTC(2026, 9, 25, 10, 0, s)).toISOString();
+const step = (kind: RunStepKind, detail: object, start: number | null, end: number, id: string): RunStep =>
+  ({ id, kind, detail: JSON.stringify(detail), startedAt: start === null ? null : at(start), createdAt: at(end) });
+
+// One block per beat: n > r > c > e.
+const seq = buildReplay([
+  step("AGENT_LOG", { message: "Reading" }, null, 1, "n"), step("DATA_READ", { resource: "expenses", count: 5 }, 2, 3, "r"),
+  step("USAGE", { amount: 5 }, null, 4, "c"), step("COMPLETE", {}, null, 5, "e"),
+], []);
+// Approved gate: d > q > w, with the not-taken ghost beside w.
+const gated = buildReplay([
+  step("WRITE_STAGED", { resource: "ledger", count: 2 }, 1, 2, "d"), step("GATE_REQUESTED", { action: "post", summary: "Post 2 entries?" }, null, 3, "q"),
+  step("GATE_DECIDED", { action: "post", decision: "APPROVED" }, null, 183, "a"), step("DATA_WRITE", { resource: "ledger", count: 2 }, 184, 185, "w"),
+], []);
+const long = (n: number) => buildReplay(Array.from({ length: n }, (_, i) => step("AGENT_LOG", { message: `m${i}` }, null, i + 1, `s${i}`)), []);
+
+const edges = (c: HTMLElement) => c.querySelectorAll("path[data-edge]");
+
+describe("ReplayCanvas", () => {
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  it("draws every step of a finished run at once", () => {
+    const { container } = render(<ReplayCanvas graph={gated} live={false} />);
+    for (const b of gated.blocks) expect(container.querySelector(`[data-block-id="${b.id}"]`)).not.toBeNull();
+    const real = [...edges(container)].filter((p) => p.getAttribute("data-edge") !== "ghost");
+    expect(real).toHaveLength(gated.edges.filter((e) => !e.ghost).length);
+    for (const p of real) expect(p).toHaveAttribute("marker-end");
+    expect(container.querySelector("path[data-growing]")).toBeNull();
+    expect(container.querySelector("text")).toHaveTextContent("Approved");
+  });
+
+  it("draws no arrow before its step, and no head while the line is still growing", () => {
+    vi.useFakeTimers();
+    const { container } = render(<ReplayCanvas graph={seq} live={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Replay" }));
+    expect(edges(container)).toHaveLength(0);
+    act(() => { vi.advanceTimersByTime(1600); });
+    const growing = container.querySelector("path[data-growing]")!;
+    expect(growing).not.toBeNull();
+    expect(growing).not.toHaveAttribute("marker-end");
+    expect(edges(container)).toHaveLength(1);
+    expect(container.querySelector(`[data-block-id="${growing.getAttribute("data-to")}"]`)).toBeNull();
+    act(() => { vi.advanceTimersByTime(700); });
+    expect(container.querySelector(`path[data-to="${growing.getAttribute("data-to")}"]`)).toHaveAttribute("marker-end");
+    expect(container.querySelector("path[data-growing]")).toBeNull();
+    expect(container.querySelector(`[data-block-id="${growing.getAttribute("data-to")}"]`)).not.toBeNull();
+  });
+
+  it("fades the not-taken branch in without growing it", () => {
+    vi.useFakeTimers();
+    const { container } = render(<ReplayCanvas graph={gated} live={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Replay" }));
+    act(() => { vi.advanceTimersByTime(3200); }); // beat 2: the fork, line phase
+    const ghost = container.querySelector('path[data-edge="ghost"]')!;
+    expect(ghost).not.toBeNull();
+    expect(ghost).not.toHaveAttribute("data-growing");
+    expect(ghost).toHaveAttribute("data-fading");
+    expect(container.querySelector('path[data-growing][data-to="w"]')).not.toBeNull();
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(container.querySelector('path[data-edge="ghost"]')).not.toHaveAttribute("data-growing");
+  });
+
+  it("tells screen readers the steps and the branch in words", () => {
+    render(<ReplayCanvas graph={gated} live={false} />);
+    const list = screen.getByRole("list", { name: "Steps in order" });
+    const items = within(list).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    expect(items[1]).toHaveTextContent("Asks you: Post 2 entries?, Approved at");
+    expect(items[1]).toHaveTextContent("then Approved. Not taken: Stops here, Nothing is posted");
+  });
+
+  it("reports progress as Step n of N", () => {
+    render(<ReplayCanvas graph={seq} live={false} />);
+    const bar = screen.getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuetext", "Step 4 of 4");
+    expect(bar).toHaveAttribute("aria-valuenow", "4");
+    expect(bar).toHaveAttribute("aria-valuemax", "4");
+    expect(screen.getByText("Step 4 of 4")).toBeInTheDocument();
+  });
+
+  it("disables replay controls on a live run", () => {
+    render(<ReplayCanvas graph={seq} live />);
+    for (const name of ["Replay", /^(Pause|Resume)$/, "Step back", "Step forward"]) expect(screen.getByRole("button", { name })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "0.5×" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "1×" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("selects a step when its block is clicked", async () => {
+    const onSelect = vi.fn();
+    const { container, rerender } = render(<ReplayCanvas graph={seq} live={false} onSelect={onSelect} />);
+    await userEvent.click(container.querySelector('[data-block-id="r"]')!);
+    expect(onSelect).toHaveBeenCalledWith("r");
+    rerender(<ReplayCanvas graph={seq} live={false} onSelect={onSelect} selectedId="r" />);
+    expect(container.querySelector('[data-block-id="r"]')).toHaveAttribute("aria-pressed", "true");
+    expect(container.querySelector('[data-block-id="n"]')).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("stops shrinking at 80% and scrolls instead", () => {
+    vi.stubGlobal("ResizeObserver", class { constructor(private cb: () => void) {} observe() { this.cb(); } disconnect() {} });
+    const cw = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    const { container } = render(<ReplayCanvas graph={long(60)} live={false} />);
+    expect((container.querySelector("[data-world]") as HTMLElement).style.transform).toContain("scale(0.8)");
+    cw.mockRestore();
+  });
+
+  it("stays at the right end on a live run only if the user was there", () => {
+    const sw = vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(1000);
+    const cw = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    const box = (c: HTMLElement) => c.querySelector("[data-scroll]") as HTMLElement;
+    const { container, rerender } = render(<ReplayCanvas graph={long(3)} live />);
+    Object.defineProperty(box(container), "scrollLeft", { value: 600, writable: true, configurable: true });
+    rerender(<ReplayCanvas graph={long(4)} live />);
+    expect(box(container).scrollLeft).toBe(1000);
+    box(container).scrollLeft = 0;
+    rerender(<ReplayCanvas graph={long(5)} live />);
+    expect(box(container).scrollLeft).toBe(0);
+    sw.mockRestore(); cw.mockRestore();
+  });
+});
