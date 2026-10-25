@@ -43,6 +43,12 @@ it("lets ADMIN into /admin, and only matches whole segments", () => {
   expect(gateTarget("BUYER_ADMIN", "/administrators")).toBeNull();
 });
 
+it.each(["/admin/payouts", "/admin/reconciliation"])("keeps non-admins out of %s and lets ADMIN in", (path) => {
+  expect(gateTarget("BUYER_ADMIN", path)).toBe("/home");
+  expect(gateTarget("DEVELOPER", path)).toBe("/developer/verification");
+  expect(gateTarget("ADMIN", path)).toBeNull();
+});
+
 it("sends a signed-in user past login and signup to their own home", () => {
   expect(gateTarget("BUYER_ADMIN", "/login")).toBe("/home");
   expect(gateTarget("BUYER_MEMBER", "/signup")).toBe("/home");

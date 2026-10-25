@@ -142,6 +142,28 @@ class RefundServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @Order(0)
+    void frozenOrgCannotRefund() {
+        Org org = buyer();
+        paidTopUp(org, "1000.00", daysAgo(1));
+        jdbc.update("update org set money_frozen_at = now(), money_frozen_reason = 'review' where id = ?", org.getId());
+
+        assertThatThrownBy(() -> refunds.request(org.getId(), UUID.randomUUID(), "req-" + UUID.randomUUID(),
+                new BigDecimal("100.00")))
+                .isInstanceOfSatisfying(PaymentApiException.class, e -> {
+                    assertThat(e.status().value()).isEqualTo(409);
+                    assertThat(e.code()).isEqualTo("MONEY_FROZEN");
+                });
+        assertThat(wallet(org.getId())).isEqualByComparingTo("1000.00");
+        assertThat(jdbc.queryForObject("select count(*) from buyer_refund where org_id = ?", Long.class, org.getId()))
+                .isZero();
+
+        jdbc.update("update org set money_frozen_at = null, money_frozen_reason = null where id = ?", org.getId());
+        assertThat(refunds.request(org.getId(), UUID.randomUUID(), "req-" + UUID.randomUUID(),
+                new BigDecimal("100.00")).status()).isEqualTo("DONE");
+    }
+
+    @Test
     @Order(1)
     void splitsNewestFirst() {
         Org org = buyer();

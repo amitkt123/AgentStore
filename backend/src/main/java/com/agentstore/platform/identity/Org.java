@@ -50,6 +50,12 @@ public class Org {
     /** Postpaid credit limit; null means the configured default. */
     private BigDecimal creditLimit;
 
+    /** Set by an admin to stop all money leaving the org (withdrawals and buyer refunds); null when not frozen. */
+    private Instant moneyFrozenAt;
+
+    @Column(length = 500)
+    private String moneyFrozenReason;
+
     public Org(UUID id, String name, OrgType type) {
         this.id = id;
         this.name = name;

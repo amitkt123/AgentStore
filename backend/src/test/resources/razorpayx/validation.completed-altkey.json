@@ -1,0 +1,21 @@
+{
+  "entity": "event",
+  "account_id": "acc_BFQ7uQEaa7j2z7",
+  "event": "fund_account.validation.completed",
+  "contains": ["fund_account.validation"],
+  "payload": {
+    "fund_account_validation": {
+      "entity": {
+        "id": "fav_00000000000001",
+        "entity": "fund_account.validation",
+        "fund_account": { "id": "fa_00000000000001", "entity": "fund_account" },
+        "status": "completed",
+        "amount": 100,
+        "currency": "INR",
+        "results": { "account_status": "active", "registered_name": "ASHA K SHARMA" },
+        "created_at": 1597078866
+      }
+    }
+  },
+  "created_at": 1597078900
+}

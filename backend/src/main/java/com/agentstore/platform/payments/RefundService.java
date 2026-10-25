@@ -1,6 +1,7 @@
 package com.agentstore.platform.payments;
 
 import com.agentstore.platform.events.DomainEventPublisher;
+import com.agentstore.platform.identity.OrgRepository;
 import com.agentstore.platform.ledger.LedgerAccountKind;
 import com.agentstore.platform.ledger.LedgerAccounts;
 import com.agentstore.platform.ledger.LedgerService;
@@ -82,6 +83,7 @@ public class RefundService {
     private final DomainEventPublisher events;
     private final ReconciliationIssues issues;
     private final TransactionTemplate tx;
+    private final OrgRepository orgRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -89,7 +91,9 @@ public class RefundService {
     public RefundService(PaymentProvider provider, PaymentProperties props, PaymentOrderRepository orders,
                          BuyerRefundRepository refunds, BuyerRefundPartRepository parts,
                          WalletRepository walletRepository, LedgerAccounts ledgerAccounts, LedgerService ledgerService,
-                         DomainEventPublisher events, ReconciliationIssues issues, TransactionTemplate tx) {
+                         DomainEventPublisher events, ReconciliationIssues issues, TransactionTemplate tx,
+                         OrgRepository orgRepository) {
+        this.orgRepository = orgRepository;
         this.provider = provider;
         this.props = props;
         this.orders = orders;
@@ -132,7 +136,7 @@ public class RefundService {
     /**
      * Creates and submits a refund, or returns the one already created under {@code requestId}.
      *
-     * @throws PaymentApiException AMOUNT_INVALID, NOTHING_REFUNDABLE or REFUND_EXCEEDS_REFUNDABLE
+     * @throws PaymentApiException AMOUNT_INVALID, MONEY_FROZEN (409), NOTHING_REFUNDABLE or REFUND_EXCEEDS_REFUNDABLE
      */
     public Requested requestOrExisting(UUID orgId, UUID userId, String requestId, BigDecimal amount) {
         if (requestId == null || requestId.isBlank() || requestId.length() > 128) {
@@ -169,6 +173,12 @@ public class RefundService {
         Optional<BuyerRefund> existing = refunds.findByOrgIdAndRequestId(orgId, requestId);
         if (existing.isPresent()) {
             return new Created(existing.get().getId(), List.of(), false);
+        }
+
+        // A frozen org can take money in but cannot move any out.
+        if (orgRepository.findById(orgId).map(o -> o.getMoneyFrozenAt() != null).orElse(false)) {
+            throw new PaymentApiException(HttpStatus.CONFLICT, "MONEY_FROZEN",
+                    "Money movement is frozen for this organisation");
         }
 
         List<PaymentOrder> eligible = orders.refundableTopUps(orgId, windowStart());

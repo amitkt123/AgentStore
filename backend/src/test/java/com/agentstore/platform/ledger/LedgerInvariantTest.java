@@ -21,6 +21,14 @@ import com.agentstore.platform.llm.LlmCallRepository;
 import com.agentstore.platform.llm.LlmCallStatus;
 import com.agentstore.platform.llm.LlmFixtures;
 import com.agentstore.platform.llm.LlmSource;
+import com.agentstore.platform.payouts.FakePayoutProvider;
+import com.agentstore.platform.payouts.PayoutApiException;
+import com.agentstore.platform.payouts.PayoutProvider;
+import com.agentstore.platform.payouts.PayoutWebhookEvent;
+import com.agentstore.platform.payouts.PayoutWebhookProcessor;
+import com.agentstore.platform.payouts.WithdrawalService;
+import com.agentstore.platform.verification.DeveloperVerification;
+import com.agentstore.platform.verification.DeveloperVerificationRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -37,6 +45,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +107,16 @@ class LedgerInvariantTest extends AbstractIntegrationTest {
     TransactionTemplate tx;
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired
+    LedgerChecks ledgerChecks;
+    @Autowired
+    WithdrawalService withdrawalService;
+    @Autowired
+    PayoutWebhookProcessor payoutWebhooks;
+    @Autowired
+    PayoutProvider payoutProvider;
+    @Autowired
+    DeveloperVerificationRepository developerVerifications;
 
     /** A run not yet finished: it can take more charges and, once, its LLM cost. */
     record OpenRun(Run run, UUID buyerOrgId) {}
@@ -257,6 +276,213 @@ class LedgerInvariantTest extends AbstractIntegrationTest {
         assertThat(wallet(postpaidBuyer.getId()).getBalance()).isEqualByComparingTo("0");
         assertThat(orgBalance(postpaidBuyer.getId(), LedgerAccountKind.BUYER_WALLET)).isEqualByComparingTo("0");
         assertThat(billingModeService.owed(postpaidBuyer.getId())).isPositive();
+    }
+
+    /** A developer earning from charges, with its ledger expectations tracked across the random payout run. */
+    private static final class Dev {
+        final UUID orgId;
+        final Run run;
+        final UUID buyerOrgId;
+        final BigDecimal payableAtStart;
+        BigDecimal credits = BigDecimal.ZERO;
+        final List<UUID> withdrawals = new ArrayList<>();
+
+        Dev(UUID orgId, Run run, UUID buyerOrgId, BigDecimal payableAtStart) {
+            this.orgId = orgId;
+            this.run = run;
+            this.buyerOrgId = buyerOrgId;
+            this.payableAtStart = payableAtStart;
+        }
+    }
+
+    /**
+     * Money out, randomised: run charges credit two developers, who withdraw (sometimes behind a provider timeout,
+     * sometimes too much, sometimes twice under one request id); payouts are processed, failed or reversed by
+     * webhook (also before the retry recorded them, and reversed after processing); the retry job resubmits. After
+     * every step the ledger checks hold, each DEVELOPER_PAYABLE is credits - withdrawn + reversed, and
+     * PAYOUT_CLEARING holds exactly the in-flight (REQUESTED or PROCESSING) withdrawals.
+     */
+    @Test
+    void payoutInvariantsHoldAfterRandomMoneyOut() {
+        Random random = new Random(7);
+        FakePayoutProvider fake = (FakePayoutProvider) payoutProvider;
+        fake.reset();
+        UUID clearing = ledgerAccounts.platformAccount(LedgerAccountKind.PAYOUT_CLEARING);
+        BigDecimal clearingAtStart = ledgerService.balanceOf(clearing);
+
+        List<Dev> devs = List.of(payoutDeveloper(), payoutDeveloper());
+        Map<UUID, BigDecimal> amounts = new LinkedHashMap<>();
+        int withdrawn = 0, refused = 0, processed = 0, failed = 0, reversedAfterPaid = 0, retried = 0, byReference = 0;
+
+        for (int step = 0; step < OPERATIONS; step++) {
+            Dev dev = devs.get(random.nextInt(devs.size()));
+            int kind = random.nextInt(10);
+            if (kind < 3) {
+                // A run charge: the developer's share lands in DEVELOPER_PAYABLE.
+                BigDecimal before = payable(dev.orgId);
+                BigDecimal amount = cents(random, 100, 30000);   // 1.00 .. 300.00
+                UUID eventId = usageEvents.save(new UsageEvent(null, dev.run.getId(),
+                        dev.buyerOrgId, BigDecimal.ONE, amount, amount)).getId();
+                ledgerService.chargeUsageEvent(eventId);
+                dev.credits = dev.credits.add(payable(dev.orgId).subtract(before));
+            } else if (kind < 5) {
+                BigDecimal available = payable(dev.orgId);
+                if (random.nextInt(5) == 0) {
+                    // Asking for more than is there is refused and moves nothing.
+                    BigDecimal tooMuch = available.max(new BigDecimal("100.00")).add(new BigDecimal("0.01"));
+                    try {
+                        withdrawalService.requestOrExisting(dev.orgId, UUID.randomUUID(), UUID.randomUUID(), tooMuch);
+                        throw new AssertionError("withdrawal above available was accepted at step " + step);
+                    } catch (PayoutApiException e) {
+                        assertThat(e.code()).isIn("INSUFFICIENT_EARNINGS", "BELOW_MINIMUM");
+                    }
+                    assertThat(payable(dev.orgId)).isEqualByComparingTo(available);
+                    refused++;
+                } else if (available.compareTo(new BigDecimal("100.00")) >= 0) {
+                    BigDecimal max = available.min(new BigDecimal("2000.00"));
+                    BigDecimal amount = cents(random, 10000, max.movePointRight(2).intValueExact());
+                    if (amount.compareTo(new BigDecimal("777.77")) == 0 || amount.compareTo(new BigDecimal("999.99")) == 0) {
+                        amount = amount.subtract(new BigDecimal("0.01"));   // the fake's failure amounts
+                    }
+                    if (random.nextInt(4) == 0) fake.timeoutAfterNextCreate();
+                    UUID requestId = UUID.randomUUID();
+                    UUID id = withdrawalService.requestOrExisting(dev.orgId, UUID.randomUUID(), requestId, amount)
+                            .withdrawal().id();
+                    if (random.nextInt(5) == 0) {
+                        // a double click: the same request id moves no more money
+                        assertThat(withdrawalService.requestOrExisting(dev.orgId, UUID.randomUUID(), requestId, amount)
+                                .withdrawal().id()).isEqualTo(id);
+                    }
+                    assertThat(payable(dev.orgId)).as("available after withdrawing at step %d", step)
+                            .isEqualByComparingTo(available.subtract(amount)).isGreaterThanOrEqualTo(BigDecimal.ZERO);
+                    dev.withdrawals.add(id);
+                    amounts.put(id, amount);
+                    withdrawn++;
+                }
+            } else if (kind == 5) {
+                UUID id = pick(random, dev, "REQUESTED");
+                if (id != null) {
+                    withdrawalService.submit(id);   // the retry job
+                    retried++;
+                }
+            } else if (kind < 8) {
+                UUID id = pickInFlight(random, dev);
+                if (id != null) {
+                    if (recordedPayout(id) == null) byReference++;
+                    BigDecimal fee = cents(random, 0, 999);
+                    deliver(fake, fake.signedEvent(PayoutWebhookEvent.Kind.PAYOUT_PROCESSED, payoutOf(fake, id),
+                            Map.of("amount", amounts.get(id).toPlainString(), "fees", fee.toPlainString(),
+                                    "utr", "UTR" + step)));
+                    assertThat(status(id)).isEqualTo("PROCESSED");
+                    processed++;
+                }
+            } else if (kind == 8) {
+                UUID id = pickInFlight(random, dev);
+                if (id != null) {
+                    if (recordedPayout(id) == null) byReference++;
+                    boolean fail = random.nextBoolean();
+                    deliver(fake, fake.signedEvent(fail ? PayoutWebhookEvent.Kind.PAYOUT_FAILED
+                            : PayoutWebhookEvent.Kind.PAYOUT_REVERSED, payoutOf(fake, id), Map.of()));
+                    assertThat(status(id)).isEqualTo(fail ? "FAILED" : "REVERSED");
+                    failed++;
+                }
+            } else {
+                UUID id = pick(random, dev, "PROCESSED");
+                if (id != null) {
+                    // The bank sends the money back days later.
+                    deliver(fake, fake.signedEvent(PayoutWebhookEvent.Kind.PAYOUT_REVERSED, payoutOf(fake, id),
+                            Map.of()));
+                    assertThat(status(id)).isEqualTo("REVERSED");
+                    reversedAfterPaid++;
+                }
+            }
+
+            assertThat(ledgerChecks.run()).as("ledger checks after step %d", step)
+                    .isEqualTo(new LedgerChecks.Result(true, true, true));
+            BigDecimal inFlight = BigDecimal.ZERO;
+            for (Dev d : devs) {
+                BigDecimal out = BigDecimal.ZERO, back = BigDecimal.ZERO;
+                for (UUID id : d.withdrawals) {
+                    String st = status(id);
+                    out = out.add(amounts.get(id));
+                    if (st.equals("FAILED") || st.equals("REVERSED")) back = back.add(amounts.get(id));
+                    if (st.equals("REQUESTED") || st.equals("PROCESSING")) inFlight = inFlight.add(amounts.get(id));
+                }
+                assertThat(payable(d.orgId)).as("payable of %s after step %d", d.orgId, step)
+                        .isEqualByComparingTo(d.payableAtStart.add(d.credits).subtract(out).add(back));
+            }
+            assertThat(ledgerService.balanceOf(clearing).subtract(clearingAtStart))
+                    .as("PAYOUT_CLEARING after step %d", step).isEqualByComparingTo(inFlight);
+        }
+
+        assertThat(withdrawn).as("withdrawals").isGreaterThan(20);
+        assertThat(refused).as("refused").isGreaterThan(3);
+        assertThat(processed).as("processed").isGreaterThan(10);
+        assertThat(failed).as("failed or reversed in flight").isGreaterThan(3);
+        assertThat(reversedAfterPaid).as("reversed after processed").isGreaterThan(2);
+        assertThat(retried + byReference).as("retries and webhooks matched by reference").isGreaterThan(2);
+    }
+
+    /** A verified developer earning from a run of a buyer with a deep wallet, with a VERIFIED bank account. */
+    private Dev payoutDeveloper() {
+        ExecutionFixtures.Scenario scenario = fixtures.liveTierA(new BigDecimal("100000000.00"),
+                new BigDecimal("100000000.00"));
+        Org developer = orgRepository.findById(scenario.version().getAgent().getDeveloperOrg().getId()).orElseThrow();
+        developer.setDeveloperVerifiedAt(Instant.now());
+        orgRepository.save(developer);
+        DeveloperVerification verification = new DeveloperVerification(developer.getId());
+        verification.setLegalName("Amit Tiwari");
+        developerVerifications.save(verification);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtService.issue(UUID.randomUUID(), developer.getId(), UserRole.DEVELOPER));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("type", "BANK");
+        body.put("accountNumber", "123456789012");
+        body.put("ifsc", "HDFC0001234");
+        body.put("holderName", "Amit Tiwari");
+        var response = rest.exchange("http://localhost:" + port + "/api/v1/developer/payout-account", HttpMethod.POST,
+                new HttpEntity<>(body, headers), Map.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody().get("status")).isEqualTo("VERIFIED");
+
+        Run run = newRun(scenario.buyer(), scenario.version(), scenario.connection());
+        return new Dev(developer.getId(), run, scenario.buyer().getId(), payable(developer.getId()));
+    }
+
+    private BigDecimal payable(UUID orgId) {
+        return orgBalance(orgId, LedgerAccountKind.DEVELOPER_PAYABLE);
+    }
+
+    private String status(UUID withdrawalId) {
+        return jdbc.queryForObject("select status from withdrawal where id = ?", String.class, withdrawalId);
+    }
+
+    private String recordedPayout(UUID withdrawalId) {
+        return jdbc.queryForObject("select provider_payout_id from withdrawal where id = ?", String.class, withdrawalId);
+    }
+
+    /** The provider's payout for the withdrawal, recorded or not (a timeout may have hidden it from us). */
+    private static String payoutOf(FakePayoutProvider fake, UUID withdrawalId) {
+        return fake.payoutForKey(withdrawalId.toString()).orElseThrow().payoutId();
+    }
+
+    private UUID pick(Random random, Dev dev, String status) {
+        List<UUID> matching = dev.withdrawals.stream().filter(id -> status.equals(status(id))).toList();
+        return matching.isEmpty() ? null : matching.get(random.nextInt(matching.size()));
+    }
+
+    /** A PROCESSING withdrawal, or a REQUESTED one whose payout the provider made behind a timeout. */
+    private UUID pickInFlight(Random random, Dev dev) {
+        List<UUID> matching = dev.withdrawals.stream().filter(id -> {
+            String st = status(id);
+            return st.equals("PROCESSING") || st.equals("REQUESTED");
+        }).toList();
+        return matching.isEmpty() ? null : matching.get(random.nextInt(matching.size()));
+    }
+
+    private void deliver(FakePayoutProvider fake, FakePayoutProvider.SignedEvent event) {
+        payoutWebhooks.process(fake.name(), event.body(), event.headers());
     }
 
     private Org buyer(String walletBalance) {

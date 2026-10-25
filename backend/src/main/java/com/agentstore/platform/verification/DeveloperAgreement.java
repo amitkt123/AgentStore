@@ -2,7 +2,7 @@ package com.agentstore.platform.verification;
 
 public final class DeveloperAgreement {
 
-    public static final String CURRENT_VERSION = "2.1";
+    public static final String CURRENT_VERSION = "2.2";
 
     private DeveloperAgreement() {
     }

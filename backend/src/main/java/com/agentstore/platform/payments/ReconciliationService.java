@@ -6,6 +6,7 @@ import com.agentstore.platform.ledger.LedgerChecks;
 import com.agentstore.platform.ledger.LedgerService;
 import com.agentstore.platform.ledger.LedgerTransactionType;
 import com.agentstore.platform.ledger.Posting;
+import com.agentstore.platform.payouts.PayoutReconciliation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -39,7 +40,7 @@ public class ReconciliationService {
 
     private static final Logger log = LoggerFactory.getLogger(ReconciliationService.class);
     /** A provider refund younger than this may not be stored locally yet, so it is not flagged as unmatched. */
-    static final java.time.Duration UNMATCHED_REFUND_GRACE = java.time.Duration.ofHours(1);
+    public static final java.time.Duration UNMATCHED_REFUND_GRACE = java.time.Duration.ofHours(1);
 
     private final PaymentProvider provider;
     private final ReconciliationIssues issues;
@@ -49,11 +50,12 @@ public class ReconciliationService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final TransactionTemplate tx;
+    private final PayoutReconciliation payoutReconciliation;
 
     public ReconciliationService(PaymentProvider provider, ReconciliationIssues issues, LedgerChecks ledgerChecks,
                                  LedgerService ledgerService, LedgerAccounts ledgerAccounts, JdbcTemplate jdbc,
                                  ObjectMapper mapper, PlatformTransactionManager transactionManager,
-                                 MeterRegistry meters) {
+                                 MeterRegistry meters, PayoutReconciliation payoutReconciliation) {
         this.provider = provider;
         this.issues = issues;
         this.ledgerChecks = ledgerChecks;
@@ -61,6 +63,7 @@ public class ReconciliationService {
         this.ledgerAccounts = ledgerAccounts;
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.payoutReconciliation = payoutReconciliation;
         this.tx = new TransactionTemplate(transactionManager);
         Gauge.builder("agentstore.money.reconciliation_issues", this, ReconciliationService::unresolvedCount)
                 .register(meters);
@@ -82,9 +85,20 @@ public class ReconciliationService {
         found += checkPayments(dayUtc, payments);
         found += checkPaidOrders(dayUtc, payments);
         found += checkRefunds(dayUtc, refunds, now);
+        found += checkPayouts(dayUtc, now);
         postGatewayFees(settlements);
         found += checkLedger(dayUtc);
         return found;
+    }
+
+    /** The payout check never aborts the run: a provider failure is recorded and gateway fees and ledger checks go on. */
+    private int checkPayouts(LocalDate day, Instant now) {
+        try {
+            return payoutReconciliation.check(day, now);
+        } catch (RuntimeException e) {
+            return flag(day, "PAYOUT_FETCH_FAILED", payoutReconciliation.providerName(),
+                    detail("error", e.getClass().getSimpleName(), "message", e.getMessage()));
+        }
     }
 
     private int checkPayments(LocalDate day, List<PaymentProvider.ProviderPayment> payments) {

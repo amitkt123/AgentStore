@@ -1,4 +1,4 @@
-import { getEarnings } from "@/lib/api/money";
+import { getEarnings, getPayoutsSummary, listWithdrawals } from "@/lib/api/money";
 import { ApiError } from "@/lib/api/http";
 import { parseMonth } from "@/lib/month";
 import { EarningsView } from "@/features/earnings/EarningsView";
@@ -6,11 +6,13 @@ import { ErrorState } from "@/ui/ErrorState";
 
 export default async function Page({ searchParams }: { searchParams: { month?: string } }) {
   try {
-    const earnings = await getEarnings(parseMonth(searchParams.month));
+    const [earnings, payouts, withdrawals] = await Promise.all([
+      getEarnings(parseMonth(searchParams.month)), getPayoutsSummary(), listWithdrawals(),
+    ]);
     return (
       <>
         <h1>Earnings</h1>
-        <EarningsView earnings={earnings} />
+        <EarningsView earnings={earnings} payouts={payouts} withdrawals={withdrawals} />
       </>
     );
   } catch (e) {

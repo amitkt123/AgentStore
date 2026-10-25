@@ -231,6 +231,6 @@ public class AdminMoneyController {
                 .map(a -> ledgerService.balanceOf(a.getId())).orElse(BigDecimal.ZERO);
         return new OrgMoneySettingsResponse(orgId, org.getName(), org.getType(), org.getPlatformFeePercent(),
                 effectiveFee, org.getBillingMode(), billingModeService.modeFor(orgId), org.getCreditLimit(),
-                wallet, payable);
+                wallet, payable, org.getMoneyFrozenAt(), org.getMoneyFrozenReason());
     }
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { REFRESH_COOKIE, SESSION_COOKIE, cookieOptions, decodeToken, needsRefresh } from "@/lib/session";
 import { gateTarget, isExpiredLogin } from "@/lib/gate";
 
-const PUBLIC = ["/login", "/signup", "/verify", "/forgot", "/reset"];
+const PUBLIC = ["/login", "/signup", "/verify", "/forgot", "/reset", "/legal"];
 // An emailed approval link is /approve/{token}. The signed-in gate page is /approve/{run}/{gate}, which stays gated.
 const APPROVAL_LINK = /^\/approve\/[^/]+$/;
 

@@ -4,9 +4,13 @@ import { vi } from "vitest";
 
 const save = vi.hoisted(() => vi.fn());
 const adjust = vi.hoisted(() => vi.fn());
+const freeze = vi.hoisted(() => vi.fn());
+const unfreeze = vi.hoisted(() => vi.fn());
 vi.mock("@/app/(app)/admin/money/actions", () => ({
   saveSettingsAction: (...a: unknown[]) => save(...a),
   adjustWalletAction: (...a: unknown[]) => adjust(...a),
+  freezeOrgAction: (...a: unknown[]) => freeze(...a),
+  unfreezeOrgAction: (...a: unknown[]) => unfreeze(...a),
 }));
 import { AdminMoneyView } from "./AdminMoneyView";
 import type { OrgMoney, PlatformAccounts } from "@/lib/api/types";
@@ -20,10 +24,10 @@ const accounts: PlatformAccounts = {
 };
 const org = (over: Partial<OrgMoney> = {}): OrgMoney => ({
   orgId: ORG, name: "Acme Buyers", type: "BUYER", feePercent: null, effectiveFeePercent: 15,
-  billingMode: null, effectiveBillingMode: "PREPAID", creditLimit: null, walletBalance: 250, payableBalance: 0, ...over,
+  billingMode: null, effectiveBillingMode: "PREPAID", creditLimit: null, walletBalance: 250, payableBalance: 0, moneyFrozenAt: null, moneyFrozenReason: null, ...over,
 });
 
-beforeEach(() => { save.mockReset(); adjust.mockReset(); });
+beforeEach(() => { save.mockReset(); adjust.mockReset(); freeze.mockReset(); unfreeze.mockReset(); });
 
 it("renders platform balances formatted", () => {
   render(<AdminMoneyView accounts={accounts} org={null} />);
@@ -154,4 +158,36 @@ it("tells the admin to refresh when the post succeeded but the refetch did not",
   await typeAdjust("100", "a");
   await userEvent.click(screen.getByRole("button", { name: "Adjust wallet" }));
   expect(await screen.findByText("Adjustment saved; refresh to see the new balance")).toBeInTheDocument();
+});
+
+it("needs a reason to freeze, then shows the frozen banner and an Unfreeze button", async () => {
+  freeze.mockResolvedValue({ org: org({ moneyFrozenAt: "2026-10-22T10:00:00Z", moneyFrozenReason: "Chargeback dispute" }) });
+  render(<AdminMoneyView accounts={accounts} org={org()} orgQuery={ORG} />);
+  expect(screen.queryByRole("button", { name: "Unfreeze" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Freeze money" }));
+  expect(freeze).not.toHaveBeenCalled();
+  expect(await screen.findByText("A reason is required")).toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Reason"), "  Chargeback dispute ");
+  await userEvent.click(screen.getByRole("button", { name: "Freeze money" }));
+  expect(freeze).toHaveBeenCalledWith(ORG, "Chargeback dispute");
+  expect(await screen.findByText("Frozen 22 Oct 2026: Chargeback dispute")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Unfreeze" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Freeze money" })).not.toBeInTheDocument();
+});
+
+it("unfreezes a frozen org", async () => {
+  unfreeze.mockResolvedValue({ org: org() });
+  render(<AdminMoneyView accounts={accounts} org={org({ moneyFrozenAt: "2026-10-22T10:00:00Z", moneyFrozenReason: "x" })} orgQuery={ORG} />);
+  await userEvent.click(screen.getByRole("button", { name: "Unfreeze" }));
+  expect(unfreeze).toHaveBeenCalledWith(ORG);
+  expect(await screen.findByRole("button", { name: "Freeze money" })).toBeInTheDocument();
+  expect(screen.queryByText(/^Frozen /)).not.toBeInTheDocument();
+});
+
+it("shows a freeze error inline", async () => {
+  freeze.mockResolvedValue({ error: "reason must be 1 to 500 characters" });
+  render(<AdminMoneyView accounts={accounts} org={org()} orgQuery={ORG} />);
+  await userEvent.type(screen.getByLabelText("Reason"), "x");
+  await userEvent.click(screen.getByRole("button", { name: "Freeze money" }));
+  expect(await screen.findByText("reason must be 1 to 500 characters")).toBeInTheDocument();
 });

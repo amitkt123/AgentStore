@@ -2,14 +2,14 @@ import type { DeveloperVerification, VerificationEntityType, VerificationStatus,
 import type { Tone } from "@/ui/Pill";
 import { FIELD_TEXT, type FieldName } from "./errors";
 
-export const AGREEMENT_VERSION = "2.1";
+export const AGREEMENT_VERSION = "2.2";
 
 export interface StepMeta { key: VerificationStep; name: string; title: string; sub: string }
 export const STEPS: StepMeta[] = [
   { key: "ABOUT", name: "About you", title: "About you", sub: "This is who buyers see as the publisher of your agents." },
   { key: "TAX_IDS", name: "Tax IDs", title: "Tax IDs", sub: "Karya checks these against government records. We store them encrypted and show only the last few characters." },
   { key: "PHONE", name: "Phone", title: "Phone", sub: "A person at Karya confirms it. Buyers never see it." },
-  { key: "AGREEMENT", name: "Developer agreement", title: "Developer agreement", sub: "Version 2.1. The main points in plain words:" },
+  { key: "AGREEMENT", name: "Developer agreement", title: "Developer agreement", sub: "Version 2.2. The main points in plain words:" },
 ];
 
 export const stepIndex = (key: VerificationStep) => STEPS.findIndex((s) => s.key === key);

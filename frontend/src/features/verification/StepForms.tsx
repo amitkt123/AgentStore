@@ -102,6 +102,8 @@ const POINTS = [
   "Karya keeps 20% of what buyers pay. AI usage through Karya is charged at cost.",
   "Buyer data is never yours to keep, copy or train on.",
   "Karya can pause a version that misbehaves, and decides buyer disputes.",
+  "You are paid for services Karya resells. Your earnings balance is money owed for services, not a deposit.",
+  "Withdrawals go only to a verified account in your own name. Karya may freeze them while it investigates fraud or a dispute, and tax may be withheld where the law requires it.",
 ];
 
 export function AgreementForm({ agreed, onAgreed, error, disabled }: { agreed: boolean; onAgreed: (v: boolean) => void; error?: string; disabled: boolean }) {
@@ -114,7 +116,7 @@ export function AgreementForm({ agreed, onAgreed, error, disabled }: { agreed: b
       </div>
       <label className={styles.chk}>
         <input type="checkbox" checked={agreed} disabled={disabled} onChange={(e) => onAgreed(e.target.checked)} />
-        I've read the full Developer Distribution Agreement 2.1 and accept it
+        I've read the full <a href="/legal/developer-agreement" target="_blank" rel="noreferrer">Developer Distribution Agreement 2.2</a> and accept it
       </label>
       {error && <span className={styles.err}>{error}</span>}
     </>

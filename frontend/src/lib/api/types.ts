@@ -120,7 +120,7 @@ export interface Earnings {
 export interface OrgMoney {
   orgId: string; name: string; type: OrgType; feePercent: number | null; effectiveFeePercent: number;
   billingMode: BillingMode | null; effectiveBillingMode: BillingMode; creditLimit: number | null;
-  walletBalance: number; payableBalance: number;
+  walletBalance: number; payableBalance: number; moneyFrozenAt: string | null; moneyFrozenReason: string | null;
 }
 export interface OrgMoneyPatch { feePercent?: number; billingMode?: BillingMode; creditLimit?: number }
 export interface PlatformAccounts {
@@ -157,3 +157,30 @@ export interface Bill {
   id: string; period: string; amount: number; status: "OPEN" | "PAID" | "OVERDUE"; dueAt: string; paidAt: string | null;
 }
 export type SimulateOutcome = "PAID" | "FAILED";
+
+export type PayoutAccountType = "BANK" | "VPA";
+export type PayoutAccountStatus = "PENDING" | "VERIFIED" | "FAILED";
+export interface PayoutAccount {
+  id: string; type: PayoutAccountType; accountLast4: string | null; ifsc: string | null; vpa: string | null;
+  holderName: string; validatedName: string | null; nameMatch: boolean | null; status: PayoutAccountStatus;
+  failureReason: string | null; createdAt: string; verifiedAt: string | null;
+}
+export interface PayoutAccountBody {
+  type: PayoutAccountType; accountNumber?: string; ifsc?: string; vpa?: string; holderName: string;
+}
+export interface PayoutsSummary {
+  account: PayoutAccount | null; available: number; minimum: number; dailyLimit: number; withdrawnToday: number;
+  canWithdraw: boolean; blockedReason: string | null; validationAttemptsLeft: number; provider: string; verifiedName: string | null;
+}
+export type WithdrawalStatus = "REQUESTED" | "PROCESSING" | "PROCESSED" | "REVERSED" | "FAILED";
+export interface Withdrawal {
+  id: string; amount: number; mode: string; status: WithdrawalStatus; utr: string | null; accountLabel: string | null;
+  failureReason: string | null; createdAt: string; processedAt: string | null;
+}
+export interface AdminWithdrawal extends Withdrawal { orgId: string; orgName: string | null }
+export interface AdminPayoutAccount extends PayoutAccount { orgId: string; orgName: string | null; legalName: string | null }
+export interface ReconciliationIssue {
+  id: string; day: string; kind: string; providerRef: string | null; detail: Record<string, unknown> | null;
+  createdAt: string; resolvedAt: string | null;
+}
+export type PayoutSimulateOutcome = "PROCESSED" | "REVERSED" | "FAILED";

@@ -55,6 +55,20 @@ agentstore:
         webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
         base-url: https://api.razorpay.com
       # fake.webhook-secret is set only in application-dev.yml and application-test.yml
+    payouts:
+      provider: razorpayx
+      withdrawal-min: 100.00
+      withdrawal-daily-limit: 200000.00
+      validation-attempts-per-day: 3
+      retry-after: PT2M
+      stuck-after: PT24H
+      razorpayx:
+        key-id: ${RAZORPAY_KEY_ID:}
+        key-secret: ${RAZORPAY_KEY_SECRET:}
+        account-number: ${RAZORPAYX_ACCOUNT_NUMBER:}
+        webhook-secret: ${RAZORPAYX_WEBHOOK_SECRET:}
+        base-url: https://api.razorpay.com
+      # fake.webhook-secret is set only in application-dev.yml and application-test.yml
   data:
     retention-interval: PT1H
   jwt:
