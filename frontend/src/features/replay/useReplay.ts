@@ -68,9 +68,11 @@ export function useReplay(beats: number, opts: { reducedMotion: boolean }): Repl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const send = useCallback((a: Action) => {
+    const key = (x: State) => `${x.playing}${x.drawing?.beat}${x.drawing?.phase}${x.speed}`;
+    const before = key(ref.current);
     ref.current = reduce(ref.current, a);
     setS(ref.current);
-    arm();
+    if (key(ref.current) !== before) arm(); // else the running timer keeps its elapsed time
   }, [arm]);
 
   useEffect(() => {

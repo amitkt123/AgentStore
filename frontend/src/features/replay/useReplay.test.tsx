@@ -70,6 +70,15 @@ describe("useReplay", () => {
     tick(1600); expect(result.current).toMatchObject({ visible: 4, drawing: null, playing: false });
   });
 
+  it("keeps the beat clock when more beats arrive mid-beat", () => {
+    const { result, rerender } = mount(3);
+    act(() => result.current.replay()); tick(1600); tick(1000);
+    expect(result.current.visible).toBe(2);
+    rerender({ n: 4 });
+    tick(599); expect(result.current.visible).toBe(2);
+    tick(1); expect(result.current.visible).toBe(3);
+  });
+
   it("catches up quickly when far behind", () => {
     const { result, rerender } = mount(1);
     rerender({ n: 9 });
