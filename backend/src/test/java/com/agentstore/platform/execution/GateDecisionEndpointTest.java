@@ -124,6 +124,19 @@ class GateDecisionEndpointTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void decidingAnExpiredGateIsAConflictAndNothingChanges() {
+        Fx fx = awaiting("tok-gd-exp");
+        GateRequest gate = gateRepository.findById(fx.gate().getId()).orElseThrow();
+        gate.setExpiresAt(java.time.Instant.now().minusSeconds(1));
+        gateRepository.save(gate);
+
+        var response = decideRaw(fx, approver(fx.scenario().buyer().getId(), UUID.randomUUID()), Map.of("decision", "APPROVE"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(gateRepository.findById(fx.gate().getId()).orElseThrow().getStatus()).isEqualTo(GateStatus.PENDING);
+    }
+
+    @Test
     void anUnknownDecisionValueIsABadRequest() {
         Fx fx = awaiting("tok-gd-4");
 

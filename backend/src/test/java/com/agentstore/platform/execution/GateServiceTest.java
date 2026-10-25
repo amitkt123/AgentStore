@@ -88,6 +88,37 @@ class GateServiceTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> open(run, 5)).isInstanceOf(RunTerminatedException.class);
     }
 
+    private GateRequest openAndLapse(Run run) {
+        GateRequest gate = open(run, 5);
+        gate.setExpiresAt(Instant.now().minusSeconds(1));
+        gateRepository.save(gate);
+        return gate;
+    }
+
+    @Test
+    void refusesToApproveAGateWhoseExpiryHasPassed() {
+        Run run = running("tok-gs-exp-1");
+        GateRequest gate = openAndLapse(run);
+
+        assertThatThrownBy(() -> gateService.decide(run.getId(), gate.getId(), true, UUID.randomUUID(), null, DecisionChannel.WEB))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(gateRepository.findById(gate.getId()).orElseThrow().getStatus()).isEqualTo(GateStatus.PENDING);
+        assertThat(reload(run).getStatus()).isEqualTo(RunStatus.AWAITING_APPROVAL);
+    }
+
+    @Test
+    void refusesARejectionPastExpiry() {
+        Run run = running("tok-gs-exp-2");
+        GateRequest gate = openAndLapse(run);
+
+        assertThatThrownBy(() -> gateService.decide(run.getId(), gate.getId(), false, UUID.randomUUID(), null, DecisionChannel.WEB))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(gateRepository.findById(gate.getId()).orElseThrow().getStatus()).isEqualTo(GateStatus.PENDING);
+        assertThat(reload(run).getStatus()).isEqualTo(RunStatus.AWAITING_APPROVAL);
+    }
+
     @Test
     void approvingMarksTheGateAndResumesTheRun() {
         Run run = running("tok-gs-4");

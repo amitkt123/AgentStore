@@ -115,6 +115,10 @@ public class GateService {
             if (gate.getStatus() != GateStatus.PENDING) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Gate already " + gate.getStatus());
             }
+            if (!Instant.now().isBefore(gate.getExpiresAt())) {
+                // Past its expiry but the reaper has not run yet: refuse; the reaper moves it to EXPIRED.
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Gate expired");
+            }
             requireApprover(run, gate, userId);
             gate.setStatus(approve ? GateStatus.APPROVED : GateStatus.REJECTED);
             gate.setDecidedByUserId(userId);

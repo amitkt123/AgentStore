@@ -85,12 +85,31 @@ class ConnectionMonthlyLimitTest extends AbstractIntegrationTest {
     @Test
     void anInFlightRunCountsForItsReservation() {
         var s = scenario("150.00");
-        priorRun(s, RunStatus.RUNNING, "10.00", "100.00", Instant.now());
+        priorRun(s, RunStatus.RUNNING, "10.00", "90.00", Instant.now());
 
         var response = trigger(s);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYMENT_REQUIRED);
         assertThat(response.getBody()).contains("AGENT_MONTHLY_LIMIT");
+    }
+
+    @Test
+    void anInFlightRunCountsWhatItHasAlreadyCharged() {
+        var s = scenario("140.00");
+        priorRun(s, RunStatus.RUNNING, "40.00", "10.00", Instant.now());
+
+        var response = trigger(s);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYMENT_REQUIRED);
+        assertThat(reserved(s)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void aRunThatSpentItsWholeCapStillCounts() {
+        var s = scenario("150.00");
+        priorRun(s, RunStatus.RUNNING, "100.00", "0.00", Instant.now());
+
+        assertThat(trigger(s).getStatusCode()).isEqualTo(HttpStatus.PAYMENT_REQUIRED);
     }
 
     @Test
