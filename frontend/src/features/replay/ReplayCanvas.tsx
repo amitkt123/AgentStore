@@ -4,7 +4,7 @@ import { Glass } from "@/ui/Glass";
 import styles from "./ReplayCanvas.module.css";
 import type { ReplayBlock, ReplayEdge, ReplayGraph } from "./graph";
 import { elbowPath, placeReplay } from "./place";
-import { CATCH_UP_AFTER, CATCH_UP_MS, DRAW_MS, usePrefersReducedMotion, useReplay } from "./useReplay";
+import { CATCH_UP_MS, usePrefersReducedMotion, useReplay } from "./useReplay";
 
 type Props = { graph: ReplayGraph; live: boolean; selectedId?: string; onSelect?: (id: string) => void };
 
@@ -22,7 +22,12 @@ const say = (b: ReplayBlock) => `${b.label}: ${b.title}${b.detail ? `, ${b.detai
 
 export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
   const reducedMotion = usePrefersReducedMotion();
-  const r = useReplay(graph.beats, { reducedMotion });
+  const perBeat = useMemo(() => {
+    const out: string[][] = Array.from({ length: graph.beats }, () => []);
+    for (const b of graph.blocks) out[b.beat]?.push(b.id);
+    return out;
+  }, [graph]);
+  const r = useReplay(perBeat, { reducedMotion });
   const placed = useMemo(() => placeReplay(graph), [graph]);
   const uid = useId().replace(/:/g, "");
   const head = `rh-${uid}`, ghostHead = `rg-${uid}`;
@@ -52,18 +57,19 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
     stick.current = false;
   }, [graph.beats]);
 
-  const { visible, drawing, speed } = r;
+  const { visible, drawing, speed, settled } = r;
   const lineOf = (beat: number) => drawing?.beat === beat && drawing.phase === "line";
-  const shown = (b: ReplayBlock) => b.beat < visible && !lineOf(b.beat);
-  const catchUp = live && graph.beats - visible > CATCH_UP_AFTER;
-  const drawMs = catchUp ? CATCH_UP_MS / 2 : DRAW_MS / speed;
-  const enterMs = catchUp ? CATCH_UP_MS / 2 : ENTER_MS / speed;
+  // Settled blocks were on screen before their beat gained a step; they stay while it is re-drawn.
+  const shown = (b: ReplayBlock) => settled.has(b.id) || (b.beat < visible && !lineOf(b.beat));
+  const drawMs = r.lineMs;
+  const enterMs = r.catchUp ? CATCH_UP_MS / 2 : ENTER_MS / speed;
   const beatOf = new Map(graph.blocks.map((b) => [b.id, b.beat]));
   const blocks = graph.blocks.filter(shown);
   const current = Math.max(-1, ...blocks.filter((b) => b.tone !== "ghost").map((b) => b.beat));
 
-  const sr = graph.blocks.filter((b) => b.beat < visible && b.tone !== "ghost").map((b) => {
-    const ghost = graph.blocks.find((g) => g.id === `ghost:${b.id}` && g.beat < visible);
+  const told = (b: ReplayBlock) => b.beat < visible || settled.has(b.id);
+  const sr = graph.blocks.filter((b) => told(b) && b.tone !== "ghost").map((b) => {
+    const ghost = graph.blocks.find((g) => g.id === `ghost:${b.id}` && told(g));
     // The taken word: from the taken edge, else the opposite of the not-taken edge (a gate that ended the run).
     const ghostLabel = graph.edges.find((e) => e.from === b.id && e.ghost)?.label;
     const taken = graph.edges.find((e) => e.from === b.id && !e.ghost && e.label)?.label
@@ -74,11 +80,12 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
   const edge = (e: ReplayEdge) => {
     const beat = beatOf.get(e.to) ?? 0;
     const a = placed.boxes.get(e.from), b = placed.boxes.get(e.to);
-    if (beat >= visible || !a || !b) return null; // an arrow never exists before its step
-    if (e.ghost && lineOf(beat)) return null; // the not-taken arrow arrives with its block
+    const kept = settled.has(e.from) && settled.has(e.to); // drawn before; never re-grows
+    if (!a || !b || (!kept && beat >= visible)) return null; // an arrow never exists before its step
+    if (!kept && e.ghost && lineOf(beat)) return null; // the not-taken arrow arrives with its block
     const { d, labelAt } = elbowPath(a, b);
-    const growing = !e.ghost && lineOf(beat);
-    const fading = e.ghost && drawing?.beat === beat;
+    const growing = !kept && !e.ghost && lineOf(beat);
+    const fading = !kept && e.ghost && drawing?.beat === beat;
     return (
       <g key={`${e.from}>${e.to}`}>
         <path
@@ -143,7 +150,7 @@ export function ReplayCanvas({ graph, live, selectedId, onSelect }: Props) {
             </svg>
             {blocks.map((b) => {
               const p = placed.boxes.get(b.id)!;
-              const entering = drawing?.beat === b.beat;
+              const entering = drawing?.beat === b.beat && !settled.has(b.id);
               return (
                 <button
                   key={b.id}

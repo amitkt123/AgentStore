@@ -5,65 +5,97 @@ export type Speed = 0.5 | 1;
 export interface Replay {
   visible: number;
   drawing: { beat: number; phase: "line" | "block" } | null;
+  /** Blocks already on screen when a drawn beat gained a step: they stay put while it is re-drawn. */
+  settled: ReadonlySet<string>;
+  /** How long the current beat's line takes to grow, in ms. */
+  lineMs: number;
+  /** The current beat runs at catch-up pace. */
+  catchUp: boolean;
   playing: boolean; speed: Speed;
   replay(): void; pause(): void; resume(): void; back(): void; next(): void; setSpeed(s: Speed): void;
 }
 
+type Beats = string[][]; // block ids per beat
 interface State {
+  ids: Beats;
   visible: number;
   drawing: { beat: number; phase: "line" | "block" } | null;
+  settled: ReadonlySet<string>;
   playing: boolean; speed: Speed;
   target: number; // playback runs until this many beats are visible
   live: boolean;  // catch-up pacing applies (beats that arrived while watching)
+  fast: boolean;  // the current beat was started at catch-up pace
 }
 type Action =
-  | { type: "grow"; beats: number }
-  | { type: "replay" | "resume" | "next"; beats: number }
-  | { type: "back" | "pause" | "block" | "end" }
+  | { type: "grow"; ids: Beats }
+  | { type: "replay" | "resume" | "next" | "back" | "pause" | "block" | "end" }
   | { type: "speed"; speed: Speed };
 
-const startBeat = (s: State): State => ({ ...s, visible: s.visible + 1, drawing: { beat: s.visible, phase: "line" }, playing: true });
-const stop = (s: State): State => ({ ...s, playing: false, drawing: null });
+const NONE: ReadonlySet<string> = new Set();
+const startBeat = (s: State): State => {
+  const visible = s.visible + 1;
+  return { ...s, visible, drawing: { beat: s.visible, phase: "line" }, playing: true, fast: s.live && s.target - visible > CATCH_UP_AFTER };
+};
+const stop = (s: State): State => ({ ...s, playing: false, drawing: null, settled: NONE });
+
+/** Ids on screen now: settled ones, plus every drawn beat except one still growing its line. */
+const onScreen = (s: State): Set<string> => {
+  const out = new Set(s.settled);
+  s.ids.slice(0, s.visible).forEach((beat, n) => {
+    if (s.drawing?.beat === n && s.drawing.phase === "line") return;
+    beat.forEach((id) => out.add(id));
+  });
+  return out;
+};
 
 function reduce(s: State, a: Action): State {
+  const beats = s.ids.length;
   switch (a.type) {
     case "grow": {
-      if (a.beats < s.visible) return { ...stop(s), visible: a.beats, target: a.beats };
-      const grown = { ...s, target: a.beats };
-      if (s.playing || a.beats === s.visible) return grown;
+      const n = a.ids.length;
+      if (n < s.visible) return { ...stop(s), ids: a.ids, visible: n, target: n };
+      // A step landing in a beat already drawn re-draws from that beat; what is on screen stays.
+      const shown = onScreen(s);
+      const k = a.ids.slice(0, s.visible).findIndex((beat, i) =>
+        beat.some((id) => !shown.has(id)) && !(s.drawing?.beat === i && s.drawing.phase === "line"));
+      const grown = { ...s, ids: a.ids, target: n };
+      if (k >= 0) return startBeat({ ...grown, visible: k, settled: shown, live: true });
+      if (s.playing || n === s.visible) return grown;
       return startBeat({ ...grown, live: true });
     }
-    case "replay": return a.beats > 0 ? startBeat({ ...s, visible: 0, target: a.beats, live: false }) : s;
+    case "replay": return beats > 0 ? startBeat({ ...s, visible: 0, settled: NONE, target: beats, live: false }) : s;
     case "resume": {
       if (s.playing) return s;
-      const t = { ...s, target: a.beats };
+      const t = { ...s, target: beats };
       if (s.drawing) return { ...t, playing: true };
-      return s.visible < a.beats ? startBeat(t) : s;
+      return s.visible < beats ? startBeat(t) : s;
     }
     case "pause": return s.playing ? { ...s, playing: false } : s;
     case "back": return { ...stop(s), visible: Math.max(1, s.visible - 1) };
-    case "next": return s.visible < a.beats ? startBeat({ ...stop(s), target: s.visible + 1, live: false }) : stop(s);
+    case "next": return s.visible < beats ? startBeat({ ...stop(s), target: s.visible + 1, live: false }) : stop(s);
     case "block": return s.drawing ? { ...s, drawing: { ...s.drawing, phase: "block" } } : s;
     case "end": return s.visible < s.target ? startBeat(s) : stop(s);
     case "speed": return { ...s, speed: a.speed };
   }
 }
 
-export function useReplay(beats: number, opts: { reducedMotion: boolean }): Replay {
-  const [s, setS] = useState<State>(() => ({ visible: beats, drawing: null, playing: false, speed: 1, target: beats, live: false }));
+const lineOf = (s: State) => (s.fast ? CATCH_UP_MS / 2 : DRAW_MS / s.speed);
+
+export function useReplay(ids: Beats, opts: { reducedMotion: boolean }): Replay {
+  const [s, setS] = useState<State>(() => ({ ids, visible: ids.length, drawing: null, settled: NONE, playing: false, speed: 1, target: ids.length, live: false, fast: false }));
   // State lives in a ref too so a timer can chain the next phase without waiting for a render.
   const ref = useRef(s);
   const timer = useRef<ReturnType<typeof setTimeout>>();
-  const seen = useRef(beats);
+  const sig = ids.map((b) => b.join(",")).join("|");
+  const seen = useRef(sig);
 
   const arm = useCallback(() => {
     clearTimeout(timer.current);
-    const { playing, drawing, speed, live, target, visible } = ref.current;
-    if (!playing || !drawing) return;
-    const catchUp = live && target - visible > CATCH_UP_AFTER;
-    const beat = catchUp ? CATCH_UP_MS : BEAT_MS / speed;
-    const line = catchUp ? CATCH_UP_MS / 2 : DRAW_MS / speed;
-    const isLine = drawing.phase === "line";
+    const cur = ref.current;
+    if (!cur.playing || !cur.drawing) return;
+    const beat = cur.fast ? CATCH_UP_MS : BEAT_MS / cur.speed;
+    const line = lineOf(cur);
+    const isLine = cur.drawing.phase === "line";
     timer.current = setTimeout(() => { send(isLine ? { type: "block" } : { type: "end" }); }, isLine ? line : beat - line);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -75,20 +107,23 @@ export function useReplay(beats: number, opts: { reducedMotion: boolean }): Repl
     if (key(ref.current) !== before) arm(); // else the running timer keeps its elapsed time
   }, [arm]);
 
+  const idsRef = useRef(ids);
+  idsRef.current = ids;
   useEffect(() => {
-    if (beats === seen.current) return;
-    seen.current = beats;
-    send({ type: "grow", beats });
-  }, [beats, send]);
+    if (sig === seen.current) return;
+    seen.current = sig;
+    send({ type: "grow", ids: idsRef.current });
+  }, [sig, send]);
   useEffect(() => () => clearTimeout(timer.current), []);
 
   return {
     visible: s.visible, drawing: opts.reducedMotion ? null : s.drawing, playing: s.playing, speed: s.speed,
-    replay: useCallback(() => send({ type: "replay", beats }), [send, beats]),
+    settled: s.settled, lineMs: lineOf(s), catchUp: s.fast,
+    replay: useCallback(() => send({ type: "replay" }), [send]),
     pause: useCallback(() => send({ type: "pause" }), [send]),
-    resume: useCallback(() => send({ type: "resume", beats }), [send, beats]),
+    resume: useCallback(() => send({ type: "resume" }), [send]),
     back: useCallback(() => send({ type: "back" }), [send]),
-    next: useCallback(() => send({ type: "next", beats }), [send, beats]),
+    next: useCallback(() => send({ type: "next" }), [send]),
     setSpeed: useCallback((speed: Speed) => send({ type: "speed", speed }), [send]),
   };
 }

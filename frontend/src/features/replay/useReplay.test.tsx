@@ -2,8 +2,10 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useReplay } from "./useReplay";
 
-const mount = (beats: number, reducedMotion = false) =>
-  renderHook(({ n }) => useReplay(n, { reducedMotion }), { initialProps: { n: beats } });
+/** n beats, one block each: [["b0"], ["b1"], ...]. */
+const ids = (n: number) => Array.from({ length: n }, (_, i) => [`b${i}`]);
+const mount = (beats: number | string[][], reducedMotion = false) =>
+  renderHook(({ n }) => useReplay(typeof n === "number" ? ids(n) : n, { reducedMotion }), { initialProps: { n: beats } });
 const tick = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
 
 describe("useReplay", () => {
@@ -114,5 +116,48 @@ describe("useReplay", () => {
     act(() => result.current.replay());
     unmount();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("re-draws a beat that gains a step, keeping what was already drawn", () => {
+    const { result, rerender } = mount([["a"], ["b"]]);
+    rerender({ n: [["a"], ["b", "c"]] });
+    expect(result.current).toMatchObject({ visible: 2, drawing: { beat: 1, phase: "line" }, playing: true });
+    expect([...result.current.settled].sort()).toEqual(["a", "b"]);
+    tick(700); expect(result.current.drawing).toEqual({ beat: 1, phase: "block" });
+    tick(900); expect(result.current).toMatchObject({ visible: 2, drawing: null, playing: false });
+  });
+
+  it("re-draws from the earliest drawn beat that gains a step, then plays the new beats", () => {
+    const { result, rerender } = mount([["a"], ["b"], ["c"]]);
+    rerender({ n: [["a", "x"], ["b"], ["c"], ["d"]] });
+    expect(result.current).toMatchObject({ visible: 1, drawing: { beat: 0, phase: "line" } });
+    expect([...result.current.settled].sort()).toEqual(["a", "b", "c"]);
+    tick(1600 * 3); expect(result.current.visible).toBe(4);
+    tick(1600); expect(result.current).toMatchObject({ visible: 4, drawing: null, playing: false });
+  });
+
+  it("re-draws a beat that gains a step while its block is rising", () => {
+    const { result, rerender } = mount([["a"]]);
+    rerender({ n: [["a"], ["b"]] }); tick(700);
+    expect(result.current.drawing).toEqual({ beat: 1, phase: "block" });
+    rerender({ n: [["a"], ["b", "c"]] });
+    expect(result.current.drawing).toEqual({ beat: 1, phase: "line" });
+    expect(result.current.settled.has("b")).toBe(true);
+  });
+
+  it("does not re-draw a beat still in its line phase", () => {
+    const { result, rerender } = mount([["a"]]);
+    rerender({ n: [["a"], ["b"]] }); tick(300);
+    rerender({ n: [["a"], ["b", "c"]] });
+    tick(400); expect(result.current.drawing).toEqual({ beat: 1, phase: "block" });
+  });
+
+  it("states the line duration it paces by", () => {
+    const { result, rerender } = mount(1);
+    expect(result.current.lineMs).toBe(700);
+    act(() => result.current.setSpeed(0.5)); expect(result.current.lineMs).toBe(1400);
+    act(() => result.current.setSpeed(1));
+    rerender({ n: 9 });
+    expect(result.current.lineMs).toBe(150);
   });
 });

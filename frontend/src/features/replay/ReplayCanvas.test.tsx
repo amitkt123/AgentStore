@@ -155,4 +155,55 @@ describe("ReplayCanvas", () => {
     expect(box(container).scrollLeft).toBe(0);
     sw.mockRestore(); cw.mockRestore();
   });
+
+  it("grows a step that lands in an already-drawn beat (a write beside the not-taken branch)", () => {
+    vi.useFakeTimers();
+    const read = step("DATA_READ", { resource: "ledger", count: 2 }, 1, 2, "r");
+    const ask = step("GATE_REQUESTED", { action: "post", summary: "Post?" }, null, 3, "q");
+    const ok = step("GATE_DECIDED", { action: "post", decision: "APPROVED" }, null, 60, "a");
+    const write = step("DATA_WRITE", { resource: "ledger", count: 2 }, 61, 62, "w");
+    const { container, rerender } = render(<ReplayCanvas graph={buildReplay([read, ask], [])} live />);
+    rerender(<ReplayCanvas graph={buildReplay([read, ask, ok], [])} live />);
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(container.querySelector('[data-block-id="ghost:q"]')).not.toBeNull();
+    rerender(<ReplayCanvas graph={buildReplay([read, ask, ok, write], [])} live />);
+    expect(container.querySelector('[data-block-id="w"]')).toBeNull();
+    const line = container.querySelector('path[data-to="w"]')!;
+    expect(line).toHaveAttribute("data-growing");
+    expect(line).not.toHaveAttribute("marker-end");
+    expect(container.querySelector('[data-block-id="ghost:q"]')).not.toBeNull(); // already drawn: stays
+    expect(container.querySelector('path[data-edge="ghost"]')).toHaveAttribute("marker-end");
+    act(() => { vi.advanceTimersByTime(700); });
+    expect(container.querySelector('[data-block-id="w"]')).not.toBeNull();
+    expect(container.querySelector('path[data-to="w"]')).toHaveAttribute("marker-end");
+  });
+
+  it("grows a parallel call that finishes after the poll that drew its partner", () => {
+    vi.useFakeTimers();
+    const note = step("AGENT_LOG", { message: "Reading" }, null, 1, "n");
+    const a = step("DATA_READ", { resource: "bank" }, 2, 6, "a");
+    const b = step("DATA_READ", { resource: "ledger" }, 3, 8, "b");
+    const { container, rerender } = render(<ReplayCanvas graph={buildReplay([note, a], [])} live />);
+    rerender(<ReplayCanvas graph={buildReplay([note, a, b], [])} live />);
+    expect(container.querySelector('[data-block-id="a"]')).not.toBeNull();
+    expect(container.querySelector('path[data-to="a"]')).toHaveAttribute("marker-end");
+    expect(container.querySelector('path[data-to="a"]')).not.toHaveAttribute("data-growing");
+    expect(container.querySelector('[data-block-id="b"]')).toBeNull();
+    expect(container.querySelector('path[data-to="b"]')).toHaveAttribute("data-growing");
+    expect(container.querySelector('path[data-to="b"]')).not.toHaveAttribute("marker-end");
+    act(() => { vi.advanceTimersByTime(700); });
+    expect(container.querySelector('[data-block-id="b"]')).not.toBeNull();
+    expect(container.querySelector('path[data-to="b"]')).toHaveAttribute("marker-end");
+  });
+
+  it("grows a catch-up line at the pace the replay keeps, even when the run ends mid-beat", () => {
+    vi.useFakeTimers();
+    const { container, rerender } = render(<ReplayCanvas graph={long(1)} live />);
+    const nine = long(9);
+    rerender(<ReplayCanvas graph={nine} live />);
+    const growing = () => container.querySelector("path[data-growing]") as SVGPathElement;
+    expect(growing().style.animationDuration).toBe("150ms");
+    rerender(<ReplayCanvas graph={nine} live={false} />);
+    expect(growing().style.animationDuration).toBe("150ms");
+  });
 });
