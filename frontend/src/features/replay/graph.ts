@@ -81,11 +81,12 @@ export function buildReplay(steps: RunStep[], gates: GateDetail[]): ReplayGraph 
       const gateId = str(d.gateId);
       const match = gateId ? gates.find((g) => g.gateId === gateId) : key ? gates.filter((g) => g.action === key).sort((a, b) => (ms(b.decidedAt) ?? 0) - (ms(a.decidedAt) ?? 0))[0] : undefined;
       const dec = str(decided?.d.decision);
-      const outcome: Outcome = dec === "APPROVED" || dec === "REJECTED" || dec === "EXPIRED" ? dec : (match?.status ?? "PENDING");
+      // No decision step and no gate record (a legacy agent-reported GATE): an ask with no known outcome, never "waiting".
+      const outcome: Outcome | undefined = dec === "APPROVED" || dec === "REJECTED" || dec === "EXPIRED" ? dec : match?.status;
       const decidedIso = decided?.step.createdAt ?? match?.decidedAt ?? (outcome === "EXPIRED" ? match?.expiresAt ?? null : null);
       block = { ...block, title: str(d.summary) ?? stepText(s), tone: outcome === "PENDING" ? "waiting" : "done" };
       if (outcome === "PENDING") block.detail = "Waiting for you";
-      else {
+      else if (outcome) {
         block.detail = `${OUTCOME_WORD[outcome]} at ${decidedIso ? formatTime(decidedIso) : "–"}`;
         const a = ms(s.createdAt), b = ms(decidedIso);
         if (a !== null && b !== null) block.metric = `waited ${Math.max(0, Math.round((b - a) / 60000))} min`;
