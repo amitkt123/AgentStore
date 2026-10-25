@@ -1,0 +1,6 @@
+.surface { border: 1px solid var(--glass-line); border-radius: var(--radius); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2); backdrop-filter: blur(var(--glass-blur)) saturate(1.2); }
+.l1 { background: var(--glass-1); box-shadow: var(--glass-edge), var(--shadow-1); }
+.l2 { background: var(--glass-2); box-shadow: var(--glass-edge), var(--shadow-2); }
+.l3 { background: var(--glass-3); box-shadow: var(--glass-edge), var(--shadow-3); }
+.surface .surface { -webkit-backdrop-filter: none; backdrop-filter: none; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .surface { background: var(--s); } }
