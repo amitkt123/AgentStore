@@ -1,0 +1,1 @@
+ALTER TABLE run ALTER COLUMN reached_block TYPE TEXT;
