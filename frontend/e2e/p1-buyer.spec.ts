@@ -26,11 +26,16 @@ test("buyer admin uploads a file, sees the store flow and the plug-in screen", a
   await page.goto("/store");
   await page.getByRole("link", { name: /E2E Bank Reconciliation/ }).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("E2E Bank Reconciliation");
-  await page.getByRole("link", { name: "Add to workspace" }).click();
+  await expect(page.getByText("Approved", { exact: true })).toBeVisible();
+  await expect(page.getByText("Rejected", { exact: true })).toBeVisible();
+  await expect(page.getByText("Stops here, nothing is posted")).toBeVisible();
+  // The seed's run already connects this buyer to the agent, so the store offers Run now; the plug-in screen is still reachable.
+  await page.goto(page.url().replace("/store/", "/connect/"));
+  await expect(page.getByText("Can write: Ledger, only after your approval")).toBeVisible();
 
   await page.getByLabel(/bank statement/i).selectOption({ label: name });
   await expect(page.getByText(/1 rows, columns match/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /add and run now/i })).toBeEnabled();
+  await expect(page.getByRole("button", { name: /add to workspace/i })).toBeEnabled();
 });
 
 test("buyer admin sees a waiting run but cannot decide it", async ({ page }) => {
@@ -38,15 +43,19 @@ test("buyer admin sees a waiting run but cannot decide it", async ({ page }) => 
   await page.goto("/runs");
   await expect(page.getByRole("link", { name: "R-E2E1", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "R-E2E1", exact: true }).click();
-  await expect(page.getByText("Post 142 journal entries for August?")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Post 142 journal entries for August?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
 });
 
 test("approver approves the gate from the run page and the run moves on", async ({ page }) => {
   await signIn(page, "e2e-approver@example.com");
   await page.goto("/runs/R-E2E1");
-  await page.getByRole("button", { name: "Approve" }).click();
-  await expect(page.getByText("You approved this.")).toBeVisible();
+  const replay = page.getByRole("region", { name: "Run replay" });
+  await expect(replay).toContainText("Read your data");
+  await expect(replay).toContainText("Waiting for you");
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(page.getByText(/You approved this/)).toBeVisible();
+  await expect(replay.getByRole("list")).toContainText("then Approved");
   await page.goto("/runs");
   await expect(page.getByRole("link", { name: "R-E2E1", exact: true })).toBeVisible();
 });

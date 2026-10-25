@@ -1,13 +1,19 @@
 .wrap { display: flex; flex-direction: column; gap: 20px; }
 .head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .note { color: var(--ink3); margin: 0; }
-.why { margin: 0; padding: 12px 16px; background: var(--l2); border-radius: var(--radius); color: var(--ink2); }
-.cols { display: grid; grid-template-columns: 1fr 280px; gap: 20px; align-items: start; }
-.sub { margin: 4px 0 12px; color: var(--ink3); font-size: 13px; }
-.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.steps li { display: flex; gap: 12px; padding: 8px 12px; background: var(--s); border: 1px solid var(--l); border-radius: 10px; }
-.facts { background: var(--s); border: 1px solid var(--l); border-radius: var(--radius); padding: 16px; }
+.why { margin: 0; padding: 12px 16px; background: var(--glass-1); border: 1px solid var(--glass-line); box-shadow: var(--glass-edge), var(--shadow-1); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2); backdrop-filter: blur(var(--glass-blur)) saturate(1.2); border-radius: var(--radius); color: var(--ink2); }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+.facts { padding: 16px; }
 .facts dl { margin: 0; display: flex; flex-direction: column; gap: 12px; }
 .facts dt { font-size: 12px; color: var(--ink3); }
 .facts dd { margin: 2px 0 0; font-weight: 600; }
-@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+.factsTitle { margin: 0 0 12px; font-size: 15px; }
+.fact { overflow-wrap: anywhere; font-weight: 500; }
+.decided { background: var(--glass-1); border: 1px solid var(--glass-line); box-shadow: var(--glass-edge), var(--shadow-1); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2); backdrop-filter: blur(var(--glass-blur)) saturate(1.2); border-radius: var(--radius); }
+.decided > summary { cursor: pointer; padding: 12px 16px; font-weight: 600; }
+.decided[open] > summary { border-bottom: 1px solid var(--l); }
+.canvas { padding: 20px; }
+.all { align-self: flex-start; margin: 12px 0 0; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--glass-line); background: var(--glass-2); font: inherit; font-size: 13px; color: var(--b); cursor: pointer; }
+.meter { margin-top: 6px; height: 6px; border-radius: 999px; background: var(--l2); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--b); border-radius: 999px; transition: width var(--dur-2) var(--ease); }
+.gate { margin-top: 12px; }

@@ -24,6 +24,18 @@ export function formatTime(iso: string | null): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A past moment: the time alone for today, with the day for earlier dates, and the year when it is not this year. */
+export function formatWhen(iso: string | null, now: Date = new Date()): string {
+  if (!iso) return "–";
+  const d = new Date(iso);
+  const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  if (d.toDateString() === now.toDateString()) return time;
+  const day = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return d.getFullYear() === now.getFullYear() ? `${day}, ${time}` : `${day} ${d.getFullYear()}, ${time}`;
+}
+
 export function formatDate(iso: string | null): string {
   if (!iso) return "–";
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });

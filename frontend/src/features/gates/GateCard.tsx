@@ -1,17 +1,19 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import styles from "./GateCard.module.css";
 import { Button } from "@/ui/Button";
 import { decideGateAction } from "@/app/(app)/runs/actions";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, humanize } from "@/lib/format";
+import { cell, decisionText } from "./previewCells";
 import type { GateDetail } from "@/lib/api/types";
 
 export function gateIsExpired(g: GateDetail, nowMs: number): boolean {
   return g.status === "EXPIRED" || (g.status === "PENDING" && new Date(g.expiresAt).getTime() <= nowMs);
 }
 
-export function GateCard({ runRef, gate, canDecide }: { runRef: string; gate: GateDetail; canDecide: boolean }) {
+export function GateCard({ runRef, gate, canDecide, viewerUserId }: { runRef: string; gate: GateDetail; canDecide: boolean; viewerUserId?: string }) {
   const [error, setError] = useState<string | null>(null);
+  const headingId = useId();
   const [pending, start] = useTransition();
   const expired = gateIsExpired(gate, Date.now());
   const decided = gate.status === "APPROVED" || gate.status === "REJECTED";
@@ -24,18 +26,19 @@ export function GateCard({ runRef, gate, canDecide }: { runRef: string; gate: Ga
     });
 
   const cols = gate.preview?.columns ?? (gate.preview?.rows[0] ? Object.keys(gate.preview.rows[0]) : []);
+  const numericCols = new Set(cols.filter((c) => gate.preview?.rows.some((r) => cell(r[c], c).numeric)));
 
   return (
-    <section className={styles.card} aria-labelledby={`g-${gate.gateId}`}>
-      <h2 id={`g-${gate.gateId}`}>{gate.summary}</h2>
+    <section className={styles.card} aria-labelledby={headingId}>
+      <h2 id={headingId}>{gate.summary}</h2>
       {gate.costIfApproved != null && <p>Approving costs {formatMoney(gate.costIfApproved)}.</p>}
       {gate.preview && gate.preview.rows.length > 0 && (
         <div className={styles.scroll}>
           <table>
-            <thead><tr>{cols.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+            <thead><tr>{cols.map((c) => <th key={c} className={numericCols.has(c) ? styles.num : undefined}>{humanize(c)}</th>)}</tr></thead>
             <tbody>
               {gate.preview.rows.map((r, i) => (
-                <tr key={i}>{cols.map((c) => <td key={c} className="mono">{String(r[c] ?? "")}</td>)}</tr>
+                <tr key={i}>{cols.map((c) => { const v = cell(r[c], c); return <td key={c} className={`mono ${v.numeric ? styles.num : ""}`}>{v.text}</td>; })}</tr>
               ))}
             </tbody>
           </table>
@@ -45,7 +48,7 @@ export function GateCard({ runRef, gate, canDecide }: { runRef: string; gate: Ga
           </p>
         </div>
       )}
-      {decided && <p role="status">{gate.status === "APPROVED" ? "You approved this." : "You rejected this."}</p>}
+      {decided && <p role="status">{decisionText(gate, viewerUserId)}</p>}
       {!decided && expired && <p role="status">This request has expired.</p>}
       {!decided && !canDecide && <p role="status">An approver has to decide this. You can see what it will do but not answer it.</p>}
       {!decided && canDecide && (

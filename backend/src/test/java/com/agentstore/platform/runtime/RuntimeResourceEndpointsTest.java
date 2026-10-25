@@ -49,6 +49,20 @@ class RuntimeResourceEndpointsTest extends AbstractStorageIntegrationTest {
     }
 
     @Test
+    void aWriteStepRecordsWhenTheCallStartedAndAgentLogsDoNot() {
+        var agent = fx.runningAgent(new BigDecimal("500.00"));
+        call(HttpMethod.POST, "/runtime/v1/resources/journal_entries/records", agent.token(),
+                Map.of("records", List.of(Map.of("account", "1000"))));
+        call(HttpMethod.POST, "/runtime/v1/logs", agent.token(),
+                Map.of("entries", List.of(Map.of("level", "info", "message", "hi"))));
+        var steps = stepRepository.findByRunIdOrderByCreatedAtAsc(agent.run().getId());
+        var staged = steps.stream().filter(s -> s.getKind() == RunStepKind.WRITE_STAGED).findFirst().orElseThrow();
+        assertThat(staged.getStartedAt()).isNotNull().isBeforeOrEqualTo(staged.getCreatedAt());
+        var log = steps.stream().filter(s -> s.getKind() == RunStepKind.AGENT_LOG).findFirst().orElseThrow();
+        assertThat(log.getStartedAt()).isNull();
+    }
+
+    @Test
     void aGrantedWriteIsAcceptedAndStagedBecauseTheScopeRequiresApproval() {
         var agent = fx.runningAgent(new BigDecimal("500.00"));
 

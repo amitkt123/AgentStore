@@ -45,7 +45,7 @@ it("disables the buttons once the gate has expired", () => {
 });
 
 it("shows the outcome of a decided gate and no buttons", () => {
-  render(<GateCard runRef="R-1" gate={{ ...gate, status: "APPROVED", decidedAt: "2026-09-29T10:00:00Z" }} canDecide />);
+  render(<GateCard runRef="R-1" gate={{ ...gate, status: "APPROVED", decidedAt: "2026-09-29T10:00:00Z", decidedByUserId: "me" }} canDecide viewerUserId="me" />);
   expect(screen.getByText(/you approved this/i)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
 });
@@ -61,4 +61,17 @@ it("expiry helper", () => {
   expect(gateIsExpired({ ...gate, expiresAt: "2000-01-01T00:00:00Z" }, Date.now())).toBe(true);
   expect(gateIsExpired(gate, Date.now())).toBe(false);
   expect(gateIsExpired({ ...gate, status: "EXPIRED" }, Date.now())).toBe(true);
+});
+
+it("humanizes headers and right-aligns formatted amounts", () => {
+  render(<GateCard runRef="R-1" gate={gate} canDecide />);
+  expect(screen.getByRole("columnheader", { name: "Amount" })).toBeInTheDocument();
+  const amount = screen.getByText("48,200");
+  expect(amount.className).toMatch(/num/);
+});
+
+it("says who decided instead of always 'you'", () => {
+  render(<GateCard runRef="R-1" gate={{ ...gate, status: "APPROVED", decidedByUserId: "someone-else", decidedVia: "WEB", decidedAt: "2026-09-29T08:47:00Z" }} canDecide={false} viewerUserId="me" />);
+  expect(screen.queryByText(/you approved/i)).toBeNull();
+  expect(screen.getByText(/^Approved/)).toBeInTheDocument();
 });

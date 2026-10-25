@@ -13,7 +13,7 @@ Mockup elements omitted because the backend has no data or route for them. Updat
 | G7 | Test cases passed, attack probes, runs and dispute rate, typical cost | Waits on WS8 |
 | G8 | Try on sample data | No backend |
 | G9 | Version pinning and "1 new" update badge | Waits on WS9 |
-| G10 | Sign-in with Google | Backend supports it (POST /auth/google) but it needs a Google client id, which is not configured |
+| G10 | Sign-in with Google | Backend supports it (POST /auth/google) but it needs a Google client id, which is not configured; the button is hidden until then (UX-1) |
 | G11 | Block descriptions on the live run | Run detail has no agentId/versionId to fetch the manifest |
 | G12 | "Code we sent by SMS" on the Phone step | WS7a captures the number and a person at Karya confirms it; no SMS vendor (no paid third parties) |
 | G13 | "Payout account" step | Bank fields are deferred to WS10c, so the flow is four steps, not five |
@@ -26,10 +26,10 @@ Mockup elements omitted because the backend has no data or route for them. Updat
 | G20 | Billing bills list and "Pay" in postpaid mode | Resolved in WS10b |
 | G21 | Earnings "Withdraw", "Payout account", withdrawal history | No payout backend; arrives with WS10c |
 | G22 | Tax invoices on Billing | GST tax invoices are a WS10 non-goal (legal question, spec §8 Q6); the postpaid bill in WS10b is a statement, not a tax invoice |
+| G23 | Parallel columns in the run replay for runs before V48 | Parallel columns need `startedAt`, which only steps recorded after V48 carry; older runs draw one step per beat |
 
 ## Known visual differences
-- Files "Added" shows a time only; a date is needed for files older than today.
-- Runs history "Started" shows a time only for the same reason.
-- Live run block descriptions are missing (G11).
+- Live run block descriptions are missing (G11). The flow canvas still shows each node's title; only its body is empty.
+- The flow order is a display convention (spec `2026-10-25-glass-flow-ui-design.md` §2): the canvas groups blocks as Reads, Thinks, Drafts, Asks you, Writes, Charges, and adds a "Posts <resource>" node after each approval. The backend still emits scopes, then gates.
 - Get verified has two panels (steps and form); the mockup's third "What changes when you're verified" panel is omitted (G15).
 - The Studio has no flow canvas and no observed-behaviour half (G16).

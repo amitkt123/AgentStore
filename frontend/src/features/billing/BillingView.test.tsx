@@ -109,3 +109,14 @@ it("hides money back on postpaid when nothing is refundable", () => {
     payments={{ ...none, bills: [], refundable: { refundable: 0, parts: [] }, refunds: [] }} />);
   expect(screen.queryByRole("heading", { name: "Get money back" })).not.toBeInTheDocument();
 });
+
+it("says when a payment panel could not load instead of hiding it silently", () => {
+  render(<BillingView wallet={prepaid} summary={summary} payments={{ options: null, topUps: null, refundable: null, refunds: null, bills: null, failed: ["options"] }} />);
+  expect(screen.getByText("We couldn't load Add money. Refresh to try again.")).toBeInTheDocument();
+});
+
+it("names every panel that failed in one line, in page order", () => {
+  render(<BillingView wallet={prepaid} summary={summary} payments={{ options: null, topUps: null, refundable: null, refunds: null, bills: null, failed: ["refunds", "options", "topUps"] }} />);
+  expect(screen.getAllByRole("status").filter((n) => /couldn't load/.test(n.textContent ?? ""))).toHaveLength(1);
+  expect(screen.getByText("We couldn't load Add money, your top-ups and your refunds. Refresh to try again.")).toBeInTheDocument();
+});

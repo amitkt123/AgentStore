@@ -1,4 +1,4 @@
-.page { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr); }
+.page { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr); background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.3px); background-size: 18px 18px; }
 @media (min-width: 1024px) { .page { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 
 /* hero */

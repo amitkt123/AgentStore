@@ -1,7 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("@/app/(app)/connect/actions", () => ({ startRunAction: vi.fn() }));
 import { StoreFlow } from "./StoreFlow";
 import type { VersionDetail } from "@/lib/api/types";
+import { bankManifest } from "./fixtures";
 
 const detail: VersionDetail = {
   id: "v1", agentId: "a1", agentName: "Bank Reconciliation", versionNumber: "1.3.0", status: "LIVE",
@@ -16,7 +19,7 @@ const detail: VersionDetail = {
 it("shows the declared blocks and what the buyer agrees to", () => {
   render(<StoreFlow agentId="a1" versionId="v1" detail={detail} canConnect />);
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bank Reconciliation");
-  expect(screen.getByText("Your statement lines, CSV")).toBeInTheDocument();
+  expect(screen.getAllByText("Your statement lines, CSV").length).toBeGreaterThan(0);
   expect(screen.getByText("₹2 per match")).toBeInTheDocument();
   expect(screen.getByText("₹500")).toBeInTheDocument();
   expect(screen.getByText("None")).toBeInTheDocument();
@@ -38,4 +41,39 @@ it("shows the selected block in the side panel", async () => {
   render(<StoreFlow agentId="a1" versionId="v1" detail={detail} canConnect />);
   await userEvent.click(screen.getByRole("button", { name: /Your approval/ }));
   expect(screen.getByRole("region", { name: "Selected block" })).toHaveTextContent("Before anything is posted");
+});
+
+it("opens on the first block instead of an empty panel", () => {
+  render(<StoreFlow agentId="a1" versionId="v1" detail={detail} canConnect />);
+  expect(screen.getByRole("region", { name: "Selected block" })).toHaveTextContent("Your statement lines, CSV");
+  expect(screen.queryByText(/pick a block/i)).toBeNull();
+});
+
+it("does not show run state on a store page", () => {
+  render(<StoreFlow agentId="a1" versionId="v1" detail={detail} canConnect />);
+  expect(screen.queryByText("Not started")).toBeNull();
+});
+
+it("labels unenforced declarations as declared by the developer", () => {
+  render(<StoreFlow agentId="a1" versionId="v1" detail={detail} canConnect />);
+  expect(screen.getAllByText(/declared by the developer/i)).toHaveLength(2);
+});
+
+it("offers Run now instead of a second add when the agent is already added", () => {
+  render(<StoreFlow agentId="a1" versionId="v1" detail={detail} canConnect connectionId="c1" />);
+  expect(screen.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Add to workspace" })).toBeNull();
+  expect(screen.getByText(/already in your workspace/i)).toBeInTheDocument();
+  expect(screen.getByText(/runs use the version you added/i)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Set it up again" })).toHaveAttribute("href", "/connect/a1/v1");
+});
+
+it("shows the gate's wait and preview when selected", async () => {
+  const d: VersionDetail = { ...detail, manifest: bankManifest };
+  render(<StoreFlow agentId="a1" versionId="v1" detail={d} canConnect />);
+  await userEvent.click(screen.getByRole("button", { name: /Your approval/ }));
+  expect(screen.getByRole("region", { name: "Selected block" })).toHaveTextContent("Waits up to 30 minutes for an answer");
+  expect(screen.getByRole("region", { name: "Selected block" })).toHaveTextContent("You will see: Date, Debit");
+  await userEvent.click(screen.getByRole("button", { name: /Posts ledger/ }));
+  expect(screen.getByRole("region", { name: "Selected block" })).toHaveTextContent("You see every change before it is posted");
 });

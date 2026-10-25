@@ -42,3 +42,8 @@ it("gives ADMIN Money, Payouts and Reconciliation, and nobody else", async () =>
   }
   expect(railItemsFor("ADMIN", 0)).toEqual(adminRailItems());
 });
+
+it("shows each item's label as visible text", () => {
+  render(<Rail items={items} activePath="/home" />);
+  expect(screen.getByText("Workspace")).toBeVisible();
+});

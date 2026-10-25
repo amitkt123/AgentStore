@@ -11,14 +11,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) redirect("/login");
   const me = await getMe();
   const active = me.memberships.find((m) => m.orgId === me.activeOrgId);
-  const initials = me.fullName.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   let needsYou = 0;
   if (isBuyer(session.role)) {
     needsYou = await listRuns({ group: "needs_you", size: 1 }).then((r) => r.counts.needs_you).catch(() => 0);
   }
   const items = railItemsFor(session.role, needsYou);
   return (
-    <AppShell items={items} orgName={active?.orgName ?? "Karya"} initials={initials}>
+    <AppShell items={items} orgName={active?.orgName ?? "Karya"} fullName={me.fullName} email={me.email}>
       {children}
     </AppShell>
   );

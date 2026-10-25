@@ -1,5 +1,6 @@
 .main { margin-left: var(--rail-w); min-height: 100vh; }
 .content { padding: 28px 32px 48px; max-width: 1200px; }
+.content.wide { max-width: none; }
 @media (max-width: 767px) {
   .main { margin-left: 0; padding-bottom: 72px; }
   .content { padding: 20px 16px 32px; }

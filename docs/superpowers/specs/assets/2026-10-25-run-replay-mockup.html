@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Run replay, branches</title>
+<style>
+  :root { --ink:#141a2b; --ink2:#4a5468; --ink3:#7a8396; --b:#3b5bdb; --ok:#2f8a4e; --okS:#cfe8d6; --wa:#b7791f; --line:#dfe3ec; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, "Inter", system-ui, sans-serif; color:var(--ink); background:#f6f7fb; padding: 24px; }
+  h2 { margin: 0 0 4px; } .sub { color: var(--ink2); margin: 0 0 16px; font-size: 14px; max-width: 900px; }
+  .view { position:relative; height: 620px; border-radius: 16px; overflow:hidden; border:1px solid #e6e9f1; background-color:#fafbfe; background-image: radial-gradient(circle, #d3d8e4 1px, transparent 1.2px); box-shadow: 0 8px 24px rgba(20,26,43,.07); }
+  .view.dragging { cursor:grabbing; }
+  .world { position:absolute; left:0; top:0; transform-origin:0 0; }
+  .world.follow { transition: transform .9s ease-in-out; }
+  .hud { position:absolute; z-index:5; display:flex; gap:6px; align-items:center; padding:6px; border-radius:999px;
+    background: rgba(255,255,255,.78); backdrop-filter: blur(14px); border:1px solid rgba(255,255,255,.9); box-shadow: 0 6px 20px rgba(20,26,43,.08); }
+  .hud.top { left:14px; top:14px; } .hud.zoom { right:14px; bottom:14px; }
+  .hud button { font: inherit; font-size:13px; padding:6px 11px; border-radius:999px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  .hud button.on { background: var(--b); color:#fff; border-color: var(--b); }
+  .hud .now { font-size: 13px; color: var(--ink2); padding: 0 6px; min-width: 92px; }
+  .hud .pct { font-size: 12px; color: var(--ink2); min-width: 44px; text-align:center; font-variant-numeric: tabular-nums; }
+  .bar { width:140px; height:4px; background:#e7eaf2; border-radius:4px; overflow:hidden; }
+  .bar i { display:block; height:100%; width:0; background:var(--b); transition: width .4s ease; }
+  .hint { position:absolute; left:14px; bottom:14px; z-index:5; font-size:12px; color:var(--ink3); }
+  svg { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; }
+  .edge { fill:none; stroke: var(--ok); stroke-width: 1.8; }
+  .edge.drawing { stroke: var(--b); stroke-width: 2.2; }
+  .edge.ghost { stroke: var(--ink3); stroke-dasharray: 4 5; opacity:.7; }
+  .elabel { font-size: 11px; font-weight: 700; fill: var(--ink2); paint-order: stroke; stroke:#fafbfe; stroke-width:4px; opacity:0; transition: opacity .5s; }
+  .elabel.on { opacity: 1; }
+  .box { position:absolute; width:180px; padding:10px 12px; border-radius:12px; background: rgba(255,255,255,.9); border:1px solid var(--line);
+    box-shadow: 0 6px 18px rgba(20,26,43,.06); font-size: 13px; opacity:0; transform: translateY(8px) scale(.96);
+    transition: opacity .6s ease, transform .6s ease, border-color .4s, box-shadow .4s; cursor:default; }
+  .box.shown { opacity:1; transform:none; border-color: var(--okS); }
+  .box.current { border-color: var(--b); box-shadow: 0 0 0 4px #dbe4ff, 0 8px 22px rgba(59,91,219,.15); }
+  .box.ghost.shown { opacity:.55; border-style:dashed; border-color: var(--ink3); background: rgba(255,255,255,.5); }
+  .box .t { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--ink3); }
+  .box .k { font-size: 10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color: var(--ink3); margin-left:6px; }
+  .box strong { display:block; margin-top:3px; font-size: 14px; }
+  .box .d { color: var(--ink2); margin-top:2px; }
+  .box .m { font-family: ui-monospace, Menlo, monospace; font-size:12px; margin-top:4px; }
+  .lane { position:absolute; left:-200px; width: 2600px; border-top: 1px dashed #d9dde7; }
+  .lane.alt { background: rgba(59,91,219,.03); }
+  .lane span { position:absolute; left:214px; top:8px; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink3); }
+</style></head>
+<body>
+<h2>Replaying run R-12: reconcile March</h2>
+<p class="sub">A made-up run with two kinds of branch. <b>Parallel:</b> the agent reads two sources at once, then joins them. <b>Decision:</b> at your approval the run forks; the path taken lights up, and the path not taken shows faded and dashed. No panning or zooming: the whole run is drawn to fit this panel and stays put while it builds or replays.</p>
+
+<div class="view" id="view">
+  <div class="hud top">
+    <button data-a="replay">▶ Replay</button><button data-a="pause">Pause</button><button data-a="back">◀ Step</button><button data-a="next">Step ▶</button>
+    <button data-a="s05">0.5×</button><button data-a="s1" class="on">1×</button>    <div class="bar"><i></i></div><span class="now"></span>
+  </div>
+      <div class="world" id="world"></div>
+</div>
+
+<script>
+const COL=240, ROW=118, X0=110;
+const LANES = [ {name:"Agent", rows:1}, {name:"Your data", rows:2}, {name:"You", rows:1}, {name:"Money", rows:1}, {name:"Run", rows:1} ];
+// col = time slot, row = global row. beat = when it appears in the replay; same beat means it happened together.
+const STEPS = [
+  { id:"n1", beat:0, col:0, row:0, t:"10:01", k:"Agent note", title:"Agent note", d:"Reconciling March" },
+  { id:"r1", beat:1, col:1, row:1, t:"10:01", k:"Read", title:"Read your data", d:"Bank statement", m:"42 rows" },
+  { id:"r2", beat:1, col:1, row:2, t:"10:01", k:"Read", title:"Read your data", d:"Ledger", m:"40 rows" },
+  { id:"th", beat:2, col:2, row:0, t:"10:02", k:"Model call", title:"Thinking", d:"Matched 38 of 40", m:"1,840 tokens" },
+  { id:"dr", beat:3, col:3, row:1, t:"10:02", k:"Draft", title:"Staged a change", d:"2 ledger entries" },
+  { id:"gt", beat:4, col:4, row:3, t:"10:02", k:"Asks you", title:"Post 2 entries?", d:"Approved by you at 10:05", m:"waited 3 min" },
+  { id:"wr", beat:5, col:5, row:1, t:"10:05", k:"Write", title:"Posted to ledger", m:"2 rows" },
+  { id:"no", beat:5, col:5, row:3, ghost:true, k:"Not taken", title:"Stops here", d:"Nothing is posted" },
+  { id:"ch", beat:6, col:6, row:4, t:"10:05", k:"Charge", title:"Charge recorded", m:"₹12 of ₹100" },
+  { id:"end",beat:7, col:7, row:5, t:"10:05", k:"End", title:"Run finished", d:"Nothing was blocked" },
+];
+const EDGES = [ ["n1","r1"],["n1","r2"],["r1","th"],["r2","th"],["th","dr"],["dr","gt"],["gt","wr","Approved"],["gt","no","Rejected",true],["wr","ch"],["ch","end"] ];
+const BEATS = Math.max(...STEPS.map(s=>s.beat))+1;
+
+const world=document.getElementById("world"), view=document.getElementById("view");
+const pos = s => ({ x: X0 + s.col*COL, y: 14 + s.row*ROW, w:180, h:92 });
+const byId = Object.fromEntries(STEPS.map(s=>[s.id,s]));
+
+// lanes
+let r=0; LANES.forEach((l,i)=>{ const d=document.createElement("div"); d.className="lane"+(i%2?" alt":""); d.style.top=(r*ROW)+"px"; d.style.height=(l.rows*ROW)+"px"; d.innerHTML=`<span>${l.name}</span>`; world.appendChild(d); r+=l.rows; });
+
+const SVGNS="http://www.w3.org/2000/svg", svg=document.createElementNS(SVGNS,"svg");
+svg.innerHTML=`<defs><marker id="h" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="11" markerHeight="11" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L8 4L0 8z" fill="#2f8a4e"/></marker>
+<marker id="hg" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="11" markerHeight="11" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L8 4L0 8z" fill="#7a8396"/></marker></defs>`;
+world.appendChild(svg);
+
+function edgePath(a,b){
+  const x1=a.x+a.w, y1=a.y+a.h/2, x2=b.x-1, y2=b.y+b.h/2;
+  if (Math.abs(y1-y2)<2) return { d:`M${x1} ${y1} H${x2}`, lx:(x1+x2)/2, ly:y1-8, anchor:"middle" };
+  const mx=x1+(x2-x1)/2, dir=Math.sign(y2-y1), rr=Math.min(10,Math.abs(y2-y1)/2,(x2-x1)/2-2);
+  return { d:`M${x1} ${y1} H${mx-rr} Q${mx} ${y1} ${mx} ${y1+dir*rr} V${y2-dir*rr} Q${mx} ${y2} ${mx+rr} ${y2} H${x2}`, lx:mx+6, ly:(y1+y2)/2, anchor:"start" };
+}
+
+const boxes = Object.fromEntries(STEPS.map(s=>{ const p=pos(s), el=document.createElement("div"); el.className="box"+(s.ghost?" ghost":"");
+  el.style.left=p.x+"px"; el.style.top=p.y+"px"; el.style.minHeight=p.h+"px";
+  el.innerHTML=`${s.t?`<span class="t">${s.t}</span>`:""}<span class="k">${s.k}</span><strong>${s.title}</strong>${s.d?`<div class="d">${s.d}</div>`:""}${s.m?`<div class="m">${s.m}</div>`:""}`;
+  world.appendChild(el); return [s.id, el]; }));
+
+const edges = EDGES.map(([f,t,label,ghost])=>{ const g=edgePath(pos(byId[f]),pos(byId[t])), p=document.createElementNS(SVGNS,"path");
+  p.setAttribute("d",g.d); p.setAttribute("class","edge"+(ghost?" ghost":"")); svg.appendChild(p);
+  const len=p.getTotalLength(); p.style.strokeDasharray = ghost ? "" : len; p.style.strokeDashoffset = ghost ? 0 : len; p.style.opacity = ghost ? 0 : "";
+  let txt=null; if (label) { txt=document.createElementNS(SVGNS,"text"); txt.setAttribute("x",g.lx); txt.setAttribute("y",g.ly); txt.setAttribute("text-anchor",g.anchor); txt.setAttribute("class","elabel"); txt.textContent=label; svg.appendChild(txt); }
+  return { p, len, txt, ghost, beat: byId[t].beat, marker: ghost ? "url(#hg)" : "url(#h)" }; });
+
+// ---- infinite canvas: pan + zoom ----
+let cam={x:0,y:0,k:1};
+function apply(){ world.style.transform=`translate(${cam.x}px,${cam.y}px) scale(${cam.k})`;
+  const g=22*cam.k; view.style.backgroundSize=`${g}px ${g}px`; view.style.backgroundPosition=`${cam.x}px ${cam.y}px`; }
+function zoomAt(f, cx, cy){ const k=Math.min(8,Math.max(0.1,cam.k*f)); cam.x=cx-(cx-cam.x)*(k/cam.k); cam.y=cy-(cy-cam.y)*(k/cam.k); cam.k=k; apply(); }
+function noFollowAnim(){ world.classList.remove("follow"); }
+function bounds(){ const xs=STEPS.map(s=>pos(s)); return { x0: 0, y0: 0, x1: Math.max(...xs.map(p=>p.x+p.w))+30, y1: Math.max(...xs.map(p=>p.y+p.h))+20 }; }
+function fit(anim){ const b=bounds(), vw=view.clientWidth, vh=view.clientHeight-70; const k=Math.min(vw/(b.x1-b.x0), vh/(b.y1-b.y0), 1.2);
+  world.classList.toggle("follow", !!anim); cam={k, x:(vw-(b.x1-b.x0)*k)/2-b.x0*k, y:70+(vh-(b.y1-b.y0)*k)/2-b.y0*k}; apply(); }
+function centreOn(ids){ const ps=ids.map(id=>pos(byId[id])); const cx=(Math.min(...ps.map(p=>p.x))+Math.max(...ps.map(p=>p.x+p.w)))/2, cy=(Math.min(...ps.map(p=>p.y))+Math.max(...ps.map(p=>p.y+p.h)))/2;
+  world.classList.add("follow"); cam.x=view.clientWidth/2-cx*cam.k; cam.y=(view.clientHeight+60)/2-cy*cam.k; apply(); }
+
+// ---- replay ----
+let beat=-1, timer=null, speed=1; const STEP=1600;
+const ctl=document.querySelector(".hud.top"), bar=ctl.querySelector(".bar i"), now=ctl.querySelector(".now");
+function show(n, animate){
+  const dur = 700/speed;
+  STEPS.forEach(s=>{ const el=boxes[s.id], on=s.beat<=n; el.classList.toggle("current", s.beat===n && !s.ghost);
+    if (animate && s.beat===n) { el.classList.remove("shown"); setTimeout(()=>el.classList.add("shown"), dur*0.9); } else el.classList.toggle("shown", on); });
+  edges.forEach(e=>{ const on=e.beat<=n, fresh=animate && e.beat===n; clearTimeout(e.mt); e.p.removeAttribute("marker-end");
+    if (e.txt) e.txt.classList.toggle("on", on && !fresh);
+    if (e.ghost) { e.p.style.transition = fresh ? `opacity ${dur}ms ease` : "none"; e.p.style.opacity = on ? "" : 0;
+      if (on) e.mt=setTimeout(()=>{ e.p.setAttribute("marker-end",e.marker); e.txt && e.txt.classList.add("on"); }, fresh?dur:0); return; }
+    e.p.style.transition = fresh ? `stroke-dashoffset ${dur}ms ease-in-out` : "none"; e.p.classList.toggle("drawing", fresh);
+    e.p.style.strokeDashoffset = on ? 0 : e.len;
+    if (on) e.mt=setTimeout(()=>{ e.p.setAttribute("marker-end",e.marker); e.p.classList.remove("drawing"); e.txt && e.txt.classList.add("on"); }, fresh?dur:0); });
+  bar.style.width=((n+1)/BEATS*100)+"%"; now.textContent = n<0 ? "" : `Step ${n+1} of ${BEATS}`;
+  beat=n;
+}
+function stop(){ clearTimeout(timer); timer=null; }
+function tick(){ if (beat>=BEATS-1) { stop(); return; } show(beat+1,true); timer=setTimeout(tick, STEP/speed); }
+ctl.addEventListener("click", e=>{ const a=e.target.dataset.a; if(!a) return;
+  if (a==="replay") { stop(); show(-1,false); setTimeout(tick, 500); }
+  if (a==="pause") { if (timer) stop(); else tick(); }
+  if (a==="back") { stop(); show(Math.max(0,beat-1),false); }
+  if (a==="next") { stop(); if (beat<BEATS-1) show(beat+1,true); }
+  if (a==="s05"||a==="s1") { speed=a==="s05"?0.5:1; ctl.querySelectorAll('[data-a^="s"]').forEach(b=>b.classList.toggle("on", b.dataset.a===a)); }
+});
+show(BEATS-1,false); fit(false); window.addEventListener("resize", ()=>fit(false));
+</script>
+</body></html>

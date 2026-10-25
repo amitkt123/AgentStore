@@ -24,7 +24,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await apiFetch(path, init);
-  if (res.status === 401) redirect("/login");
+  if (res.status === 401) redirect("/login?expired=1");
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as ({ code?: string; message?: string } & Record<string, unknown>) | null;
     throw new ApiError(res.status, body?.code ?? null, body?.message || `Request failed (${res.status})`, body ?? {});

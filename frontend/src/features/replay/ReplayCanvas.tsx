@@ -1,0 +1,196 @@
+"use client";
+import { forwardRef, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Glass } from "@/ui/Glass";
+import styles from "./ReplayCanvas.module.css";
+import type { ReplayBlock, ReplayEdge, ReplayGraph } from "./graph";
+import { elbowPath, placeReplay } from "./place";
+import { CATCH_UP_MS, usePrefersReducedMotion, useReplay } from "./useReplay";
+
+type Props = { graph: ReplayGraph; live: boolean; selectedId?: string; onSelect?: (id: string) => void };
+export interface ReplayCanvasHandle { focusBlock(id: string): void }
+
+const MIN_SCALE = 0.8, DOT = 22, ENTER_MS = 600;
+const atEnd = (el: HTMLElement) => el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+
+/** Sets the dash length a growing line animates from; jsdom has no getTotalLength. */
+const measure = (p: SVGPathElement | null) => {
+  if (!p) return;
+  const len = typeof p.getTotalLength === "function" ? p.getTotalLength() : 0;
+  p.style.setProperty("--len", String(len || 10000));
+};
+
+const say = (b: ReplayBlock) => `${b.label}: ${b.title}${b.detail ? `, ${b.detail}` : ""}`;
+
+export const ReplayCanvas = forwardRef<ReplayCanvasHandle, Props>(function ReplayCanvas({ graph, live, selectedId, onSelect }, ref) {
+  const root = useRef<HTMLElement>(null);
+  useImperativeHandle(ref, () => ({
+    focusBlock: (id) => Array.from(root.current?.querySelectorAll<HTMLElement>("[data-block-id]") ?? []).find((b) => b.dataset.blockId === id)?.focus(),
+  }), []);
+  const reducedMotion = usePrefersReducedMotion();
+  const perBeat = useMemo(() => {
+    const out: string[][] = Array.from({ length: graph.beats }, () => []);
+    for (const b of graph.blocks) out[b.beat]?.push(b.id);
+    return out;
+  }, [graph]);
+  const r = useReplay(perBeat, { reducedMotion });
+  const placed = useMemo(() => placeReplay(graph), [graph]);
+  const uid = useId().replace(/:/g, "");
+  const head = `rh-${uid}`, ghostHead = `rg-${uid}`;
+
+  // Fit: shrink to the panel, never below 80%; past that the panel scrolls.
+  const box = useRef<HTMLDivElement>(null);
+  const [k, setK] = useState(1);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const fit = () => { const w = el.clientWidth; setK(w ? Math.max(MIN_SCALE, Math.min(1, w / placed.width)) : 1); };
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [placed.width]);
+
+  // Live: whether the user sits at the right end, kept from scroll events so it is known before new content lands.
+  const seenBeats = useRef(graph.beats);
+  const stick = useRef(false);
+  const onScroll = () => { if (box.current) stick.current = atEnd(box.current); };
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    if (graph.beats !== seenBeats.current) {
+      seenBeats.current = graph.beats;
+      if (live && stick.current) el.scrollLeft = el.scrollWidth;
+    }
+    stick.current = atEnd(el);
+  }, [graph.beats, live]);
+
+  const { visible, drawing, speed, settled } = r;
+  const lineOf = (beat: number) => drawing?.beat === beat && drawing.phase === "line";
+  // Settled blocks were on screen before their beat gained a step; they stay while it is re-drawn.
+  const shown = (b: ReplayBlock) => settled.has(b.id) || (b.beat < visible && !lineOf(b.beat));
+  const drawMs = r.lineMs;
+  const enterMs = r.catchUp ? CATCH_UP_MS / 2 : ENTER_MS / speed;
+  const beatOf = new Map(graph.blocks.map((b) => [b.id, b.beat]));
+  const blocks = graph.blocks.filter(shown);
+  const current = Math.max(-1, ...blocks.filter((b) => b.tone !== "ghost").map((b) => b.beat));
+
+  const told = (b: ReplayBlock) => b.beat < visible || settled.has(b.id);
+  const sr = graph.blocks.filter((b) => told(b) && b.tone !== "ghost").map((b) => {
+    const ghost = graph.blocks.find((g) => g.id === `ghost:${b.id}` && told(g));
+    // The taken word: from the taken edge, else the opposite of the not-taken edge (a gate that ended the run).
+    const ghostLabel = graph.edges.find((e) => e.from === b.id && e.ghost)?.label;
+    const taken = graph.edges.find((e) => e.from === b.id && !e.ghost && e.label)?.label
+      ?? (ghostLabel ? (ghostLabel === "Approved" ? "Rejected" : "Approved") : undefined);
+    return { id: b.id, text: ghost && taken ? `${say(b)}, then ${taken}. Not taken: ${ghost.title}${ghost.detail ? `, ${ghost.detail}` : ""}` : say(b) };
+  });
+
+  const edge = (e: ReplayEdge) => {
+    const beat = beatOf.get(e.to) ?? 0;
+    const a = placed.boxes.get(e.from), b = placed.boxes.get(e.to);
+    const kept = settled.has(e.from) && settled.has(e.to); // drawn before; never re-grows
+    if (!a || !b || (!kept && beat >= visible)) return null; // an arrow never exists before its step
+    if (!kept && e.ghost && lineOf(beat)) return null; // the not-taken arrow arrives with its block
+    const { d, labelAt } = elbowPath(a, b);
+    const growing = !kept && !e.ghost && lineOf(beat);
+    const fading = !kept && e.ghost && drawing?.beat === beat;
+    return (
+      <g key={`${e.from}>${e.to}`}>
+        <path
+          ref={growing ? measure : undefined}
+          d={d}
+          data-edge={e.ghost ? "ghost" : "taken"}
+          data-from={e.from}
+          data-to={e.to}
+          data-growing={growing || undefined}
+          data-fading={fading || undefined}
+          className={`${styles.edge} ${e.ghost ? styles.ghostEdge : ""} ${growing ? styles.growing : ""} ${fading ? styles.fade : ""}`}
+          style={growing || fading ? { animationDuration: `${drawMs}ms` } : undefined}
+          markerEnd={growing ? undefined : `url(#${e.ghost ? ghostHead : head})`}
+        />
+        {e.label && !growing && (
+          <text x={labelAt.x} y={labelAt.y} textAnchor={labelAt.anchor} className={`${styles.label} ${fading ? styles.fade : ""}`}
+            style={fading ? { animationDuration: `${drawMs}ms` } : undefined}>{e.label}</text>
+        )}
+      </g>
+    );
+  };
+
+  const n = visible, total = graph.beats;
+  const busy = live;
+  return (
+    <section ref={root} aria-label="Run replay" className={styles.panel} style={{ backgroundSize: `${DOT * k}px ${DOT * k}px` }}>
+      <Glass level={2} className={styles.controls} role="group" aria-label="Replay controls">
+        <button type="button" className={styles.btn} disabled={busy || total === 0} onClick={r.replay}>Replay</button>
+        <button type="button" className={styles.btn} disabled={busy || (!r.playing && !drawing && visible >= total)} onClick={r.playing ? r.pause : r.resume}>
+          {r.playing ? "Pause" : "Resume"}
+        </button>
+        <button type="button" className={styles.btn} disabled={busy || visible <= 1} onClick={r.back}>Step back</button>
+        <button type="button" className={styles.btn} disabled={busy || visible >= total} onClick={r.next}>Step forward</button>
+        <button type="button" className={styles.btn} aria-pressed={speed === 0.5} onClick={() => r.setSpeed(0.5)}>0.5×</button>
+        <button type="button" className={styles.btn} aria-pressed={speed === 1} onClick={() => r.setSpeed(1)}>1×</button>
+        <div role="progressbar" aria-label="Replay progress" aria-valuemin={0} aria-valuenow={n} aria-valuemax={total}
+          aria-valuetext={`Step ${n} of ${total}`} className={styles.bar}>
+          <i style={{ width: `${total ? (n / total) * 100 : 0}%` }} />
+        </div>
+        <span className={styles.now} aria-hidden="true">Step {n} of {total}</span>
+      </Glass>
+
+      <div ref={box} className={styles.scroll} data-scroll="" onScroll={onScroll}>
+        <div className={styles.spacer} style={{ width: placed.width * k, height: placed.height * k }}>
+          <div data-world="" className={styles.world}
+            style={{ width: placed.width, height: placed.height, transform: `scale(${k})` }}>
+            {placed.lanes.map((l, i) => (
+              <div key={l.lane} aria-hidden="true" className={`${styles.lane} ${i % 2 ? styles.alt : ""}`} style={{ top: l.top, height: l.height }}>
+                <span>{l.lane}</span>
+              </div>
+            ))}
+            <svg className={styles.edges} width={placed.width} height={placed.height} aria-hidden="true">
+              <defs>
+                <marker id={head} viewBox="0 0 8 8" refX="8" refY="4" markerWidth="11" markerHeight="11" markerUnits="userSpaceOnUse" orient="auto">
+                  <path d="M0 0L8 4L0 8z" className={styles.head} />
+                </marker>
+                <marker id={ghostHead} viewBox="0 0 8 8" refX="8" refY="4" markerWidth="11" markerHeight="11" markerUnits="userSpaceOnUse" orient="auto">
+                  <path d="M0 0L8 4L0 8z" className={styles.ghostHead} />
+                </marker>
+              </defs>
+              {graph.edges.map(edge)}
+            </svg>
+            {blocks.map((b) => {
+              const p = placed.boxes.get(b.id)!;
+              const entering = drawing?.beat === b.beat && !settled.has(b.id);
+              const ghost = b.tone === "ghost";
+              const look = {
+                "data-block-id": b.id,
+                className: `${styles.block} ${styles[b.tone]} ${b.beat === current && !ghost ? styles.current : ""} ${selectedId === b.id ? styles.sel : ""} ${entering ? styles.enter : ""}`,
+                style: { left: p.x, top: p.y, width: p.w, minHeight: p.h, ...(entering ? { animationDuration: `${enterMs}ms` } : {}) },
+              };
+              const body = (
+                <>
+                  <span className={styles.top}>
+                    {b.time && <span className={`${styles.time} mono`}>{b.time}</span>}
+                    <span className={styles.kind}>{b.label}</span>
+                  </span>
+                  <strong>{b.title}</strong>
+                  {b.detail && <span className={`${styles.detail} ${b.tone === "waiting" ? styles.warn : ""}`}>{b.detail}</span>}
+                  {b.metric && <span className={`${styles.metric} mono`}>{b.metric}</span>}
+                </>
+              );
+              // A path not taken has no detail to show; the step list narrates it with its gate.
+              if (ghost) return <div key={b.id} aria-hidden="true" {...look}>{body}</div>;
+              return (
+                <button key={b.id} type="button" aria-pressed={selectedId === b.id} aria-label={say(b)} onClick={() => onSelect?.(b.id)} {...look}>
+                  {body}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <ol className="sr-only" aria-label="Steps in order">
+        {sr.map((s) => <li key={s.id}>{s.text}</li>)}
+      </ol>
+    </section>
+  );
+});

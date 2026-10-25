@@ -18,6 +18,18 @@ export interface PaymentPanels {
   refundable: Refundable | null;
   refunds: Refund[] | null;
   bills: Bill[] | null;
+  /** The panels whose call failed, by key, so the page can say so instead of leaving a gap. */
+  failed?: (keyof Omit<PaymentPanels, "failed">)[];
+}
+
+const PANEL_NAMES: Record<keyof Omit<PaymentPanels, "failed">, string> = {
+  options: "Add money", topUps: "your top-ups", refundable: "Get money back", refunds: "your refunds", bills: "your bills",
+};
+
+/** The failed panels in page order, joined as English: "A", "A and B", "A, B and C". */
+function failedList(failed: NonNullable<PaymentPanels["failed"]>): string {
+  const names = (Object.keys(PANEL_NAMES) as (keyof typeof PANEL_NAMES)[]).filter((k) => failed.includes(k)).map((k) => PANEL_NAMES[k]);
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
 }
 
 function figures(wallet: Wallet): [string, number][] {
@@ -38,6 +50,9 @@ export function BillingView({ wallet, summary, payments }: { wallet: Wallet; sum
           </div>
         ))}
       </dl>
+      {payments?.failed && payments.failed.length > 0 && (
+        <p role="status" className={styles.failed}>{`We couldn't load ${failedList(payments.failed)}. Refresh to try again.`}</p>
+      )}
       {payments && wallet.mode === "PREPAID" && (
         <>
           {payments.options && <AddMoney options={payments.options} balance={wallet.balance} />}

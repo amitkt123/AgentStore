@@ -54,6 +54,7 @@ export function Rail({ items, activePath }: { items: RailItem[]; activePath: str
         return (
           <Link key={item.href} href={item.href} aria-label={label} aria-current={active ? "page" : undefined} className={`${styles.nav} ${active ? styles.on : ""}`}>
             <Icon name={item.icon} />
+            <span className={styles.label} aria-hidden="true">{item.label}</span>
             {item.badge ? <span className={styles.badge}>{item.badge}</span> : null}
           </Link>
         );

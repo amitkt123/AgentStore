@@ -75,6 +75,8 @@ class RunDetailControllerTest extends AbstractIntegrationTest {
         assertThat(ownerResponse.getBody().connectionId()).isEqualTo(connection.getId());
         assertThat(ownerResponse.getBody().steps()).hasSize(1);
         assertThat(ownerResponse.getBody().steps().get(0).kind()).isEqualTo(RunStepKind.READ);
+        assertThat(ownerResponse.getBody().steps().get(0).id()).isNotNull();
+        assertThat(ownerResponse.getBody().steps().get(0).block()).isNull();   // READ carries no block
 
         HttpHeaders intruderHeaders = new HttpHeaders();
         intruderHeaders.setBearerAuth(jwtService.issue(UUID.randomUUID(), intruder.getId(), UserRole.BUYER_ADMIN));

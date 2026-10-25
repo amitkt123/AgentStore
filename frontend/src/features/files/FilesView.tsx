@@ -8,7 +8,7 @@ import { Dropzone } from "@/ui/Dropzone";
 import { EmptyState } from "@/ui/EmptyState";
 import { ResponsiveTable } from "@/ui/ResponsiveTable";
 import { deleteFileAction, uploadFileAction } from "@/app/(app)/files/actions";
-import { formatTime } from "@/lib/format";
+import { formatWhen } from "@/lib/format";
 import type { Dataset, Storage } from "@/lib/api/types";
 
 export function FilesView({ datasets, storage }: { datasets: Dataset[]; storage: Storage }) {
@@ -46,7 +46,7 @@ export function FilesView({ datasets, storage }: { datasets: Dataset[]; storage:
           { key: "file", header: "File", render: (d) => <><strong>{d.displayName}</strong>{d.sourceLabel && <div className={styles.sub}>{d.sourceLabel}</div>}</> },
           { key: "rows", header: "Rows", render: (d) => <span className="mono">{d.rowCount ?? "–"}</span> },
           { key: "use", header: "Plugged into", render: (d) => (d.usage?.length ? d.usage.map((u) => <div key={`${u.connectionId}${u.resource}`}>{u.agent}</div>) : "Not plugged in") },
-          { key: "added", header: "Added", render: (d) => <span className="mono">{formatTime(d.createdAt)}</span> },
+          { key: "added", header: "Added", render: (d) => <span className="mono">{formatWhen(d.createdAt)}</span> },
           { key: "go", header: "", render: (d) => <Button variant="ghost" onClick={() => setOpen(d)} aria-label={`Where ${d.displayName} goes`}>Where it goes</Button> },
         ]}
       />

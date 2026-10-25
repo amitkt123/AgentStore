@@ -37,7 +37,7 @@ it("falls back to a generic message when the body is empty", async () => {
 it("redirects to login on 401", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 401 })));
   await expect(api("/api/v1/x")).rejects.toThrow("NEXT_REDIRECT");
-  expect(redirect).toHaveBeenCalledWith("/login");
+  expect(redirect).toHaveBeenCalledWith("/login?expired=1");
 });
 
 it("does not force a JSON content type on FormData", async () => {

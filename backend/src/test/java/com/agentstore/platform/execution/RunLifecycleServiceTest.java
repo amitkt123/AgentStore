@@ -59,6 +59,17 @@ class RunLifecycleServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void aUsageStepCarriesTheAmountCharged() {
+        Run run = fixtures.run(scenario(), RunStatus.RUNNING, sandbox(), "tok-" + UUID.randomUUID());
+
+        lifecycle.recordUsage(run.getId(), new BigDecimal("2"), Map.of());   // 2 units at the fixture's unit price 2.00
+
+        var usage = runStepRepository.findByRunIdOrderByCreatedAtAsc(run.getId()).stream()
+                .filter(s -> s.getKind() == RunStepKind.USAGE).findFirst().orElseThrow();
+        assertThat(usage.getDetail()).containsPattern("\"amount\"\\s*:\\s*4(\\.00)?\\b");
+    }
+
+    @Test
     void terminateIsIdempotentAndRecordsOneStep() {
         String sandboxId = sandbox();
         Run run = fixtures.run(scenario(), RunStatus.RUNNING, sandboxId, "tok-" + UUID.randomUUID());

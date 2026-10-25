@@ -1,15 +1,11 @@
 import styles from "./Topbar.module.css";
-import { Icon } from "./Icon";
+import { AccountMenu } from "./AccountMenu";
 
-export function Topbar({ orgName, initials }: { orgName: string; initials: string }) {
+export function Topbar({ orgName, fullName, email }: { orgName: string; fullName: string; email: string }) {
   return (
     <header className={styles.top}>
       <span className={styles.org}>{orgName}</span>
-      <div className={styles.search} role="search">
-        <Icon name="search" />
-        <input aria-label="Search" placeholder="Search is coming soon" disabled />
-      </div>
-      <span className={styles.avatar} aria-label="Your account">{initials}</span>
+      <AccountMenu fullName={fullName} email={email} orgName={orgName} />
     </header>
   );
 }

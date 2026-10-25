@@ -14,7 +14,7 @@ it("shows filter chips with counts and rows with their reached block", () => {
   render(<RunsView initial={initial} />);
   expect(screen.getByRole("button", { name: /Needs you 1/ })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "R-2291" })).toHaveAttribute("href", "/runs/R-2291");
-  expect(screen.getByText("Your approval")).toBeInTheDocument();
+  expect(screen.getByText("Asked you")).toBeInTheDocument();
 });
 
 it("shows an empty state when no run matches", () => {

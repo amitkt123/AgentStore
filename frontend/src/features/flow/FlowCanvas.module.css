@@ -1,0 +1,73 @@
+.wrap { display: flex; flex-direction: column; gap: 10px; }
+.canvas { position: relative; container-type: inline-size; }
+.edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.flow { position: relative; list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 28px 64px; align-items: center; }
+.col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.off { flex: 0 0 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 16px; padding-top: 8px; }
+.off .node { flex: 0 1 220px; }
+
+.node {
+  width: 100%; text-align: left; display: flex; flex-direction: column; gap: 5px; padding: 14px;
+  background: var(--glass-2); border: 1px solid var(--glass-line); border-radius: var(--radius);
+  box-shadow: var(--glass-edge), var(--shadow-1); font: inherit; color: inherit; cursor: pointer;
+  overflow-wrap: anywhere; position: relative;
+  transition: box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.node:hover { box-shadow: var(--glass-edge), var(--shadow-2); }
+.kind { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink3); }
+.body { font-size: 12px; color: var(--ink2); }
+.metric { font-size: 12px; color: var(--ink); }
+.flag { font-size: 12px; font-weight: 600; color: var(--bad); }
+.state { margin-top: 4px; font-size: 12px; font-weight: 600; }
+.sel { background: var(--glass-3); border-color: var(--b); box-shadow: var(--glass-edge), var(--shadow-2), 0 0 0 3px var(--sky2); }
+
+.DONE { border-color: var(--okS); }
+.DONE .state { color: var(--ok); }
+.WAITING { border-color: var(--wa); box-shadow: var(--glass-edge), var(--shadow-1), 0 0 0 4px var(--waS); }
+.WAITING .state { color: var(--wa); }
+.FAILED { border-color: var(--bad); background: var(--badS); }
+.FAILED .state { color: var(--bad); }
+.SKIPPED .state, .IDLE .state { color: var(--ink3); }
+.SKIPPED { opacity: 0.75; }
+
+.end { font-size: 12px; color: var(--ink3); padding: 8px 12px; border: 1px dashed var(--l); border-radius: 10px; background: var(--glass-1); }
+.reached { color: var(--bad); border-color: var(--bad); background: var(--badS); }
+
+.edge { fill: none; stroke: var(--b3); stroke-width: 1.5; transition: stroke var(--dur-2) var(--ease); }
+.head { fill: var(--b3); }
+.fromDONE { stroke: var(--ok); }
+.fromWAITING { stroke: var(--wa); }
+.fromFAILED { stroke: var(--bad); }
+.fromIDLE, .fromSKIPPED { stroke: var(--ink3); stroke-dasharray: 4 4; opacity: 0.6; }
+.rejected { stroke: var(--ink3); stroke-dasharray: 3 4; }
+.undeclared { stroke: var(--bad); stroke-dasharray: 3 4; opacity: 1; }
+.active { stroke: var(--b); stroke-width: 2; stroke-dasharray: none; opacity: 1; }
+.halted { stroke: var(--bad); stroke-width: 2; stroke-dasharray: none; opacity: 1; }
+.label { font-size: 11px; font-weight: 600; fill: var(--ink2); paint-order: stroke; stroke: var(--g); stroke-width: 4px; }
+.pulse { fill: var(--b); offset-distance: 0%; offset-rotate: 0deg; animation: travel var(--dur-flow) linear infinite; }
+@keyframes travel { to { offset-distance: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .pulse { display: none; }
+  .active { stroke-width: 3; }
+}
+
+.caption { margin: 0; font-size: 12px; color: var(--ink3); }
+
+/* Too narrow for six columns side by side: run top to bottom, with each reject end beside its gate. */
+@container (max-width: 860px) {
+  .flow { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 32px; }
+  .col { flex: 0 0 auto; }
+  .col[data-stage="Asks you"] { flex-direction: row; align-items: center; gap: 64px; }
+  .col[data-stage="Asks you"] .node { flex: 1 1 60%; }
+  .col[data-stage="Asks you"] .end { flex: 1 1 40%; }
+  .off { justify-content: stretch; }
+  .off .node { flex: 1 1 auto; }
+}
+
+.mini { display: inline-flex; align-items: center; height: 28px; }
+.miniStep { display: inline-flex; align-items: center; }
+.miniLine { display: block; width: 12px; height: 1px; background: var(--ink3); opacity: 0.5; }
+.miniDot { display: block; width: 10px; height: 10px; border-radius: 50%; background: var(--l); border: 1px solid var(--ink3); }
+.miniDot.DONE { background: var(--ok); border-color: var(--ok); }
+.miniDot.WAITING { background: var(--wa); border-color: var(--wa); box-shadow: none; }
+.miniDot.FAILED { background: var(--bad); border-color: var(--bad); }

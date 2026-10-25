@@ -37,7 +37,7 @@ export type BlockState = "DONE" | "WAITING" | "FAILED" | "SKIPPED" | "IDLE";
 export interface FlowBlock { block: string; state: BlockState; metrics: Record<string, unknown> | null; gateId: string | null; flag: "UNDECLARED" | null }
 export interface FlowView { blocks: FlowBlock[]; reachedBlock: string | null; spend: { charged: number; cap: number }; deadlineAt: string | null; blockedAttempts: number }
 export type RunStepKind = "READ" | "WRITE" | "GATE" | "COST" | "COMPLETE" | "FAILED" | "TIMEOUT" | "COST_CAP_REACHED" | "DATA_READ" | "DATA_WRITE" | "WRITE_STAGED" | "GATE_REQUESTED" | "GATE_DECIDED" | "LLM_CALL" | "USAGE" | "SCOPE_VIOLATION" | "AGENT_LOG" | "CANCELLED" | "NETWORK_BLOCKED";
-export interface RunStep { kind: RunStepKind; source?: "PLATFORM" | "AGENT"; detail: string; createdAt: string }
+export interface RunStep { id?: string; kind: RunStepKind; source?: "PLATFORM" | "AGENT"; detail: string; block?: string | null; startedAt?: string | null; createdAt: string | null }
 export interface RunDetail { id: string; displayId: string; status: RunStatus; terminalReason: TerminalReason | null; costCap: number; totalCharged: number; steps: RunStep[] }
 export type GateStatus = "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED";
 export interface GateDetail { gateId: string; action: string; summary: string; payload: unknown; status: GateStatus; expiresAt: string; estimatedUnits: number | null; costIfApproved: number | null; preview: { columns?: string[]; rows: Record<string, unknown>[]; totalRows: number; total?: number } | null; decidedVia: "WEB" | "EMAIL_LINK" | "SLACK_LINK" | null; decidedByUserId: string | null; decidedAt: string | null; note: string | null }

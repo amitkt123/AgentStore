@@ -2,7 +2,7 @@
 
 The single place to see what is done and what is next. Update it in the same PR as any change that finishes, starts or reshapes a workstream. Gaps and risks stay in `docs/frontend-gaps.md` and `docs/known-issues.md`; this file links to them, it does not copy them.
 
-Last updated: 2026-10-22 (WS10c money out done incl. final-review fixes, manual RazorpayX test-mode check pending)
+Last updated: 2026-10-25 (WS10c money out done incl. final-review fixes and UPI username masking; manual Razorpay and RazorpayX test-mode checks pending)
 
 Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-and-sandbox-design.md` (workstreams in §5, milestones in §7). Specs and plans named below live in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
 
@@ -57,6 +57,9 @@ Parent spec: `docs/superpowers/specs/2026-09-23-agent-store-developer-platform-a
 | Admin Reconciliation page `/admin/reconciliation` (payment and payout issues by day, resolve) | Done (WS10c) | this PR | plan `2026-10-22-ws10c-…` | — |
 | FE-3 developer money (earnings, payouts) | Superseded by the Earnings page above | — | plan `2026-09-23-fe3-…` | — |
 | FE-4 admin consoles | Not started | — | plan `2026-09-23-fe4-…` | All |
+| UX-1 portal polish (frontend only) | Done | this PR | spec `2026-10-22-ux-roadmap.md`, plan `2026-10-22-ux1-portal-polish.md` | — |
+| UX-G glass and flow | G1, G2 done, run replay (this PR); G3 next | #48, #49 | spec `2026-10-25-glass-flow-ui-design.md`, plan `2026-10-25-ux-g1-g2-glass-and-flow-canvas.md` | G2 to G5 |
+| UX-2 to UX-5 (store cards, approvals, Home, trust evidence) | Not started | — | spec `2026-10-22-ux-roadmap.md` | All; UX-4 and UX-5 wait on WS8, WS9, WS11 and others |
 
 ## Small fixes waiting
 
