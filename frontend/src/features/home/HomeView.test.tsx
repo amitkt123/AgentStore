@@ -39,7 +39,7 @@ it("confirms an agent was just added", () => {
   expect(screen.getByRole("status")).toHaveTextContent("Bank Reconciliation is added. Run it when you're ready.");
 });
 
-it("does not offer Run now to an approver", () => {
+it("offers Run now to a member, who runs agents but cannot add them", () => {
   render(<HomeView fullName="Priya Shah" role="BUYER_MEMBER" needsYou={[]} connections={[conn()]} />);
-  expect(screen.queryByRole("button", { name: "Run now" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Run now" })).toBeInTheDocument();
 });
