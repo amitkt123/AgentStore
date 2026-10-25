@@ -126,3 +126,20 @@ it("says the run waits for an approver, not for you, when the viewer cannot deci
   expect(screen.queryByText("Waiting for you")).toBeNull();
   expect(screen.getAllByText("Waiting for an approver").length).toBeGreaterThan(0);
 });
+
+it("keeps one set of approve buttons when the clicked approval's card opens in the facts panel", async () => {
+  const s = snap({ steps: [{ id: "q", kind: "GATE_REQUESTED", detail: '{"gateId":"g1","action":"post","summary":"Post 142 entries?"}', createdAt: "2026-09-29T10:05:00Z" }] }, [gate]);
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  await userEvent.click(within(screen.getByRole("region", { name: "Run replay" })).getByRole("button", { name: /Post 142 entries/ }));
+  expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(1);
+  expect(within(screen.getByRole("complementary", { name: "Run facts" })).getAllByRole("heading", { name: "Post 142 entries?" })).toHaveLength(1);
+});
+
+it("shows no approve buttons in the facts panel for a decided approval", async () => {
+  const s = snap({ steps: [{ id: "q", kind: "GATE_REQUESTED", detail: '{"gateId":"g1","action":"post","summary":"Post 142 entries?"}', createdAt: "2026-09-29T10:05:00Z" }] }, [{ ...gate, status: "APPROVED", decidedAt: "2026-09-29T10:06:00Z", decidedByUserId: "u1", decidedVia: "WEB" }]);
+  vi.mocked(useRunPolling).mockReturnValue({ data: s, error: null, forbidden: false });
+  render(<LiveRun runRef="R-2291" initial={s} manifest={null} canDecide />);
+  await userEvent.click(within(screen.getByRole("region", { name: "Run replay" })).getByRole("button", { name: /Post 142 entries/ }));
+  expect(within(screen.getByRole("complementary", { name: "Run facts" })).queryByRole("button", { name: "Approve" })).toBeNull();
+});

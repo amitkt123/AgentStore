@@ -48,7 +48,7 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
       </header>
       {error && <p role="status" className={styles.note}>{error}</p>}
       {why && terminal && <p className={styles.why}>{why}</p>}
-      {pending.map((g) => <GateCard key={g.gateId} runRef={runRef} gate={g} canDecide={canDecide} viewerUserId={viewerUserId} />)}
+      {pending.filter((g) => g.gateId !== blockGate?.gateId).map((g) => <GateCard key={g.gateId} runRef={runRef} gate={g} canDecide={canDecide} viewerUserId={viewerUserId} />)}
       <Glass as="section" className={styles.canvas}>
         <ReplayCanvas ref={canvas} graph={replay} live={!terminal} selectedId={sel} onSelect={toggle} />
       </Glass>
@@ -62,7 +62,7 @@ export function LiveRun({ runRef, initial, manifest, canDecide, viewerUserId }: 
         <Glass as="aside" aria-label="Run facts" className={styles.facts}>
           {block ? (
             <>
-              <h2 className={styles.factsTitle}>{block.title}</h2>
+              {!blockGate && <h2 className={styles.factsTitle}>{block.title}</h2>}
               <dl>{block.facts.map(([k, v], i) => <div key={i}><dt>{k}</dt><dd className={styles.fact}>{v}</dd></div>)}</dl>
               {blockGate && <div className={styles.gate}><GateCard runRef={runRef} gate={blockGate} canDecide={canDecide} viewerUserId={viewerUserId} /></div>}
               <button type="button" className={styles.all} onClick={close}>Close</button>
