@@ -1,7 +1,7 @@
 .wrap { display: flex; flex-direction: column; gap: 28px; }
 .wrap h2 { font-size: 15px; margin-bottom: 10px; color: var(--ink2); }
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.list li { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--s); border: 1px solid var(--l); border-radius: var(--radius); padding: 12px 16px; }
+.list li { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--glass-1); border: 1px solid var(--glass-line); box-shadow: var(--glass-edge), var(--shadow-1); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2); backdrop-filter: blur(var(--glass-blur)) saturate(1.2); border-radius: var(--radius); padding: 12px 16px; }
 .list li > :first-child { flex: 1; min-width: 160px; font-weight: 600; }
 .added { margin: 0; padding: 12px 16px; background: var(--okS); color: var(--ok); border-radius: var(--radius); font-weight: 500; }
 .cap { color: var(--ink3); font-size: 13px; margin-left: auto; }

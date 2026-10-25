@@ -1,15 +1,17 @@
-.rail { position: fixed; left: 0; top: 0; bottom: 0; width: var(--rail-w); background: rgba(255,255,255,0.88); border-right: 1px solid var(--l); display: flex; flex-direction: column; align-items: center; padding: 18px 0; gap: 6px; z-index: 5; }
+.rail { position: fixed; left: 0; top: 0; bottom: 0; width: var(--rail-w); background: var(--glass-3); border-right: 1px solid var(--glass-line); box-shadow: var(--shadow-1); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2); backdrop-filter: blur(var(--glass-blur)) saturate(1.2); display: flex; flex-direction: column; align-items: center; padding: 18px 0; gap: 6px; z-index: 5; }
 .logo { display: grid; grid-template-columns: repeat(2, 9px); gap: 3px; margin-bottom: 20px; }
 .logo i { width: 9px; height: 9px; border-radius: 3px; background: var(--b); }
 .logo i:nth-child(2) { background: var(--b2); }
 .logo i:nth-child(3) { background: var(--b3); }
 .logo i:nth-child(4) { background: var(--sky2); }
 .nav { width: 60px; min-height: 52px; padding: 6px 2px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--ink3); text-decoration: none; position: relative; }
-.nav:hover, .on { background: var(--sky); color: var(--b); }
+.nav { transition: background var(--dur-1) var(--ease), box-shadow var(--dur-2) var(--ease); }
+.nav:hover { background: var(--glass-2); color: var(--b); }
+.on { background: var(--glass-2); box-shadow: var(--glass-edge), var(--shadow-1); color: var(--b); }
 .label { font-size: 10px; line-height: 1.15; text-align: center; font-weight: 500; }
 .badge { position: absolute; top: 5px; right: 5px; min-width: 16px; height: 16px; border-radius: 999px; background: var(--b); color: #fff; font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 4px; }
 @media (max-width: 767px) {
-  .rail { top: auto; right: 0; width: auto; height: 60px; flex-direction: row; justify-content: space-around; padding: 0 8px; border-right: 0; border-top: 1px solid var(--l); }
+  .rail { top: auto; right: 0; width: auto; height: 60px; flex-direction: row; justify-content: space-around; padding: 0 8px; border-right: 0; border-top: 1px solid var(--glass-line); }
   .logo { display: none; }
   .nav { width: 64px; min-height: 52px; }
 }
